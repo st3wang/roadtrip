@@ -1,8 +1,6 @@
 const util = require('util')
 const http = require('http')
 const fs = require('fs')
-const unzipper = require('unzipper')
-const unzip = require('unzip')
 const gunzip = require('gunzip-file')
 var padStart = require('string.prototype.padstart');
 padStart.shim();
@@ -20,6 +18,8 @@ const talibExecute = util.promisify(talib.execute)
 
 const filePath = 'data/trade/YYYYMMDD.csv'
 const symbol = 'XBTUSD'
+
+const roadmap = require('./roadmap');
 
 function writeCleanedFile(ymd,output) {
   var writePath = filePath.replace('YYYYMMDD',ymd+'_'+symbol)
@@ -142,7 +142,7 @@ async function getCandleDay(ymd,interval) {
 
 function downloadTradeDay(ymd) {
   return new Promise((resolve, reject) => {
-    const request = http.get('http://s3-eu-west-1.amazonaws.com/public.bitmex.com/data/trade/' + ymd + '.csv.gz', function(response) {
+    const request = http.get(roadmap.url + '.csv.gz', function(response) {
       const csvFilename = 'data/trade/' + ymd + '.csv'
       const gzFilename = csvFilename + '.gz'
       const ws = fs.createWriteStream(gzFilename);
@@ -339,21 +339,21 @@ function pushExit(trades,time,price) {
 }
 
 async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent) {
-  var time = 0
-  var timeIncrement = interval*60000
   var capital = 100
-  var rsis = market.rsis
-  var opens = market.opens
+  var startBar = 96
+  var timeIncrement = interval*60000
+  var time = startTime + (startBar-1)*timeIncrement
+  var rsis = market.rsis[rsiLength]
+  // var opens = market.opens
   var highs = market.highs
   var lows = market.lows
   var closes = market.closes
-  var high, low, close, positionSize, entryPrice, stopLoss, takeProfit, lossDistance, profitDistance, riskPerTrade
+  var high, low, close, positionSize, entryPrice, stopLoss, takeProfit, lossDistance, profitDistance
   var rsi, prsi, longCondition, shortCondition
-  var trades = [], winCount = 0, highestCapital = capital, maxDrawdown = 0, accumulatedBars = 0, enterBar = 0
-
-  for (var i = 96; i < rsis.length; i++) {
-    time = startTime + i*timeIncrement
-
+  var trades = [], winCount = 0, highestCapital = capital, maxDrawdown = 0, barsInTrade = 0, barsNotInTrade = 0, enterBar = 0, exitBar = startBar
+  // var shortLossDistance, longLossDistance
+  for (var i = startBar; i < rsis.length; i++) {
+    time += timeIncrement
     if (positionSize > 0) {
       high = highs[i]
       low = lows[i]
@@ -363,7 +363,8 @@ async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiO
         positionSize = 0
         let drawdown = (capital-highestCapital) / highestCapital 
         maxDrawdown = Math.min(maxDrawdown,drawdown)
-        accumulatedBars += i - enterBar
+        barsInTrade += i - enterBar
+        exitBar = i
         pushExit(trades,time,stopLoss,profit)
       }
       else if (takeProfit >= low && takeProfit <= high) {
@@ -372,7 +373,8 @@ async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiO
         capital += profit
         positionSize = 0
         highestCapital = Math.max(capital,highestCapital)
-        accumulatedBars += i - enterBar
+        barsInTrade += i - enterBar
+        exitBar = i
         pushExit(trades,time,takeProfit,profit)
       }
     }
@@ -380,61 +382,144 @@ async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiO
       rsi = rsis[i]
       prsi = rsis[i-1]
       close = closes[i]
-      riskPerTrade = capital * riskPerTradePercent
-      var longLossDistance = Math.abs(close - lowestLow)
-      var shortLossDistance = Math.abs(highestHigh - close)
-      var lowestLow = lowest(lows,i,stopLossLookBack)
-      var highestHigh = highest(highs,i,stopLossLookBack)
-
-      longCondition = prsi < rsiOversold && rsi >= rsiOversold && longLossDistance/close >= minimumStopLoss
-      shortCondition = prsi > rsiOverbought && rsi <= rsiOverbought && shortLossDistance/close >= minimumStopLoss
-      if (longCondition) {
+      // riskPerTrade = capital * riskPerTradePercent
+      // var lowestLow = lowest(lows,i,stopLossLookBack)
+      // var highestHigh = highest(highs,i,stopLossLookBack)
+      // shortLossDistance = Math.abs(highest(highs,i,stopLossLookBack) - close)
+      shortCondition = prsi > rsiOverbought && rsi <= rsiOverbought 
+        && Math.abs(highest(highs,i,stopLossLookBack) - close)/close >= minimumStopLoss
+      if (shortCondition) {
         entryPrice = close
-        lossDistance = longLossDistance
+        lossDistance = Math.abs(highest(highs,i,stopLossLookBack) - close)
         profitDistance = lossDistance * profitFactor
-        stopLoss = entryPrice - lossDistance
-        takeProfit = entryPrice + profitDistance
-        positionSize = riskPerTrade / lossDistance
+        stopLoss = entryPrice + lossDistance // optimize
+        takeProfit = entryPrice - profitDistance
+        positionSize = capital * riskPerTradePercent / lossDistance
+        barsNotInTrade += i - exitBar
         enterBar = i
         pushEnter(trades,time,positionSize,entryPrice,stopLoss,takeProfit)
       }
-      else if (shortCondition) {
-        entryPrice = close
-        lossDistance = shortLossDistance
-        profitDistance = lossDistance * profitFactor
-        stopLoss = entryPrice + lossDistance
-        takeProfit = entryPrice - profitDistance
-        positionSize = riskPerTrade / lossDistance
-        enterBar = i
-        pushEnter(trades,time,positionSize,entryPrice,stopLoss,takeProfit)
+      else {
+        // longLossDistance = Math.abs(close - lowest(lows,i,stopLossLookBack))
+        longCondition = prsi < rsiOversold && rsi >= rsiOversold 
+          && Math.abs(close - lowest(lows,i,stopLossLookBack))/close >= minimumStopLoss
+        if (longCondition) {
+          entryPrice = close
+          lossDistance = Math.abs(close - lowest(lows,i,stopLossLookBack))
+          profitDistance = lossDistance * profitFactor
+          stopLoss = entryPrice - lossDistance
+          takeProfit = entryPrice + profitDistance
+          positionSize = capital * riskPerTradePercent / lossDistance
+          barsNotInTrade += i - exitBar
+          enterBar = i
+          pushEnter(trades,time,positionSize,entryPrice,stopLoss,takeProfit)
+        }
       }
     }
   }
   return {
-    startTime:startTime,interval:interval,rsiLength:rsiLength,rsiOverbought:rsiOverbought,rsiOversold:rsiOversold,
-    stopLossLookBack:stopLossLookBack,profitFactor:profitFactor,minimumStopLoss:minimumStopLoss,
-    trades:trades,netProfit:capital-100,winRate:winCount/trades.length,maxDrawdown:maxDrawdown,
-    averageBarsInTrade:accumulatedBars/trades.length
+    setup: {
+      startTime:startTime,interval:interval,rsiLength:rsiLength,rsiOverbought:rsiOverbought,rsiOversold:rsiOversold,
+      stopLossLookBack:stopLossLookBack,profitFactor:profitFactor,minimumStopLoss:minimumStopLoss
+    },
+    overview: {
+      netProfit:(capital-100),
+      winRate:(winCount/trades.length*100),
+      maxDrawdown:(maxDrawdown*100),
+      averageBarsInTrade:barsInTrade/trades.length, 
+      averageBarsNotInTrade:barsNotInTrade/trades.length
+    },
+    trades:trades
   }
 }
 
-async function getRsiCases(startYmd,length,interval) {
+async function generateRsiCaseFiles(startYmd,length,interval) {
   var startTime = new Date(YYYY_MM_DD(startYmd)).getTime()
   var market = await getMarket(startYmd,length,interval)
-  var rsiLength = 11
-  market.rsis = await getRsi(market.closes,rsiLength)
-  var rsiOverbought = 55
-  var rsiOversold = 25
-  var stopLossLookBack = 4
-  var profitFactor = 1.39
+  market.rsis = []
+
+  var minRsiLength = 6, maxRsiLength = 18
+  var minRsiOverbought = 56, maxRsiOverbought = 75
+  var minRsiOversold = 18, maxRsiOversold = 26
+  var minStopLossLookBack = 1, maxStopLossLookBack = 18
+  var minProfitFactor = 1.00, maxProfitFactor = 4.00
   var minimumStopLoss = 0.001
   var riskPerTradePercent = 0.01
-  var acase = await getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent)
-  debugger
+  // var bestCase = {overview:{netProfit:0}}
+  
+  for (var rsiLength = minRsiLength; rsiLength <= maxRsiLength; rsiLength++) {
+    market.rsis[rsiLength] = await getRsi(market.closes,rsiLength)
+  }
+
+  var fileWritten = 0
+  var fileTotal = (maxRsiOverbought - minRsiOverbought + 1) * (maxRsiOversold - minRsiOversold + 1)
+  var t0 = new Date()
+
+  for (var rsiOverbought = minRsiOverbought; rsiOverbought <= maxRsiOverbought; rsiOverbought++) {
+    for (var rsiOversold = minRsiOversold; rsiOversold <= maxRsiOversold; rsiOversold+=2) {
+      var writeFilePath = 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'_'+rsiOverbought+'_'+rsiOversold+'.csv'
+      if (fs.existsSync(writeFilePath)) {
+        console.log('skip',rsiOverbought,rsiOversold)
+      }
+      else {
+        var csv = 'rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,netProfit,numTrades,winRate,maxDrawdown,averageBarsInTrade,averageBarsNotInTrade\n'
+        for (var rsiLength = minRsiLength; rsiLength <= maxRsiLength; rsiLength++) {
+          for (var stopLossLookBack = minStopLossLookBack; stopLossLookBack <= maxStopLossLookBack; stopLossLookBack++) {
+            for (var profitFactor = minProfitFactor; profitFactor <= maxProfitFactor; profitFactor+=0.01) {
+              var acase = await getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent)
+              var overview = acase.overview
+              if (overview.netProfit >= 95 && overview.winRate >= 50) {
+                // netProfit:(capital-100).toFixed(2),
+                // winRate:(winCount/trades.length*100).toFixed(1),
+                // maxDrawdown:(maxDrawdown*100).toFixed(1),
+                // averageBarsInTrade:Math.round(barsInTrade/trades.length), 
+                // averageBarsNotInTrade:Math.round(barsNotInTrade/trades.length)
+                csv += rsiLength + ',' + rsiOverbought + ',' + rsiOversold + ',' + stopLossLookBack + ',' + profitFactor + ',' + minimumStopLoss + ',' +
+                  overview.netProfit.toFixed(2) + ',' + acase.trades.length + ',' + 
+                  overview.winRate.toFixed(1) + ',' + overview.maxDrawdown.toFixed(1) + ',' + 
+                  Math.round(overview.averageBarsInTrade) + ',' + Math.round(overview.averageBarsNotInTrade) + '\n'
+              }
+            }
+          }
+        }
+        await writeFile(writeFilePath,csv,writeFileOptions)
+        fileWritten++
+        var t1 = new Date()
+        var timeSpent = t1 - t0
+        var avgTimeSpent = timeSpent/fileWritten
+        var fileRemaining = fileTotal-fileWritten
+        var timeFinish = new Date(t1.getTime() + (fileRemaining * avgTimeSpent))
+  
+        console.log('done',rsiOverbought,rsiOversold)
+        console.log('estimated finish', timeFinish.toString())
+      }
+    }
+    // fs.appendFileSync(writeFilePath, csv);
+    // console.log('bestCase netProfit', bestCaseInRsi.overview.netProfit)
+    // if (bestCaseInRsi.overview.netProfit > bestCase.overview.netProfit) {
+    //   bestCase = bestCaseInRsi
+    // }
+  }
+
+  // var rsiOverbought = 55
+  // var rsiOversold = 22
+  // var stopLossLookBack = 1
+  // var profitFactor = 2.7799
+  // var minimumStopLoss = 0.001
+  // var riskPerTradePercent = 0.01
+  // var rsiLength = 11
+  // console.log('rsiLength',rsiLength,new Date())
+  // market.rsis = await getRsi(market.closes,rsiLength)
+  // var acase = await getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent)
+  // debugger
+
+  console.log('done generateRsiCaseFiles')
 }
 
 // downloadTradeData(20190208,20190208)
 
 // generateCandleDayFiles(20170101,20190208,15);
 
-getRsiCases(20181001,121,15)
+// getRsiCases(20170320,90,15)
+// getRsiCases(20190108,30,15)
+generateRsiCaseFiles(20181001,90,15)
