@@ -577,7 +577,7 @@ async function generateRsiCaseOBOSAnalysisFile(startYmd,length,interval,minRsiOv
   await writeFile('data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/obos/netprofit.csv',netProfitCSV,writeFileOptions)
 }
 
-// downloadTradeData(20190208,20190208)
+downloadTradeData(20190208,20190208)
 
 // generateCandleDayFiles(20170101,20190208,15);
 
@@ -590,7 +590,7 @@ async function generateRsiTestCases() {
   await generateRsiCaseFiles(20190101,30,15)
 }
 
-generateRsiTestCases()
+// generateRsiTestCases()
 
 async function generateRsiOBOSTestCases() {
   await generateRsiCaseOBOSAnalysisFile(20181001,30,15,50,60,10,35)
