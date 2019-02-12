@@ -158,7 +158,7 @@ async function getCandleDay(ymd,interval) {
 
 function downloadTradeDay(ymd) {
   return new Promise((resolve, reject) => {
-    const request = http.get(roadmap.url + '.csv.gz', function(response) {
+    const request = http.get(roadmap.url + ymd + '.csv.gz', function(response) {
       const csvFilename = 'data/trade/' + ymd + '.csv'
       const gzFilename = csvFilename + '.gz'
       const ws = fs.createWriteStream(gzFilename);
