@@ -580,7 +580,7 @@ async function generateRsiCaseOBOSAnalysisFile(startYmd,length,interval,minRsiOv
   console.log('done generateRsiCaseOBOSAnalysisFile', startYmd, length, interval)
 }
 
-downloadTradeData(20190208,20190208)
+// downloadTradeData(20190208,20190208)
 
 // generateCandleDayFiles(20170101,20190208,15);
 
@@ -597,12 +597,37 @@ async function generateRsiTestCases() {
 
 async function generateRsiOBOSTestCases() {
   await generateRsiCaseOBOSAnalysisFile(20181001,30,15,50,60,10,40)
-  // await generateRsiCaseOBOSAnalysisFile(20181101,30,15,50,60,10,35)
-  // await generateRsiCaseOBOSAnalysisFile(20181201,30,15,50,60,10,35)
-  // await generateRsiCaseOBOSAnalysisFile(20190101,30,15,50,60,10,35)
+  await generateRsiCaseOBOSAnalysisFile(20181101,30,15,50,60,10,35)
+  await generateRsiCaseOBOSAnalysisFile(20181201,30,15,50,60,10,35)
+  await generateRsiCaseOBOSAnalysisFile(20190101,30,15,50,60,10,35)
 }
-generateRsiOBOSTestCases()
+// generateRsiOBOSTestCases()
 // generateRsiCaseOBOSAnalysisFile(20181001,90,15,50,65,10,40)
+
+async function getBestOBOS(startYmd,length,interval) {
+  var obosString = await readFile('data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/obos.json',readFileOptions)
+  var obos = JSON.parse(obosString)
+  var obCaseAvg = obos.ob.caseAvg, osCaseAvg = obos.os.caseAvg
+  obCaseAvg[0] = 0
+  osCaseAvg[0] = 0
+  var bestOB = Object.keys(obCaseAvg).reduce((a,c) => {
+    return (obCaseAvg[c] > obCaseAvg[a]) ? c : a
+  },0)
+  var bestOS = Object.keys(osCaseAvg).reduce((a,c) => {
+    return (osCaseAvg[c] > osCaseAvg[a]) ? c : a
+  },0)
+  return {ob:bestOB,os:bestOS}
+}
+
+async function testBestOBOS() {
+  var bestOBOS = {} 
+  bestOBOS[20181001] = await getBestOBOS(20181001,15,15)
+  bestOBOS[20181008] = await getBestOBOS(20181008,15,15)
+  bestOBOS[20181016] = await getBestOBOS(20181016,15,15)
+  debugger
+}
+
+testBestOBOS()
 
 // testRsiCase(20190107,31,15,11,55,25,4,1.39,0.001,0.01)
 // testRsiCase(20190101,30,15,11,55,22,1,2.78,0.001,0.01)
