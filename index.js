@@ -65,6 +65,22 @@ function readAndParseForCandle(ymd) {
   });
 }
 
+function readAndParseOBOSCases(readPath) {
+  return new Promise((resolve, reject) => {
+    const data = [];
+    fs.createReadStream(readPath).pipe(csvParse())
+      .on('data', (record) => {
+        if (record[0] !== 'rsiLength') {
+          record[6] = parseFloat(record[6])
+          data.push(record)
+        }
+      })
+      .on('error', e => reject(e))
+      .on('end', () => {
+        resolve(data)});
+  });
+}
+
 function getGroups(trades,startTime,interval) {
   return new Promise((resolve, reject) => {
     var groups = []
@@ -438,11 +454,11 @@ async function generateRsiCaseFiles(startYmd,length,interval) {
   var market = await getMarket(startYmd,length,interval)
   market.rsis = []
 
-  var minRsiLength = 6, maxRsiLength = 18
-  var minRsiOverbought = 56, maxRsiOverbought = 75
-  var minRsiOversold = 18, maxRsiOversold = 26
-  var minStopLossLookBack = 1, maxStopLossLookBack = 18
-  var minProfitFactor = 1.00, maxProfitFactor = 4.00
+  var minRsiLength = 6, maxRsiLength = 16
+  var minRsiOverbought = 50, maxRsiOverbought = 60
+  var minRsiOversold = 15, maxRsiOversold = 35
+  var minStopLossLookBack = 1, maxStopLossLookBack = 8
+  var minProfitFactor = 1.00, maxProfitFactor = 3.00
   var minimumStopLoss = 0.001
   var riskPerTradePercent = 0.01
   // var bestCase = {overview:{netProfit:0}}
@@ -456,8 +472,8 @@ async function generateRsiCaseFiles(startYmd,length,interval) {
   var t0 = new Date()
 
   for (var rsiOverbought = minRsiOverbought; rsiOverbought <= maxRsiOverbought; rsiOverbought++) {
-    for (var rsiOversold = minRsiOversold; rsiOversold <= maxRsiOversold; rsiOversold+=2) {
-      var writeFilePath = 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'_'+rsiOverbought+'_'+rsiOversold+'.csv'
+    for (var rsiOversold = minRsiOversold; rsiOversold <= maxRsiOversold; rsiOversold++) {
+      var writeFilePath = 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/'+rsiOverbought+'_'+rsiOversold+'.csv'
       if (fs.existsSync(writeFilePath)) {
         console.log('skip',rsiOverbought,rsiOversold)
       }
@@ -468,7 +484,7 @@ async function generateRsiCaseFiles(startYmd,length,interval) {
             for (var profitFactor = minProfitFactor; profitFactor <= maxProfitFactor; profitFactor+=0.01) {
               var acase = await getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent)
               var overview = acase.overview
-              if (overview.netProfit >= 95 && overview.winRate >= 50) {
+              if (overview.netProfit >= 10 && overview.winRate >= 50) {
                 // netProfit:(capital-100).toFixed(2),
                 // winRate:(winCount/trades.length*100).toFixed(1),
                 // maxDrawdown:(maxDrawdown*100).toFixed(1),
@@ -488,10 +504,11 @@ async function generateRsiCaseFiles(startYmd,length,interval) {
         var timeSpent = t1 - t0
         var avgTimeSpent = timeSpent/fileWritten
         var fileRemaining = fileTotal-fileWritten
-        var timeFinish = new Date(t1.getTime() + (fileRemaining * avgTimeSpent))
+        var timeRemaining = (fileRemaining * avgTimeSpent)
+        var timeFinish = new Date(t1.getTime() + timeRemaining)
   
         console.log('done',rsiOverbought,rsiOversold)
-        console.log('estimated finish', timeFinish.toString())
+        console.log('time remaining', (timeRemaining/60000).toFixed(2), timeFinish.toString())
       }
     }
     // fs.appendFileSync(writeFilePath, csv);
@@ -516,10 +533,73 @@ async function generateRsiCaseFiles(startYmd,length,interval) {
   console.log('done generateRsiCaseFiles')
 }
 
+//8	55	26	2	1.41	0.001
+async function testRsiCase(startYmd,length,interval,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent) {
+  var startTime = new Date(YYYY_MM_DD(startYmd)).getTime()
+  var market = await getMarket(startYmd,length,interval)
+  market.rsis = []
+  market.rsis[rsiLength] = await getRsi(market.closes,rsiLength)
+  var acase = await getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent)
+  debugger
+}
+
+async function generateRsiCaseOBOSAnalysisFile(startYmd,length,interval,minRsiOverbought,maxRsiOverbought,minRsiOversold,maxRsiOversold) {
+  var nCasesCSV = ''
+  for (var rsiOversold = minRsiOversold; rsiOversold <= maxRsiOversold; rsiOversold++) {
+    nCasesCSV += rsiOversold + ','
+  }
+  nCasesCSV = nCasesCSV.replace(/.$/,"\n")
+  var netProfitCSV = (' ' + nCasesCSV).slice(1);
+  for (var rsiOverbought = minRsiOverbought; rsiOverbought <= maxRsiOverbought; rsiOverbought++) {
+    for (var rsiOversold = minRsiOversold; rsiOversold <= maxRsiOversold; rsiOversold++) {
+      var readPath = 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/'+rsiOverbought+'_'+rsiOversold+'.csv'
+      var stats = {size:163}
+      var nCases = 0
+      var highestNetProfitCase
+      try {
+        stats = fs.statSync(readPath)
+        var cases = await readAndParseOBOSCases(readPath)
+        nCases = cases.length
+        highestNetProfitCase = cases.reduce((a,c) => {
+          return (c[6] > a[6]) ? c : a
+        }, cases[0])
+      }
+      catch(e) {
+
+      }
+      nCasesCSV += nCases + ','
+      netProfitCSV += (highestNetProfitCase ? highestNetProfitCase[6] : 0) + ','
+    }
+    nCasesCSV = nCasesCSV.replace(/.$/,"\n")
+    netProfitCSV = netProfitCSV.replace(/.$/,"\n")
+  }
+  await writeFile('data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/obos/ncases.csv',nCasesCSV,writeFileOptions)
+  await writeFile('data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/obos/netprofit.csv',netProfitCSV,writeFileOptions)
+}
+
 // downloadTradeData(20190208,20190208)
 
 // generateCandleDayFiles(20170101,20190208,15);
 
 // getRsiCases(20170320,90,15)
 // getRsiCases(20190108,30,15)
-generateRsiCaseFiles(20181001,90,15)
+async function generateRsiTestCases() {
+  await generateRsiCaseFiles(20181001,30,15)
+  await generateRsiCaseFiles(20181101,30,15)
+  await generateRsiCaseFiles(20181201,30,15)
+  await generateRsiCaseFiles(20190101,30,15)
+}
+
+generateRsiTestCases()
+
+async function generateRsiOBOSTestCases() {
+  await generateRsiCaseOBOSAnalysisFile(20181001,30,15,50,60,10,35)
+  await generateRsiCaseOBOSAnalysisFile(20181101,30,15,50,60,10,35)
+  await generateRsiCaseOBOSAnalysisFile(20181201,30,15,50,60,10,35)
+  await generateRsiCaseOBOSAnalysisFile(20190101,30,15,50,60,10,35)
+}
+// generateRsiOBOSTestCases()
+// generateRsiCaseOBOSAnalysisFile(20181001,90,15,50,65,10,40)
+
+// testRsiCase(20190107,31,15,11,55,25,4,1.39,0.001,0.01)
+// testRsiCase(20190101,30,15,11,55,22,1,2.78,0.001,0.01)
