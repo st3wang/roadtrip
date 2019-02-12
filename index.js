@@ -594,22 +594,14 @@ async function generateRsiCaseOBOSAnalysisFile(startYmd,length,interval,minRsiOv
 // getRsiCases(20170320,90,15)
 // getRsiCases(20190108,30,15)
 async function generateRsiTestCases() {
-  await generateRsiCaseFiles(20181001,15,15)
-  await generateRsiCaseOBOSAnalysisFile(20181001,15,15,50,60,10,40)
-  await generateRsiCaseFiles(20181016,15,15)
-  await generateRsiCaseOBOSAnalysisFile(20181016,15,15,50,60,10,40)
-  await generateRsiCaseFiles(20181101,15,15)
-  await generateRsiCaseOBOSAnalysisFile(20181101,15,15,50,60,10,40)
-  await generateRsiCaseFiles(20181116,15,15)
-  await generateRsiCaseOBOSAnalysisFile(20181116,15,15,50,60,10,40)
-  await generateRsiCaseFiles(20181201,15,15)
-  await generateRsiCaseOBOSAnalysisFile(20181201,15,15,50,60,10,40)
-  await generateRsiCaseFiles(20181216,15,15)
-  await generateRsiCaseOBOSAnalysisFile(20181216,15,15,50,60,10,40)
-  await generateRsiCaseFiles(20190101,15,15)
-  await generateRsiCaseOBOSAnalysisFile(20190101,15,15,50,60,10,40)
-  await generateRsiCaseFiles(20190116,15,15)
-  await generateRsiCaseOBOSAnalysisFile(20190116,15,15,50,60,10,40)
+  await generateRsiCaseFiles(20181001,30,15)
+  await generateRsiCaseOBOSAnalysisFile(20181001,30,15,50,60,10,40)
+  await generateRsiCaseFiles(20181008,30,15)
+  await generateRsiCaseOBOSAnalysisFile(20181008,30,15,50,60,10,40)
+  await generateRsiCaseFiles(20181015,30,15)
+  await generateRsiCaseOBOSAnalysisFile(20181015,30,15,50,60,10,40)
+  await generateRsiCaseFiles(20181021,30,15)
+  await generateRsiCaseOBOSAnalysisFile(20181021,30,15,50,60,10,40)
 }
 
 generateRsiTestCases()
@@ -634,10 +626,15 @@ async function testBestOBOS() {
   bestOBOS[20181001] = await getBestOBOS(20181001,15,15)
   bestOBOS[20181008] = await getBestOBOS(20181008,15,15)
   bestOBOS[20181016] = await getBestOBOS(20181016,15,15)
+  bestOBOS[20181023] = await getBestOBOS(20181023,15,15)
+  bestOBOS[20181101] = await getBestOBOS(20181101,15,15)
+  // bestOBOS[20181108] = await getBestOBOS(20181108,15,15)
+  // bestOBOS[20181116] = await getBestOBOS(20181116,15,15)
+  // bestOBOS[20181123] = await getBestOBOS(20181123,15,15)
   debugger
 }
 
-testBestOBOS()
+// testBestOBOS()
 
 // testRsiCase(20190107,31,15,11,55,25,4,1.39,0.001,0.01)
 // testRsiCase(20190101,30,15,11,55,22,1,2.78,0.001,0.01)
