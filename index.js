@@ -593,15 +593,13 @@ async function generateRsiCaseOBOSAnalysisFile(startYmd,length,interval,minRsiOv
 
 // getRsiCases(20170320,90,15)
 // getRsiCases(20190108,30,15)
+// 30d - 15%
+// 60d - 30%
+// 90d - 60%
+// 120d - 90%
 async function generateRsiTestCases() {
-  await generateRsiCaseFiles(20181001,30,15,15,50)
-  await generateRsiCaseOBOSAnalysisFile(20181001,30,15,50,60,15,35)
-  await generateRsiCaseFiles(20181101,30,15,15,50)
-  await generateRsiCaseOBOSAnalysisFile(20181101,30,15,50,60,15,35)
-  await generateRsiCaseFiles(20181201,30,15,15,50)
-  await generateRsiCaseOBOSAnalysisFile(20181201,30,15,50,60,15,35)
-  await generateRsiCaseFiles(20190101,30,15,15,50)
-  await generateRsiCaseOBOSAnalysisFile(20190101,30,15,50,60,15,35)
+  await generateRsiCaseFiles(20181201,60,15,30,50)
+  await generateRsiCaseOBOSAnalysisFile(20181201,60,15,50,60,15,35)
 }
 
 generateRsiTestCases()
@@ -653,21 +651,14 @@ async function getBestOBOS(startYmd,length,interval) {
 async function testBestOBOS30() {
   var bestOBOS = {} 
   // bestOBOS[20181001] = await getBestOBOS(20181001,30,15)
-  // var market = await getMarket(startYmd,length,interval)
-  // market.rsis[rsiLength] = await getRsi(market.closes,rsiLength)
-  // bestOBOS[20181001].case = await getRsiCase(20181031,15,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent) {
-
-  // bestOBOS[20181008] = await getBestOBOS(20181008,30,15)
-  // bestOBOS[20181015] = await getBestOBOS(20181015,30,15)
-  // bestOBOS[20181021] = await getBestOBOS(20181021,30,15)
   // bestOBOS[20181101] = await getBestOBOS(20181101,30,15)
-  // bestOBOS[20181108] = await getBestOBOS(20181108,30,15)
-  // bestOBOS[20181115] = await getBestOBOS(20181115,30,15)
-  // bestOBOS[20181121] = await getBestOBOS(20181121,30,15)
-
-
-  bestOBOS[20181001] = await getBestOBOS(20181001,90,15)
+  // bestOBOS[20181201] = await getBestOBOS(20181201,30,15)
+  // bestOBOS[20190101] = await getBestOBOS(20190101,30,15)
+  bestOBOS[20180701] = await getBestOBOS(20180701,90,15)
+  bestOBOS[20180801] = await getBestOBOS(20180801,90,15)
   bestOBOS[20180901] = await getBestOBOS(20180901,90,15)
+  bestOBOS[20181001] = await getBestOBOS(20181001,90,15)
+  bestOBOS[20181101] = await getBestOBOS(20181101,90,15)
   debugger
 }
 
@@ -676,6 +667,5 @@ async function testBestOBOS30() {
 // testRsiCase(20190107,31,15,11,55,25,4,1.39,0.001,0.01)
 // testRsiCase(20190101,30,15,11,55,22,1,2.78,0.001,0.01)
 
-// testRsiCase(20181201,30,15,6,56,20,2,1.34,0.001,0.01)
-// testRsiCase(20181230,30,15,11,55,16,1,1.45,0.001,0.01)
-// testRsiCase(20181230,30,15,8,56,23,2,1.41,0.001,0.01)
+// testRsiCase(20190101,30,15,13,55,31,5,1.6,0.001,0.01)
+
