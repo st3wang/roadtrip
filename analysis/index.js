@@ -344,14 +344,16 @@ function highest(values,start,length) {
   return Math.max.apply( Math, array )
 }
 
-function pushEnter(trades,time,size,price,stopLoss,takeProfit) {
-  trades.push({enterTime:time,size:size,enterPrice:price,stopLoss:stopLoss,takeProfit:takeProfit})
+function pushEnter(trades,type,time,size,price,stopLoss,takeProfit) {
+  trades.push({type:type,enterTime:time,size:size,enterPrice:price,stopLoss:stopLoss,takeProfit:takeProfit})
 }
 
-function pushExit(trades,time,price) {
+function pushExit(trades,time,price,profit,capital) {
   var trade = trades[trades.length-1]
   trade.exitTime = time
   trade.exitPrice = price
+  trade.exitProfit = profit
+  trade.exitCapital = capital
 }
 
 async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent) {
@@ -375,23 +377,25 @@ async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiO
       low = lows[i]
       if (stopLoss >= low && stopLoss <= high) {
         let profit = -positionSize * lossDistance
+        let profitPercent = profit/capital
         capital += profit
         positionSize = 0
         let drawdown = (capital-highestCapital) / highestCapital 
         maxDrawdown = Math.min(maxDrawdown,drawdown)
         barsInTrade += i - enterBar
         exitBar = i
-        pushExit(trades,time,stopLoss,profit)
+        pushExit(trades,time,stopLoss,profitPercent,capital)
       }
       else if (takeProfit >= low && takeProfit <= high) {
         winCount++
         let profit = positionSize * profitDistance
+        let profitPercent = profit/capital
         capital += profit
         positionSize = 0
         highestCapital = Math.max(capital,highestCapital)
         barsInTrade += i - enterBar
         exitBar = i
-        pushExit(trades,time,takeProfit,profit)
+        pushExit(trades,time,takeProfit,profitPercent,capital)
       }
     }
     else {
@@ -413,7 +417,7 @@ async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiO
         positionSize = capital * riskPerTradePercent / lossDistance
         barsNotInTrade += i - exitBar
         enterBar = i
-        pushEnter(trades,time,positionSize,entryPrice,stopLoss,takeProfit)
+        pushEnter(trades,'SHORT',time,positionSize,entryPrice,stopLoss,takeProfit)
       }
       else {
         // longLossDistance = Math.abs(close - lowest(lows,i,stopLossLookBack))
@@ -428,7 +432,7 @@ async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiO
           positionSize = capital * riskPerTradePercent / lossDistance
           barsNotInTrade += i - exitBar
           enterBar = i
-          pushEnter(trades,time,positionSize,entryPrice,stopLoss,takeProfit)
+          pushEnter(trades,'LONG',time,positionSize,entryPrice,stopLoss,takeProfit)
         }
       }
     }
@@ -545,6 +549,12 @@ async function testRsiCase(startYmd,length,interval,rsiLength,rsiOverbought,rsiO
   market.rsis = []
   market.rsis[rsiLength] = await getRsi(market.closes,rsiLength)
   var acase = await getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent)
+  var capitalCSV = 'capital\n'
+  acase.trades.forEach(t => {
+    capitalCSV += t.exitCapital + '\n'
+  })
+  await writeFile('data/case/rsi/'+startYmd+'_'+length+'_'+interval+'_'+rsiLength+'_'+rsiOverbought+'_'+rsiOversold+'_'+stopLossLookBack+'_'+profitFactor+'.csv',capitalCSV,writeFileOptions)
+
   debugger
 }
 
@@ -602,7 +612,7 @@ async function generateRsiTestCases() {
   await generateRsiCaseOBOSAnalysisFile(20181201,60,15,50,60,15,35)
 }
 
-generateRsiTestCases()
+// generateRsiTestCases()
 
 async function getBestOBOS(startYmd,length,interval) {
   var obosString = await readFile('data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/obos.json',readFileOptions)
@@ -654,11 +664,18 @@ async function testBestOBOS30() {
   // bestOBOS[20181101] = await getBestOBOS(20181101,30,15)
   // bestOBOS[20181201] = await getBestOBOS(20181201,30,15)
   // bestOBOS[20190101] = await getBestOBOS(20190101,30,15)
-  bestOBOS[20180701] = await getBestOBOS(20180701,90,15)
-  bestOBOS[20180801] = await getBestOBOS(20180801,90,15)
-  bestOBOS[20180901] = await getBestOBOS(20180901,90,15)
-  bestOBOS[20181001] = await getBestOBOS(20181001,90,15)
-  bestOBOS[20181101] = await getBestOBOS(20181101,90,15)
+
+  // bestOBOS[20180701] = await getBestOBOS(20180701,90,15)
+  // bestOBOS[20180801] = await getBestOBOS(20180801,90,15)
+  // bestOBOS[20180901] = await getBestOBOS(20180901,90,15)
+  // bestOBOS[20181001] = await getBestOBOS(20181001,90,15)
+  // bestOBOS[20181101] = await getBestOBOS(20181101,90,15)
+
+  bestOBOS[20180601] = await getBestOBOS(20180601,120,15)
+  bestOBOS[20180701] = await getBestOBOS(20180701,120,15)
+  bestOBOS[20180801] = await getBestOBOS(20180801,120,15)
+  bestOBOS[20180901] = await getBestOBOS(20180901,120,15)
+  bestOBOS[20181001] = await getBestOBOS(20181001,120,15)
   debugger
 }
 
@@ -667,5 +684,6 @@ async function testBestOBOS30() {
 // testRsiCase(20190107,31,15,11,55,25,4,1.39,0.001,0.01)
 // testRsiCase(20190101,30,15,11,55,22,1,2.78,0.001,0.01)
 
-// testRsiCase(20190101,30,15,13,55,31,5,1.6,0.001,0.01)
+// testRsiCase(20181001,134,15,13,55,31,5,1.6,0.001,0.01)
+testRsiCase(20181001,134,15,11,55,25,4,1.39,0.001,0.01)
 
