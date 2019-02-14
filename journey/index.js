@@ -79,7 +79,32 @@ async function getRsiSignal(closes,rsiLength,rsiOverbought,rsiOversold) {
   }
 }
 
-async function getCurrentMarket(client,length,interval) {
+function reduceCandle(group) {
+  try {
+    var open = group[0].open
+    let candle = {
+      time: group[0].timestamp,
+      open: open,
+      high: open,
+      low: open,
+      close: group[group.length-1].close
+    }
+    candle = group.reduce((a,c) => {
+      if (c.high > a.high) a.high = c.high
+      if (c.low < a.low) a.low = c.low
+      return a
+    },candle)
+    if (!candle || !candle.open || !candle.close || !candle.high || !candle.low) {
+      debugger
+    }
+    return candle
+  }
+  catch(e) {
+    debugger
+  }
+}
+
+async function getMarket(client,length,interval) {
   let binSize = 5
   let pages = getBucketTimes(length,interval,binSize)
   await Promise.all(pages.map(async (page,i) => {
@@ -94,31 +119,97 @@ async function getCurrentMarket(client,length,interval) {
   let buckets = pages.reduce((a,c) => a.concat(c.buckets),[])
   let increment = interval/binSize
   var candles = []
-  var closes = []
+  var opens = [], highs = [], lows = [], closes = []
   for (var i = 0; i < buckets.length; i+=increment) {
-    let time = buckets[i].timestamp
-    let close = buckets[i+increment-1].close
-    candles.push({
-      time: time,
-      close: close
-    })
-    closes.push(close)
+    let group = buckets.slice(i,i+increment)
+    let candle = reduceCandle(group)
+    candles.push(candle)
+    opens.push(candle.open)
+    highs.push(candle.high)
+    lows.push(candle.low)
+    closes.push(candle.close)
   }
   return {
     candles:candles,
+    opens:opens,
+    highs:highs,
+    lows:lows,
     closes:closes
   }
 }
 
+function lowest(values,start,length) {
+  start++
+  var array = values.slice(start-length,start)
+  return Math.min.apply( Math, array )
+}
+
+function highest(values,start,length) {
+  start++
+  var array = values.slice(start-length,start)
+  return Math.max.apply( Math, array )
+}
+
+function getTrade(type,market,capital,riskPerTradePercent,profitFactor,stopLossLookBack) {
+  let last = market.closes.length - 1
+  let entryPrice = market.closes[last]
+  let lossDistance, stopLoss, profitDistance, takeProfit
+  switch(type) {
+    case 'SHORT':
+      stopLoss = highest(market.highs,last,stopLossLookBack)
+      lossDistance = Math.abs(stopLoss - entryPrice)
+      profitDistance = lossDistance * profitFactor
+      takeProfit = entryPrice - profitDistance
+      break;
+    case 'LONG':
+      stopLoss = lowest(market.lows,last,stopLossLookBack)
+      lossDistance = Math.abs(entryPrice - stopLoss)
+      profitDistance = lossDistance * profitFactor
+      takeProfit = entryPrice + profitDistance
+      break;
+    default:
+      debugger
+  }
+  let positionSize = capital * riskPerTradePercent / lossDistance
+  return {
+    type: type,
+    entryPrice: entryPrice,
+    lossDistance: lossDistance,
+    lossDistancePercent: lossDistance/entryPrice,
+    profitDistance: profitDistance,
+    stopLoss: stopLoss,
+    takeProfit: takeProfit,
+    positionSize: positionSize
+  }
+}
+
+async function next(client) {
+  var market = await getMarket(client,8*60,15)
+  var rsiSignal = await getRsiSignal(market.closes,11,55,25)
+  console.log(padStart(rsiSignal||'-----',5,' '),new Date().toUTCString())
+
+  var capital = 100
+  var riskPerTradePercent = 0.01
+  var profitFactor = 1.39
+  var stopLossLookBack = 4
+  var minimumStopLoss = 0.001
+  var positionSize = 0
+  if (rsiSignal && positionSize == 0) {
+    var trade = getTrade(rsiSignal,market,capital,riskPerTradePercent,profitFactor,stopLossLookBack)
+    if (trade.lossDistancePercent >= minimumStopLoss) {
+      console.log('ENTER', trade)
+    }
+    else {
+      console.log('lossDistance too small', trade)
+    }
+  }
+  
+}
+
 async function start() {
   var client = await initClient()
-  async function next() {
-    var market = await getCurrentMarket(client,24*60,15)
-    var signal = await getRsiSignal(market.closes,11,55,25)
-    console.log(signal,new Date().toUTCString())
-  }
-  next()
-  setInterval(next,15*60000)
+  next(client)
+  setInterval(_ => next(client),15*60000)
 }
 
 start()
