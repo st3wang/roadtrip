@@ -7,16 +7,27 @@ var talib = require('talib');
 const talibExecute = util.promisify(talib.execute)
 const shoes = require('./shoes');
 
+var client
+
 async function initClient() {
-  var client = await new SwaggerClient({
+  let swaggerClient = await new SwaggerClient({
     // Switch this to `www.bitmex.com` when you're ready to try it out for real.
     // Don't forget the `www`!
     url: 'https://testnet.bitmex.com/api/explorer/swagger.json',
     usePromise: true
   })
   // Comment out if you're not requesting any user data.
-  client.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(shoes.key, shoes.secret));
-  return client
+  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(shoes.key, shoes.secret));
+  return swaggerClient
+}
+
+function inspect(client) {
+  console.log("Inspecting BitMEX API...");
+  Object.keys(client).forEach(function(model) {
+    if (!client[model].operations) return;
+    console.log("Available methods for %s: %s", model, Object.keys(client[model].operations).join(', '));
+  });
+  console.log("------------------------\n");
 }
 
 function pad2(v) {
@@ -104,7 +115,7 @@ function reduceCandle(group) {
   }
 }
 
-async function getMarket(client,length,interval) {
+async function getMarket(length,interval) {
   let binSize = 5
   let pages = getBucketTimes(length,interval,binSize)
   await Promise.all(pages.map(async (page,i) => {
@@ -150,27 +161,36 @@ function highest(values,start,length) {
   return Math.max.apply( Math, array )
 }
 
-function getTrade(type,market,capital,riskPerTradePercent,profitFactor,stopLossLookBack) {
+function getOrder(type,market,capitalUSD,riskPerTradePercent,profitFactor,stopLossLookBack) {
   let last = market.closes.length - 1
   let entryPrice = market.closes[last]
-  let lossDistance, stopLoss, profitDistance, takeProfit
+  let lossDistance, stopLoss, profitDistance, takeProfit, stopLossTrigger, takeProfitTrigger, lossDistancePercent, positionSizeUSD
   switch(type) {
     case 'SHORT':
       stopLoss = highest(market.highs,last,stopLossLookBack)
       lossDistance = Math.abs(stopLoss - entryPrice)
       profitDistance = lossDistance * profitFactor
+      profitDistance =Math.round(profitDistance*2)/2;
       takeProfit = entryPrice - profitDistance
+      stopLossTrigger = stopLoss - 0.5
+      takeProfitTrigger = takeProfit + 0.5
+      lossDistancePercent = lossDistance/entryPrice
+      positionSizeUSD = -Math.round(capitalUSD * riskPerTradePercent / lossDistancePercent)
       break;
     case 'LONG':
       stopLoss = lowest(market.lows,last,stopLossLookBack)
       lossDistance = Math.abs(entryPrice - stopLoss)
       profitDistance = lossDistance * profitFactor
+      profitDistance =Math.round(profitDistance*2)/2;
       takeProfit = entryPrice + profitDistance
+      stopLossTrigger = stopLoss + 0.5
+      takeProfitTrigger = takeProfit - 0.5
+      lossDistancePercent = lossDistance/entryPrice
+      positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / lossDistancePercent)
       break;
     default:
       debugger
   }
-  let positionSize = capital * riskPerTradePercent / lossDistance
   return {
     type: type,
     entryPrice: entryPrice,
@@ -179,37 +199,92 @@ function getTrade(type,market,capital,riskPerTradePercent,profitFactor,stopLossL
     profitDistance: profitDistance,
     stopLoss: stopLoss,
     takeProfit: takeProfit,
-    positionSize: positionSize
+    positionSizeUSD: positionSizeUSD,
+    stopLossTrigger: stopLossTrigger,
+    takeProfitTrigger: takeProfitTrigger
   }
 }
 
-async function next(client) {
-  var market = await getMarket(client,8*60,15)
+async function getPosition() {
+  var response = await client.Position.Position_get()  
+  .catch(function(e) {
+    console.log('Error:', e.statusText)
+    debugger
+  })
+  var positions = JSON.parse(response.data.toString())
+  return positions[0]
+}
+
+async function enter(order) {
+  console.log('ENTER ', JSON.stringify(order))
+  var response = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
+    orderQty:order.positionSizeUSD,
+    price:order.entryPrice,
+    
+  }).catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Limit Order Submitted')
+  var response = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice',
+    orderQty:-order.positionSizeUSD,
+    price:order.stopLoss,
+    stopPx:order.stopLossTrigger
+  }).catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('StopLimit Order Submitted')
+  var response = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice',
+    orderQty:-order.positionSizeUSD,
+    price:order.takeProfit,
+    stopPx:order.takeProfitTrigger
+  }).catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('TakeProfitLimit Order Submitted')
+}
+
+async function next() {
+  var market = await getMarket(8*60,15)
   var rsiSignal = await getRsiSignal(market.closes,11,55,25)
   console.log(padStart(rsiSignal||'-----',5,' '),new Date().toUTCString())
+  
+  if (!rsiSignal) return
 
-  var capital = 100
+  var capitalUSD = 100
   var riskPerTradePercent = 0.01
   var profitFactor = 1.39
   var stopLossLookBack = 4
   var minimumStopLoss = 0.001
-  var positionSize = 0
-  if (rsiSignal && positionSize == 0) {
-    var trade = getTrade(rsiSignal,market,capital,riskPerTradePercent,profitFactor,stopLossLookBack)
-    if (trade.lossDistancePercent >= minimumStopLoss) {
-      console.log('ENTER', trade)
+
+  var position = await getPosition()
+  var positionSize = position.currentQty
+
+  if (positionSize == 0) {
+    // enter condition
+    var order = getOrder(rsiSignal,market,capitalUSD,riskPerTradePercent,profitFactor,stopLossLookBack)
+    if (order.lossDistancePercent >= minimumStopLoss) {
+      enter(order)
     }
     else {
       console.log('lossDistance too small', trade)
     }
   }
-  
+  else {
+    // exit condition
+  }
 }
 
 async function start() {
-  var client = await initClient()
-  next(client)
-  setInterval(_ => next(client),15*60000)
+  client = await initClient()
+  // inspect(client.apis)
+  next()
+  var now = new Date().getTime()
+  var interval = 15*60000
+  var startIn = interval-now%(interval)
+  setTimeout(_ => setInterval(next,interval),startIn)
 }
 
 start()
