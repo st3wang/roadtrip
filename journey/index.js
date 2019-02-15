@@ -273,7 +273,7 @@ async function next() {
     }
   }
   else {
-    // exit condition
+    console.log('already in a position', JSON.stringify(position))
   }
 }
 
@@ -283,8 +283,12 @@ async function start() {
   next()
   var now = new Date().getTime()
   var interval = 15*60000
-  var startIn = interval-now%(interval)
-  setTimeout(_ => setInterval(next,interval),startIn)
+  var startIn = interval-now%(interval) + 2000
+  console.log('next one in ' + (startIn/60000).toFixed(2) + ' minutes')
+  setTimeout(_ => {
+    next()
+    setInterval(next,interval)
+  },startIn)
 }
 
 start()
