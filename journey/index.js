@@ -79,15 +79,24 @@ async function getRsiSignal(closes,rsiLength,rsiOverbought,rsiOversold) {
   var prsi = rsis[last1]
   var close = closes[last0]
   var shortCondition = prsi > rsiOverbought && rsi <= rsiOverbought 
+  var longCondition = prsi < rsiOversold && rsi >= rsiOversold 
+  var signal = {
+    prsi: prsi,
+    rsi: rsi,
+  }
   if (shortCondition) {
-    return 'SHORT'
+    signal.condition = 'SHORT'
   }
-  else {
-    var longCondition = prsi < rsiOversold && rsi >= rsiOversold 
-    if (longCondition) {
-      return 'LONG'
-    }
+  else if (longCondition) {
+    signal.condition = 'LONG'
   }
+  else if (prsi > rsiOverbought) {
+    signal.condition = 'S'
+  }
+  else if (prsi < rsiOversold) {
+    signal.condition = 'L'
+  }
+  return signal
 }
 
 function reduceCandle(group) {
@@ -217,10 +226,15 @@ async function getPosition() {
 
 async function enter(order) {
   console.log('ENTER ', JSON.stringify(order))
+  var response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
+  .catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Cancelled All Orders')
   var response = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
     orderQty:order.positionSizeUSD,
-    price:order.entryPrice,
-    
+    price:order.entryPrice
   }).catch(function(e) {
     console.log(e.statusText)
     debugger
@@ -249,9 +263,9 @@ async function enter(order) {
 async function next() {
   var market = await getMarket(8*60,15)
   var rsiSignal = await getRsiSignal(market.closes,11,55,25)
-  console.log(padStart(rsiSignal||'-----',5,' '),new Date().toUTCString())
-  
-  if (!rsiSignal) return
+  console.log(padStart(rsiSignal.condition||'-----',5,' '),rsiSignal.rsi.toFixed(2),new Date().toUTCString())
+
+  if (rsiSignal.condition !== 'SHORT' && rsiSignal.condition !== 'LONG') return
 
   var capitalUSD = 100
   var riskPerTradePercent = 0.01
@@ -264,12 +278,12 @@ async function next() {
 
   if (positionSize == 0) {
     // enter condition
-    var order = getOrder(rsiSignal,market,capitalUSD,riskPerTradePercent,profitFactor,stopLossLookBack)
+    var order = getOrder(rsiSignal.condition,market,capitalUSD,riskPerTradePercent,profitFactor,stopLossLookBack)
     if (order.lossDistancePercent >= minimumStopLoss) {
       enter(order)
     }
     else {
-      console.log('lossDistance too small', trade)
+      console.log('lossDistance too small', order)
     }
   }
   else {
