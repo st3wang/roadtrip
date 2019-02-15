@@ -1,13 +1,26 @@
 const util = require('util')
-var SwaggerClient = require("swagger-client")
-var _ = require('lodash')
-var BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
-var padStart = require('string.prototype.padstart');
-var talib = require('talib');
-const talibExecute = util.promisify(talib.execute)
+const fs = require('fs');
+const SwaggerClient = require("swagger-client")
+const _ = require('lodash')
+const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
+const padStart = require('string.prototype.padstart');
+const talib = require('talib');
 const shoes = require('./shoes');
 
+const talibExecute = util.promisify(talib.execute)
+const writeFileOptions = {encoding:'utf-8', flag:'w'}
+
 var client
+
+if (!fs.existsSync('log')) {
+  fs.mkdirSync('log');
+}
+if (!fs.existsSync('log/condition.csv')) {
+  fs.writeFileSync('log/condition.csv','time,prsi,rsi,signalCondition,position,orderType\n',writeFileOptions)
+}
+if (!fs.existsSync('log/enter.csv')) {
+  fs.writeFileSync('log/enter.csv','Time,Capital,Risk,R/R,Type,Entry,Stop,Target,Exit,P/L,StopPercent,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent\n',writeFileOptions)
+}
 
 async function initClient() {
   let swaggerClient = await new SwaggerClient({
@@ -34,13 +47,13 @@ function pad2(v) {
   return padStart(v,2,'0')
 }
 
-function getUTCTimeString(ms) {
-  var local = new Date(ms)
-  return local.getUTCFullYear() + '-' + pad2(local.getUTCMonth()+1) + '-' + pad2(local.getUTCDate()) + 'T' +
-    pad2(local.getUTCHours()) + ':' + pad2(local.getUTCMinutes()) + ':00.000Z'
-}
+// function getUTCTimeString(ms) {
+//   var local = new Date(ms)
+//   return local.getUTCFullYear() + '-' + pad2(local.getUTCMonth()+1) + '-' + pad2(local.getUTCDate()) + 'T' +
+//     pad2(local.getUTCHours()) + ':' + pad2(local.getUTCMinutes()) + ':00.000Z'
+// }
 
-function getBucketTimes(length,interval,binSize) {
+function getPageTimes(length,interval,binSize) {
   var current = new Date()
   var currentMS = current.getTime()
   var offset = (length * 60000) + (currentMS % (interval * 60000))
@@ -48,14 +61,14 @@ function getBucketTimes(length,interval,binSize) {
   offset -= bitMexOffset
   var offsetIncrement = 8*60*60000
   var end = offsetIncrement - bitMexOffset
-  var buckets = []
+  var pages = []
   for (; offset > end; offset-=offsetIncrement) {
-    buckets.push({
-      startTime: getUTCTimeString(currentMS - offset),
-      endTime: getUTCTimeString(currentMS - (offset-offsetIncrement+1))
+    pages.push({
+      startTime: new Date(currentMS - offset).toISOString(),
+      endTime: new Date(currentMS - (offset-offsetIncrement+1)).toISOString()
     })
   }
-  return buckets
+  return pages
 }
 
 async function getRsi(data,length) {
@@ -81,8 +94,13 @@ async function getRsiSignal(closes,rsiLength,rsiOverbought,rsiOversold) {
   var shortCondition = prsi > rsiOverbought && rsi <= rsiOverbought 
   var longCondition = prsi < rsiOversold && rsi >= rsiOversold 
   var signal = {
+    rsis: rsis,
+    length: rsiLength,
+    overbought: rsiOverbought,
+    oversold: rsiOversold,
     prsi: prsi,
     rsi: rsi,
+    condition: '-'
   }
   if (shortCondition) {
     signal.condition = 'SHORT'
@@ -126,7 +144,7 @@ function reduceCandle(group) {
 
 async function getMarket(length,interval) {
   let binSize = 5
-  let pages = getBucketTimes(length,interval,binSize)
+  let pages = getPageTimes(length,interval,binSize)
   await Promise.all(pages.map(async (page,i) => {
     let response = await client.Trade.Trade_getBucketed({symbol: 'XBTUSD', binSize: binSize+'m', 
       startTime:page.startTime,endTime:page.endTime})
@@ -150,7 +168,7 @@ async function getMarket(length,interval) {
     closes.push(candle.close)
   }
   return {
-    candles:candles,
+    // candles:candles,
     opens:opens,
     highs:highs,
     lows:lows,
@@ -170,47 +188,70 @@ function highest(values,start,length) {
   return Math.max.apply( Math, array )
 }
 
-function getOrder(type,market,capitalUSD,riskPerTradePercent,profitFactor,stopLossLookBack) {
+function getOrder(signal,market,bankroll,position,margin) {
+  let signalCondition = signal.condition
+  let positionSize = position.currentQty
+
+  if (positionSize != 0 || signalCondition.length < 2) {
+    return {type:'-'}
+  }
+  
+  let capitalUSD = bankroll.capitalUSD
+  let riskPerTradePercent = bankroll.riskPerTradePercent
+  let profitFactor = bankroll.profitFactor
+  let stopLossLookBack = bankroll.stopLossLookBack
   let last = market.closes.length - 1
   let entryPrice = market.closes[last]
-  let lossDistance, stopLoss, profitDistance, takeProfit, stopLossTrigger, takeProfitTrigger, lossDistancePercent, positionSizeUSD
-  switch(type) {
+  let availableMargin = margin.availableMargin*0.000000009
+  let riskAmountUSD = capitalUSD * riskPerTradePercent
+  let riskAmountBTC = riskAmountUSD / entryPrice
+  let lossDistance, stopLoss, profitDistance, takeProfit, stopLossTrigger, takeProfitTrigger, 
+    lossDistancePercent, positionSizeUSD, positionSizeBTC, leverage
+  switch(signalCondition) {
     case 'SHORT':
       stopLoss = highest(market.highs,last,stopLossLookBack)
       lossDistance = Math.abs(stopLoss - entryPrice)
-      profitDistance = lossDistance * profitFactor
-      profitDistance =Math.round(profitDistance*2)/2;
-      takeProfit = entryPrice - profitDistance
+      profitDistance = -lossDistance * profitFactor
+      profitDistance = Math.round(profitDistance*2)/2; // round to 0.5
+      takeProfit = entryPrice + profitDistance
       stopLossTrigger = stopLoss - 0.5
       takeProfitTrigger = takeProfit + 0.5
       lossDistancePercent = lossDistance/entryPrice
-      positionSizeUSD = -Math.round(capitalUSD * riskPerTradePercent / lossDistancePercent)
+      positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
       stopLoss = lowest(market.lows,last,stopLossLookBack)
-      lossDistance = Math.abs(entryPrice - stopLoss)
-      profitDistance = lossDistance * profitFactor
-      profitDistance =Math.round(profitDistance*2)/2;
+      lossDistance = -Math.abs(entryPrice - stopLoss)
+      profitDistance = -lossDistance * profitFactor
+      profitDistance = Math.round(profitDistance*2)/2; // round to 0.5
       takeProfit = entryPrice + profitDistance
       stopLossTrigger = stopLoss + 0.5
       takeProfitTrigger = takeProfit - 0.5
       lossDistancePercent = lossDistance/entryPrice
-      positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / lossDistancePercent)
+      positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
       break;
     default:
       debugger
   }
+  
+  positionSizeBTC = positionSizeUSD / entryPrice
+  leverage = Math.ceil(Math.abs(positionSizeBTC / availableMargin))
+
   return {
-    type: type,
+    type: (Math.abs(lossDistancePercent) < bankroll.minimumStopLoss) ? '-' : signalCondition,
     entryPrice: entryPrice,
     lossDistance: lossDistance,
     lossDistancePercent: lossDistance/entryPrice,
     profitDistance: profitDistance,
     stopLoss: stopLoss,
     takeProfit: takeProfit,
-    positionSizeUSD: positionSizeUSD,
     stopLossTrigger: stopLossTrigger,
-    takeProfitTrigger: takeProfitTrigger
+    takeProfitTrigger: takeProfitTrigger,
+    riskAmountUSD: riskAmountUSD,
+    riskAmountBTC: riskAmountBTC,
+    positionSizeUSD: positionSizeUSD,
+    positionSizeBTC: positionSizeBTC,
+    leverage: leverage
   }
 }
 
@@ -224,23 +265,47 @@ async function getPosition() {
   return positions[0]
 }
 
+async function getMargin() {
+  var response = await client.User.User_getMargin()  
+  .catch(function(e) {
+    console.log('Error:', e.statusText)
+    debugger
+  })
+  var margin = JSON.parse(response.data.toString())
+  return margin
+}
+
 async function enter(order) {
+  if (order.type.length < 2) {
+    return
+  }
+
   console.log('ENTER ', JSON.stringify(order))
-  var response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
+
+  let candelAllOrdersResponse = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
   .catch(function(e) {
     console.log(e.statusText)
     debugger
   })
-  console.log('Cancelled All Orders')
-  var response = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
+  console.log('Cancelled - All Orders')
+
+  let updateLeverageResponse = await client.Position.Position_updateLeverage({symbol:'XBTUSD',leverage:order.leverage})
+  .catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Updated - Leverage ')
+
+  let limitOrderResponse = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
     orderQty:order.positionSizeUSD,
     price:order.entryPrice
   }).catch(function(e) {
     console.log(e.statusText)
     debugger
   })
-  console.log('Limit Order Submitted')
-  var response = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice',
+  console.log('Submitted - Limit Order ')
+
+  let stopLossOrderResponse = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice',
     orderQty:-order.positionSizeUSD,
     price:order.stopLoss,
     stopPx:order.stopLossTrigger
@@ -248,8 +313,9 @@ async function enter(order) {
     console.log(e.statusText)
     debugger
   })
-  console.log('StopLimit Order Submitted')
-  var response = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice',
+  console.log('Submitted - StopLimit Order ')
+
+  let takeProfitOrderResponse = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice',
     orderQty:-order.positionSizeUSD,
     price:order.takeProfit,
     stopPx:order.takeProfitTrigger
@@ -257,38 +323,72 @@ async function enter(order) {
     console.log(e.statusText)
     debugger
   })
-  console.log('TakeProfitLimit Order Submitted')
+  console.log('Submitted - TakeProfitLimit Order ')
+
+  return true
+}
+
+function writeLog(rsiSignal,market,bankroll,position,margin,order,didEnter) {
+  var isoString = new Date().toISOString()
+  var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + 
+    rsiSignal.condition + ',' + position.currentQty + ',' + order.type + '\n'
+  console.log(signalCSV.replace('\n',''))
+  fs.appendFile('log/condition.csv', signalCSV, e => {
+    if (e) {
+      console.log(e)
+      debugger
+    }
+  })
+  var prefix = 'log/'+isoString.replace(/\:/g,',')
+  var content = JSON.stringify({rsiSignal:rsiSignal,market:market,bankroll:bankroll,position:position,margin:margin,order:order})
+  fs.writeFile(prefix+'.json',content,writeFileOptions, e => {
+    if (e) {
+      console.log(e)
+      debugger
+    }
+  })
+  if (didEnter) {
+      // Time,Capital,Risk,R/R,
+      // Entry,Stop,Target,Exit,P/L,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent
+    var enterData = [isoString,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
+      order.type,order.entryPrice,order.stopLoss,order.takeProfit,'','',order.lossDistancePercent,order.lossDistance,order.profitDistance,
+      order.riskAmountBTC,order.riskAmountUSD,order.positionSizeBTC,order.positionSizeUSD,order.leverage,'','','','']
+    var enterCSV = enterData.toString()
+    console.log(enterCSV)
+    fs.appendFile('log/enter.csv', enterCSV+'\n', e => {
+      if (e) {
+        console.log(e)
+        debugger
+      }
+    })
+  }
 }
 
 async function next() {
-  var market = await getMarket(24*60,15)
-  var rsiSignal = await getRsiSignal(market.closes,11,55,25)
-  console.log(padStart(rsiSignal.condition||'-----',5,' '),rsiSignal.prsi.toFixed(2),rsiSignal.rsi.toFixed(2),new Date().toUTCString())
-
-  if (rsiSignal.condition !== 'SHORT' && rsiSignal.condition !== 'LONG') return
-
-  var capitalUSD = 100
-  var riskPerTradePercent = 0.01
-  var profitFactor = 1.39
-  var stopLossLookBack = 4
-  var minimumStopLoss = 0.001
-
-  var position = await getPosition()
-  var positionSize = position.currentQty
-
-  if (positionSize == 0) {
-    // enter condition
-    var order = getOrder(rsiSignal.condition,market,capitalUSD,riskPerTradePercent,profitFactor,stopLossLookBack)
-    if (order.lossDistancePercent >= minimumStopLoss) {
-      enter(order)
-    }
-    else {
-      console.log('lossDistance too small', order)
-    }
+  // let results = await Promise.all([
+  //   getMarket(24*60,15),
+  //   getPosition(),
+  //   getMargin()
+  // ]);
+  let market = await getMarket(24*60,15)
+  let position = await getPosition()
+  let margin = await getMargin()
+  let rsiSignal = await getRsiSignal(market.closes,11,55,25)
+  let bankroll = {
+    capitalUSD: 1000,
+    riskPerTradePercent: 0.01,
+    profitFactor: 1.39,
+    stopLossLookBack: 4,
+    minimumStopLoss: 0.001
   }
-  else {
-    console.log('already in a position', JSON.stringify(position))
-  }
+
+  // test
+  // rsiSignal.condition = 'LONG'
+  // position.currentQty = 0
+  
+  var order = getOrder(rsiSignal,market,bankroll,position,margin)
+  var didEnter = await enter(order)
+  writeLog(rsiSignal,market,bankroll,position,margin,order,didEnter)
 }
 
 async function start() {
@@ -298,7 +398,9 @@ async function start() {
   var now = new Date().getTime()
   var interval = 15*60000
   var startIn = interval-now%(interval) + 2000
-  console.log('next one in ' + (startIn/60000).toFixed(2) + ' minutes')
+  var startInSec = startIn % 60000
+  var startInMin = (startIn - startInSec) / 60000
+  console.log('next one in ' + startInMin + ':' + Math.floor(startInSec/1000) + ' minutes')
   setTimeout(_ => {
     next()
     setInterval(next,interval)
