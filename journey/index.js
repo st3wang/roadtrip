@@ -261,9 +261,9 @@ async function enter(order) {
 }
 
 async function next() {
-  var market = await getMarket(8*60,15)
+  var market = await getMarket(24*60,15)
   var rsiSignal = await getRsiSignal(market.closes,11,55,25)
-  console.log(padStart(rsiSignal.condition||'-----',5,' '),rsiSignal.rsi.toFixed(2),new Date().toUTCString())
+  console.log(padStart(rsiSignal.condition||'-----',5,' '),rsiSignal.prsi.toFixed(2),rsiSignal.rsi.toFixed(2),new Date().toUTCString())
 
   if (rsiSignal.condition !== 'SHORT' && rsiSignal.condition !== 'LONG') return
 
