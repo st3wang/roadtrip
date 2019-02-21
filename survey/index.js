@@ -453,18 +453,30 @@ async function getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiO
   }
 }
 
-async function generateRsiCaseFiles(startYmd,length,interval,netProfitFilter,winRateFilter) {
+// function getRsiCaseFilePath(startYmd,length,interval,config) {
+//   return 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/'+
+//     config.minRsiLength+'_'+config.maxRsiLength+'_'+
+//     config.minRsiOverbought+'_'+config.maxRsiOverbought+'_'+
+//     config.minRsiOversold+'_'+config.maxRsiOversold+'_'+
+//     config.minStopLossLookBack+'_'+config.maxStopLossLookBack+'_'+
+//     config.minProfitFactor+'_'+config.maxProfitFactor+'/'
+// }
+
+function getRsiCaseFileDir(startYmd,length,interval,rsiOverbought,rsiOversold) {
+  return 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/'+rsiOverbought+'_'+rsiOversold+'/'
+}
+
+async function generateRsiCaseFiles(startYmd,length,interval,config) {
   var startTime = new Date(YYYY_MM_DD(startYmd)).getTime()
   var market = await getMarket(startYmd,length,interval)
   market.rsis = []
 
-  var minRsiLength = 11, maxRsiLength = 14
-  var minRsiOverbought = 50, maxRsiOverbought = 60
-  var minRsiOversold = 15, maxRsiOversold = 35
-  var minStopLossLookBack = 1, maxStopLossLookBack = 6
-  var minProfitFactor = 1.00, maxProfitFactor = 2.00
-  var minimumStopLoss = 0.001
-  var riskPerTradePercent = 0.01
+  var minRsiLength = config.minRsiLength, maxRsiLength = config.maxRsiLength
+  var minRsiOverbought = config.minRsiOverbought, maxRsiOverbought = config.maxRsiOverbought
+  var minRsiOversold = config.minRsiOversold, maxRsiOversold = config.maxRsiOversold
+  var minStopLossLookBack = config.minStopLossLookBack, maxStopLossLookBack = config.maxStopLossLookBack
+  var minProfitFactor = config.minProfitFactor, maxProfitFactor = config.maxProfitFactor
+  var minimumStopLoss = config.minimumStopLoss, riskPerTradePercent = config.riskPerTradePercent
   // var bestCase = {overview:{netProfit:0}}
   
   for (var rsiLength = minRsiLength; rsiLength <= maxRsiLength; rsiLength++) {
@@ -475,39 +487,38 @@ async function generateRsiCaseFiles(startYmd,length,interval,netProfitFilter,win
   var fileTotal = (maxRsiOverbought - minRsiOverbought + 1) * (maxRsiOversold - minRsiOversold + 1)
   var t0 = new Date()
 
-  var writeDir = 'data/case/rsi/'+startYmd+'_'+length+'_'+interval
-  if (!fs.existsSync(writeDir)){
-    fs.mkdirSync(writeDir);
-  }
-
   for (var rsiOverbought = minRsiOverbought; rsiOverbought <= maxRsiOverbought; rsiOverbought++) {
     for (var rsiOversold = minRsiOversold; rsiOversold <= maxRsiOversold; rsiOversold++) {
-      var writeFilePath = writeDir+'/'+rsiOverbought+'_'+rsiOversold+'.csv'
-      if (fs.existsSync(writeFilePath)) {
-        console.log('skip',rsiOverbought,rsiOversold)
+      var writeDir = getRsiCaseFileDir(startYmd,length,interval,rsiOverbought,rsiOversold)
+      if (!fs.existsSync(writeDir)){
+        fs.mkdirSync(writeDir);
       }
-      else {
-        var csv = 'rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,netProfit,numTrades,winRate,maxDrawdown,averageBarsInTrade,averageBarsNotInTrade\n'
+      
+      // if (fs.existsSync(writeFilePath)) {
+      //   console.log('skip',rsiOverbought,rsiOversold)
+      // }
+      // else {
+        // var csv = '' //'rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,netProfit,numTrades,winRate,maxDrawdown,averageBarsInTrade,averageBarsNotInTrade\n'
         for (var rsiLength = minRsiLength; rsiLength <= maxRsiLength; rsiLength++) {
           for (var stopLossLookBack = minStopLossLookBack; stopLossLookBack <= maxStopLossLookBack; stopLossLookBack++) {
             for (var profitFactor = minProfitFactor; profitFactor <= maxProfitFactor; profitFactor+=0.01) {
-              var acase = await getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent)
-              var overview = acase.overview
-              if (overview.netProfit >= netProfitFilter && overview.winRate >= winRateFilter) {
-                // netProfit:(capital-100).toFixed(2),
-                // winRate:(winCount/trades.length*100).toFixed(1),
-                // maxDrawdown:(maxDrawdown*100).toFixed(1),
-                // averageBarsInTrade:Math.round(barsInTrade/trades.length), 
-                // averageBarsNotInTrade:Math.round(barsNotInTrade/trades.length)
-                csv += rsiLength + ',' + rsiOverbought + ',' + rsiOversold + ',' + stopLossLookBack + ',' + profitFactor + ',' + minimumStopLoss + ',' +
+              var writeFilePath = writeDir+rsiLength+'_'+stopLossLookBack+'_'+(profitFactor.toFixed(2))+'.csv'
+              if (fs.existsSync(writeFilePath)) {
+                console.log('skip',writeFilePath)
+              }
+              else {
+                var acase = await getRsiCase(startTime,interval,market,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,minimumStopLoss,riskPerTradePercent)
+                var overview = acase.overview
+                var csv = rsiLength + ',' + rsiOverbought + ',' + rsiOversold + ',' + stopLossLookBack + ',' + profitFactor + ',' + minimumStopLoss + ',' +
                   overview.netProfit.toFixed(2) + ',' + acase.trades.length + ',' + 
                   overview.winRate.toFixed(1) + ',' + overview.maxDrawdown.toFixed(1) + ',' + 
                   Math.round(overview.averageBarsInTrade) + ',' + Math.round(overview.averageBarsNotInTrade) + '\n'
+                await writeFile(writeFilePath,csv,writeFileOptions)
               }
             }
           }
         }
-        await writeFile(writeFilePath,csv,writeFileOptions)
+        // await writeFile(writeFilePath,csv,writeFileOptions)
         fileWritten++
         var t1 = new Date()
         var timeSpent = t1 - t0
@@ -519,7 +530,7 @@ async function generateRsiCaseFiles(startYmd,length,interval,netProfitFilter,win
         console.log('done',startYmd,rsiOverbought,rsiOversold)
         console.log('time remaining', (timeRemaining/60000).toFixed(2), timeFinish.toString())
       }
-    }
+    // }
     // fs.appendFileSync(writeFilePath, csv);
     // console.log('bestCase netProfit', bestCaseInRsi.overview.netProfit)
     // if (bestCaseInRsi.overview.netProfit > bestCase.overview.netProfit) {
@@ -558,42 +569,52 @@ async function testRsiCase(startYmd,length,interval,rsiLength,rsiOverbought,rsiO
   debugger
 }
 
-async function generateRsiCaseOBOSAnalysisFile(startYmd,length,interval,minRsiOverbought,maxRsiOverbought,minRsiOversold,maxRsiOversold) {
-  var ob = {
-    caseAvg: {},
-    maxProfitAvg: {},
+async function generateRsiCaseOBOSAnalysisFile(startYmd,length,interval,config) {
+  var minRsiLength = config.minRsiLength, maxRsiLength = config.maxRsiLength
+  var minRsiOverbought = config.minRsiOverbought, maxRsiOverbought = config.maxRsiOverbought
+  var minRsiOversold = config.minRsiOversold, maxRsiOversold = config.maxRsiOversold
+  var minStopLossLookBack = config.minStopLossLookBack, maxStopLossLookBack = config.maxStopLossLookBack
+  var minProfitFactor = config.minProfitFactor, maxProfitFactor = config.maxProfitFactor
+  var minimumStopLoss = config.minimumStopLoss, riskPerTradePercent = config.riskPerTradePercent
+
+  var profitSlots = []
+  for (var si = 0; si < 500; si++) {
+    profitSlots[si] = 0
   }
-  var os = {
-    caseAvg: {},
-    maxProfitAvg: {},
-  }
-  for (var rsiOverbought = minRsiOverbought; rsiOverbought <= maxRsiOverbought; rsiOverbought++) {
-    ob.caseAvg[rsiOverbought] = 0
-    ob.maxProfitAvg[rsiOverbought] = 0
-  }
-  for (var rsiOversold = minRsiOversold; rsiOversold <= maxRsiOversold; rsiOversold++) {
-    os.caseAvg[rsiOversold] = 0
-    os.maxProfitAvg[rsiOversold] = 0
-  }
-  var obLen = maxRsiOverbought - minRsiOverbought + 1
-  var osLen = maxRsiOversold - minRsiOversold + 1
+  
   for (var rsiOverbought = minRsiOverbought; rsiOverbought <= maxRsiOverbought; rsiOverbought++) {
     for (var rsiOversold = minRsiOversold; rsiOversold <= maxRsiOversold; rsiOversold++) {
-      var readPath = 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/'+rsiOverbought+'_'+rsiOversold+'.csv'
-      var cases = await readAndParseOBOSCases(readPath)
-      var highestNetProfitCase = cases.reduce((a,c) => {
-        return (c[6] > a[6]) ? c : a
-      }, cases[0])
-      var maxProfit = highestNetProfitCase ? highestNetProfitCase[6] : 0
-
-      ob.caseAvg[rsiOverbought] += parseFloat((cases.length/osLen).toFixed(2))
-      os.caseAvg[rsiOversold] += parseFloat((cases.length/obLen).toFixed(2))
-      
-      ob.maxProfitAvg[rsiOverbought] += parseFloat((maxProfit/osLen).toFixed(2))
-      os.maxProfitAvg[rsiOversold] += parseFloat((maxProfit/obLen).toFixed(2))
+      var readDir = getRsiCaseFileDir(startYmd,length,interval,rsiOverbought,rsiOversold)
+      for (var rsiLength = minRsiLength; rsiLength <= maxRsiLength; rsiLength++) {
+        for (var stopLossLookBack = minStopLossLookBack; stopLossLookBack <= maxStopLossLookBack; stopLossLookBack++) {
+          for (var profitFactor = minProfitFactor; profitFactor <= maxProfitFactor; profitFactor+=0.01) {
+            var readPath = readDir+rsiLength+'_'+stopLossLookBack+'_'+(profitFactor.toFixed(2))+'.csv'
+            var csv = fs.readFileSync(readPath,readFileOptions)
+            var acase = JSON.parse('['+csv+']')
+            var profitIndex = Math.round(acase[6]) + 100
+            profitSlots[profitIndex]++
+          }
+        }
+      }
+      console.log('done',rsiOverbought,rsiOversold)
     }
   }
-  await writeFile('data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/obos.json',JSON.stringify({ob:ob,os:os}),writeFileOptions)
+  var modelNumber = 
+    config.minRsiOverbought+'_'+config.maxRsiOverbought+'_'+
+    config.minRsiOversold+'_'+config.maxRsiOversold+'_'+
+    config.minRsiLength+'_'+config.maxRsiLength+'_'+
+    config.minStopLossLookBack+'_'+config.maxStopLossLookBack+'_'+
+    config.minProfitFactor+'_'+config.maxProfitFactor+'/'
+  var modelFilePath = 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/'+'models.js'
+  var modelVarPrefix = 'var models = '
+  var models = {}
+  if (fs.existsSync(modelFilePath)) {
+    modelsString = await readFile(modelFilePath,readFileOptions)
+    modelsString.replace(modelVarPrefix,'')
+    models = JSON.parse(modelsString)
+  }
+  models[modelNumber] = profitSlots
+  await writeFile(modelFilePath,modelVarPrefix+JSON.stringify(models),writeFileOptions)
   console.log('done generateRsiCaseOBOSAnalysisFile', startYmd, length, interval)
 }
 
@@ -608,11 +629,20 @@ async function generateRsiCaseOBOSAnalysisFile(startYmd,length,interval,minRsiOv
 // 90d - 60%
 // 120d - 90%
 async function generateRsiTestCases() {
-  await generateRsiCaseFiles(20181201,60,15,30,50)
-  await generateRsiCaseOBOSAnalysisFile(20181201,60,15,50,60,15,35)
+  var config = {
+    minRsiLength: 11, maxRsiLength: 14,
+    minRsiOverbought: 50, maxRsiOverbought: 80,
+    minRsiOversold: 15, maxRsiOversold: 45,
+    minStopLossLookBack: 1, maxStopLossLookBack: 8,
+    minProfitFactor: 1.00, maxProfitFactor: 2.00,
+    minimumStopLoss: 0.001, riskPerTradePercent: 0.01
+  }
+  await generateRsiCaseFiles(20190101,30,15,config)
+  // await generateRsiCaseOBOSAnalysisFile(20190101,30,15,config)
+  debugger
 }
 
-// generateRsiTestCases()
+generateRsiTestCases()
 
 async function getBestOBOS(startYmd,length,interval) {
   var obosString = await readFile('data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/obos.json',readFileOptions)
@@ -685,5 +715,5 @@ async function testBestOBOS30() {
 // testRsiCase(20190101,30,15,11,55,22,1,2.78,0.001,0.01)
 
 // testRsiCase(20181001,134,15,13,55,31,5,1.6,0.001,0.01)
-testRsiCase(20181001,134,15,11,55,25,4,1.39,0.001,0.01)
+// testRsiCase(20181001,134,15,11,55,25,4,1.39,0.001,0.01)
 
