@@ -16,7 +16,7 @@ if (!fs.existsSync('log')) {
   fs.mkdirSync('log');
 }
 if (!fs.existsSync('log/condition.csv')) {
-  fs.writeFileSync('log/condition.csv','time,prsi,rsi,signalCondition,position,orderType\n',writeFileOptions)
+  fs.writeFileSync('log/condition.csv','time,prsi,rsi,close,signalCondition,position,orderType\n',writeFileOptions)
 }
 if (!fs.existsSync('log/enter.csv')) {
   fs.writeFileSync('log/enter.csv','Time,Capital,Risk,R/R,Type,Entry,Stop,Target,Exit,P/L,StopPercent,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent\n',writeFileOptions)
@@ -330,7 +330,7 @@ async function enter(order) {
 
 function writeLog(rsiSignal,market,bankroll,position,margin,order,didEnter) {
   var isoString = new Date().toISOString()
-  var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + 
+  var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + market.closes[market.closes.length-1] + ',' +
     rsiSignal.condition + ',' + position.currentQty + ',' + order.type + '\n'
   console.log(signalCSV.replace('\n',''))
   fs.appendFile('log/condition.csv', signalCSV, e => {
@@ -370,14 +370,14 @@ async function next() {
   //   getPosition(),
   //   getMargin()
   // ]);
-  let market = await getMarket(24*60,15)
   let position = await getPosition()
   let margin = await getMargin()
-  let rsiSignal = await getRsiSignal(market.closes,11,55,25)
+  let market = await getMarket(24*60,15)
+  let rsiSignal = await getRsiSignal(market.closes,11,69,33)
   let bankroll = {
     capitalUSD: 1000,
     riskPerTradePercent: 0.01,
-    profitFactor: 1.39,
+    profitFactor: 1.42,
     stopLossLookBack: 4,
     minimumStopLoss: 0.001
   }
@@ -397,7 +397,8 @@ async function start() {
   next()
   var now = new Date().getTime()
   var interval = 15*60000
-  var startIn = interval-now%(interval) + 2000
+  var delay = 15000 // bitmex bucket data delay. it will be faster with WS
+  var startIn = interval-now%(interval) + delay
   var startInSec = startIn % 60000
   var startInMin = (startIn - startInSec) / 60000
   console.log('next one in ' + startInMin + ':' + Math.floor(startInSec/1000) + ' minutes')

@@ -1,7 +1,9 @@
 const mysql = require('promise-mysql')
 
 const options = {
-  user: 'root',
+  host: '192.168.1.34',
+  port: '3306',
+  user: 'mac',
   password: 'password',
   database: 'survey'
 }
@@ -9,7 +11,10 @@ const options = {
 var con
 
 async function connect() {
-  con = await mysql.createConnection(options).catch(e => console.error(e))
+  con = await mysql.createConnection(options).catch(e => {
+    console.error(e)
+    debugger
+  })
   console.log('db connected')
   // await dropTables()
   // await createTables()
@@ -76,15 +81,13 @@ async function endTradeSetup(query) {
   // let result = await con.query(sql,params)
   // return
   var sql = query.sql, params = query.params
-  if (params.length == 0)
-    debugger
   sql = sql.slice(0, -1)
   if (params.length % 16 !== 0) {
     params = params.concat([null,null,null,null])
   }
 
   try {
-    console.log(query.enterCount,query.exitCount,sql.length, params.length, params.length/16)
+    // console.log(query.enterCount,query.exitCount,sql.length, params.length, params.length/16)
     if (pendingEndTradeSetup) {
       // console.log('wait pending')
       await pendingEndTradeSetup
@@ -110,7 +113,7 @@ async function endTradeSetup(query) {
 }
 
 function enterTrade(query,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,type,capital,time,size,price,stopLoss,takeProfit) {
-  query.enterCount++
+  // query.enterCount++
   query.sql += ` (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?),`
   // tTrades = tTrades.concat(tSetup.concat([type,capital,time/1000,size,price,stopLoss,takeProfit]))
   query.params.push(rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,
@@ -138,7 +141,7 @@ function enterTrade(query,rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,p
 var exitCount = 0
 
 function exitTrade(query,time,price,profit,capital) {
-  query.exitCount++
+  // query.exitCount++
   // tTrades = tTrades.concat([time/1000,price,profit,capital])
   query.params.push(time/1000,price,profit,capital)
   return
