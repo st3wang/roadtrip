@@ -484,7 +484,7 @@ async function getRsiCase(startTime,interval,market,setup) {
         // barsNotInTrade += i - exitBar
         // enterBar = i
         db.enterTrade(query,
-          rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,
+          rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,setup.profitFactor,
           'SHORT',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
         // pushEnter(trades,'SHORT',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
       }
@@ -509,7 +509,7 @@ async function getRsiCase(startTime,interval,market,setup) {
       }
     }
   }
-  console.log(setup)
+  // console.log(setup)
   await db.endTradeSetup(query)
   return
   // return {
@@ -833,7 +833,7 @@ async function updateRsiCaseFiles() {
   var config = {
     minRsiLength: 11, maxRsiLength: 11,
     minRsiOverbought: 51, maxRsiOverbought: 85,
-    minRsiOversold: 16, maxRsiOversold: 49,
+    minRsiOversold: 15, maxRsiOversold: 49,
     minStopLossLookBack: 2, maxStopLossLookBack: 18,
     minProfitFactor: 100, maxProfitFactor: 200,
     minimumStopLoss: 0.001, riskPerTradePercent: 0.01
@@ -846,7 +846,7 @@ async function updateRsiCaseFiles() {
   //   minProfitFactor: 140, maxProfitFactor: 300,
   //   minimumStopLoss: 0.001, riskPerTradePercent: 0.01
   // }
-  await generateRsiCaseFiles(historyStartYmd,20190222,15,config)
+  await generateRsiCaseFiles(historyStartYmd,20190223,15,config)
   // await generateRsiOverviewFile(20190219,20190222,15,config)
   console.log('done updateRsiCaseFiles')
 }
@@ -892,9 +892,10 @@ async function start() {
   // db.enterTrade(1,2,3,4,5,6,7,8,9,10,11,12)
   // db.exitTrade(1,2,3.12666,4,5)
 
-// updateMarketData()
-updateRsiCaseFiles()
-// test()
+  // await updateMarketData()
+  await updateRsiCaseFiles()
+  // await test()
+  debugger
 }
 
 try {
