@@ -1,17 +1,10 @@
 const mysql = require('promise-mysql')
-
-const options = {
-  host: '192.168.1.34',
-  port: '3306',
-  user: 'mac',
-  password: 'password',
-  database: 'survey'
-}
+const roadmap = require('./roadmap');
 
 var con
 
 async function connect() {
-  con = await mysql.createConnection(options).catch(e => {
+  con = await mysql.createConnection(roadmap.dbOptions).catch(e => {
     console.error(e)
     debugger
   })
