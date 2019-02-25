@@ -448,7 +448,7 @@ async function getRsiCase(startTime,interval,market,setup) {
         // maxDrawdown = Math.min(maxDrawdown,drawdown)
         // barsInTrade += i - enterBar
         // exitBar = i
-        db.exitTrade(query,time,takeProfit,profitPercent,capital)
+        db.exitTrade(query,time,stopLoss,profitPercent,capital)
         // pushExit(trades,time,stopLoss,profitPercent,capital)
       }
       else if (takeProfit >= low && takeProfit <= high) {
@@ -758,7 +758,7 @@ async function studyRsiProfit(startYmd,endYmd,interval,config) {
   var minProfitFactor = config.minProfitFactor, maxProfitFactor = config.maxProfitFactor
   var minimumStopLoss = config.minimumStopLoss, riskPerTradePercent = config.riskPerTradePercent
 
-  var overviews = await getRsiOverviewFile(startYmd,endYmd)
+  // var overviews = await getRsiOverviewFile(startYmd,endYmd)
   var overbought = {}, oversold = {}, lookback = {}, factor = {}
   
   for (var rsiOverbought = minRsiOverbought; rsiOverbought <= maxRsiOverbought; rsiOverbought++) {
@@ -773,7 +773,8 @@ async function studyRsiProfit(startYmd,endYmd,interval,config) {
   for (var profitFactor = minProfitFactor; profitFactor <= maxProfitFactor; profitFactor++) {
     factor[profitFactor] = {profit:0,winRate:0}
   }
-  await loopRsiCase(config, async (key,rsiLength, rsiOverbought, rsiOversold, stopLossLookBack, profitFactor) => {
+  await loopRsiCase(config, async (key,setup,rsiLength, rsiOverbought, rsiOversold, stopLossLookBack, profitFactor) => {
+    var trades = await db.getTrades(rsiLength, rsiOverbought, rsiOversold, stopLossLookBack, profitFactor)
     var profit = overviews[key][0]
     var winRate = overviews[key][1]
     console.log(key,profit,winRate)
@@ -854,13 +855,13 @@ async function updateRsiCaseFiles() {
 async function test() {
   var config = {
     minRsiLength: 11, maxRsiLength: 11,
-    minRsiOverbought: 75, maxRsiOverbought: 75,
-    minRsiOversold: 44, maxRsiOversold: 44,
+    minRsiOverbought: 51, maxRsiOverbought: 51,
+    minRsiOversold: 15, maxRsiOversold: 15,
     minStopLossLookBack: 10, maxStopLossLookBack: 10,
-    minProfitFactor: 100, maxProfitFactor: 200,
+    minProfitFactor: 150, maxProfitFactor: 150,
     minimumStopLoss: 0.001, riskPerTradePercent: 0.01
   }
-  await studyRsiProfit(20190122,20190222,15,config)
+  await studyRsiProfit(20190123,20190223,15,config)
   // await generateRsiProfitModel(20190122,20190222,15,config)
   // for (var os = 15; os <= 25; os++) {
   //   for (var ob = 50; ob <= 57; ob++) {
@@ -889,19 +890,10 @@ async function getBestOBOS(startYmd,length,interval) {
 
 async function start() {
   await db.connect()
-  // db.enterTrade(1,2,3,4,5,6,7,8,9,10,11,12)
-  // db.exitTrade(1,2,3.12666,4,5)
-
-// updateMarketData()
-updateRsiCaseFiles()
-// test()
+  // await updateMarketData()
+  // await updateRsiCaseFiles()
+  await test()
 }
 
-try {
-  start()
-}
-catch (e){
-  console.log(e)
-  debugger
-}
+start()
 

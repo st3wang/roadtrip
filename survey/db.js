@@ -11,8 +11,8 @@ var con
 async function connect() {
   con = await mysql.createConnection(options).catch(e => console.error(e))
   console.log('db connected')
-  await dropTables()
-  await createTables()
+  // await dropTables()
+  // await createTables()
   // debugger
 }
 
@@ -146,10 +146,18 @@ function exitTrade(query,time,price,profit,capital) {
   // let result = await con.query(sql,[time/1000,price,profit,capital,tradeId])
 }
 
+async function getTrades(rsiLength, rsiOverbought, rsiOversold, stopLossLookBack, profitFactor) {
+  var sql = `select id,type,enter_capital,enter_time,enter_size,enter_price,stop_loss,take_profit,exit_time,exit_price,exit_profit,exit_capital
+    from trade where setup_rsilength = ? and setup_rsioverbought = ? and setup_rsioversold = ? and setup_stoplosslookback = ? and setup_profitfactor = ?`
+  var result = await con.query(sql,[rsiLength, rsiOverbought, rsiOversold, stopLossLookBack, profitFactor])
+  return result
+}
+
 exports.startTradeSetup = startTradeSetup
 exports.endTradeSetup = endTradeSetup
 exports.enterTrade = enterTrade
 exports.exitTrade = exitTrade
+exports.getTrades = getTrades
 
 // function createDatabase() {
 //   var con = mysql.createConnection({
