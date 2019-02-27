@@ -380,7 +380,7 @@ async function generateMarketData(startYmd,endYmd,interval) {
 async function updateMarketData() {
   var interval = 15
   var startYmd = historyStartYmd
-  var endYmd = 20190223
+  var endYmd = 20190224
   await downloadTradeData(startYmd,endYmd)
   await generateCandleDayFiles(startYmd,endYmd,interval)
   // var market = await generateMarketData(startYmd,endYmd,interval)
@@ -414,7 +414,6 @@ function pushExit(trades,time,price,profit,capital) {
 }
 
 async function getRsiCase(startTime,interval,market,setup) {
-  var query = db.startTradeSetup(setup)
   var rsiLength = setup.rsiLength,
       rsiOverbought = setup.rsiOverbought,
       rsiOversold = setup.rsiOversold,
@@ -434,6 +433,8 @@ async function getRsiCase(startTime,interval,market,setup) {
   var rsi, prsi, longCondition, shortCondition
   //var trades = [], winCount = 0, highestCapital = capital, maxDrawdown = 0, barsInTrade = 0, barsNotInTrade = 0, enterBar = 0, exitBar = startBar
 
+  var query = db.startTradeSetup(setup)
+
   for (var i = startBar; i < rsis.length; i++) {
     time += timeIncrement
     if (positionSize > 0) {
@@ -441,26 +442,26 @@ async function getRsiCase(startTime,interval,market,setup) {
       low = lows[i]
       if (stopLoss >= low && stopLoss <= high) {
         let profit = -positionSize * lossDistance
-        let profitPercent = profit/capital*100
+        // let profitPercent = profit/capital*100
         capital += profit
         positionSize = 0
         // let drawdown = (capital-highestCapital) / highestCapital 
         // maxDrawdown = Math.min(maxDrawdown,drawdown)
         // barsInTrade += i - enterBar
         // exitBar = i
-        db.exitTrade(query,time,stopLoss,profitPercent,capital)
+        db.exitTrade(query,time,stopLoss,capital)
         // pushExit(trades,time,stopLoss,profitPercent,capital)
       }
       else if (takeProfit >= low && takeProfit <= high) {
         // winCount++
         let profit = positionSize * profitDistance
-        let profitPercent = profit/capital*100
+        // let profitPercent = profit/capital*100
         capital += profit
         positionSize = 0
         // highestCapital = Math.max(capital,highestCapital)
         // barsInTrade += i - enterBar
         // exitBar = i
-        db.exitTrade(query,time,takeProfit,profitPercent,capital)
+        db.exitTrade(query,time,takeProfit,capital)
         // pushExit(trades,time,takeProfit,profitPercent,capital)
       }
     }
@@ -484,8 +485,8 @@ async function getRsiCase(startTime,interval,market,setup) {
         // barsNotInTrade += i - exitBar
         // enterBar = i
         db.enterTrade(query,
-          rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,setup.profitFactor,
-          'SHORT',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
+          rsiOverbought,rsiOversold,stopLossLookBack,setup.profitFactor,
+          'S',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
         // pushEnter(trades,'SHORT',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
       }
       else {
@@ -502,8 +503,8 @@ async function getRsiCase(startTime,interval,market,setup) {
           // barsNotInTrade += i - exitBar
           // enterBar = i
           db.enterTrade(query,
-            rsiLength,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,
-            'LONG',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
+            rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,
+            'L',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
           // pushEnter(trades,'LONG',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
         }
       }
@@ -847,7 +848,7 @@ async function updateRsiCaseFiles() {
   //   minProfitFactor: 140, maxProfitFactor: 300,
   //   minimumStopLoss: 0.001, riskPerTradePercent: 0.01
   // }
-  await generateRsiCaseFiles(historyStartYmd,20190223,15,config)
+  await generateRsiCaseFiles(historyStartYmd,20190224,15,config)
   // await generateRsiOverviewFile(20190219,20190222,15,config)
   console.log('done updateRsiCaseFiles')
 }
@@ -890,9 +891,14 @@ async function getBestOBOS(startYmd,length,interval) {
 
 async function start() {
   await db.connect()
+  // await db.dropTables(11,11)
+  // await db.createTables(11,11)
+  // debugger
+
   // await updateMarketData()
   await updateRsiCaseFiles()
   // await test()
+
   debugger
 }
 
