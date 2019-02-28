@@ -26,7 +26,7 @@ async function initClient() {
   let swaggerClient = await new SwaggerClient({
     // Switch this to `www.bitmex.com` when you're ready to try it out for real.
     // Don't forget the `www`!
-    url: 'https://testnet.bitmex.com/api/explorer/swagger.json',
+    url: shoes.swagger,
     usePromise: true
   })
   // Comment out if you're not requesting any user data.
@@ -262,7 +262,7 @@ async function getPosition() {
     debugger
   })
   var positions = JSON.parse(response.data.toString())
-  return positions[0]
+  return positions[0] || {currentQty:0}
 }
 
 async function getMargin() {
@@ -373,12 +373,12 @@ async function next() {
   let position = await getPosition()
   let margin = await getMargin()
   let market = await getMarket(24*60,15)
-  let rsiSignal = await getRsiSignal(market.closes,11,69,33)
+  let rsiSignal = await getRsiSignal(market.closes,11,70,35)
   let bankroll = {
     capitalUSD: 1000,
     riskPerTradePercent: 0.01,
-    profitFactor: 1.42,
-    stopLossLookBack: 4,
+    profitFactor: 1.69,
+    stopLossLookBack: 2,
     minimumStopLoss: 0.001
   }
 
