@@ -11,6 +11,36 @@ const talibExecute = util.promisify(talib.execute)
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
 var client
+const BitMEXRealtimeAPI = require('bitmex-realtime-api');
+// See 'options' reference below
+const wsClient = new BitMEXRealtimeAPI({
+  testnet: true,
+  apiKeyID: shoes.key,
+  apiKeySecret: shoes.secret,
+  maxTableLen: 1
+});
+
+// handle errors here. If no 'error' callback is attached. errors will crash the client.
+wsClient.on('error', console.error);
+wsClient.on('open', () => console.log('Connection opened.'));
+wsClient.on('close', () => console.log('Connection closed.'));
+wsClient.on('initialize', () => console.log('Client initialized, data is flowing.'));
+
+wsClient.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
+  var exec = data[0]
+  if (exec) {
+    console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
+    if (exec.ordStatus === 'Filled' && (exec.ordType === 'StopLimit' || exec.ordType === 'LimitIfTouched')) {
+      await client.Order.Order_cancelAll({symbol:'XBTUSD'})
+      .catch(function(e) {
+        console.log(e.statusText)
+        debugger
+      })
+      let margin = await getMargin()
+      console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
+    }
+  }
+});
 
 if (!fs.existsSync('log')) {
   fs.mkdirSync('log');
@@ -275,10 +305,12 @@ async function getMargin() {
   return margin
 }
 
-async function enter(order) {
+async function enter(order,margin) {
   if (order.type.length < 2) {
     return
   }
+
+  console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
 
   console.log('ENTER ', JSON.stringify(order))
 
@@ -387,7 +419,7 @@ async function next() {
   // position.currentQty = 0
   
   var order = getOrder(rsiSignal,market,bankroll,position,margin)
-  var didEnter = await enter(order)
+  var didEnter = await enter(order,margin)
   writeLog(rsiSignal,market,bankroll,position,margin,order,didEnter)
 }
 
