@@ -14,7 +14,7 @@ var client
 const BitMEXRealtimeAPI = require('bitmex-realtime-api');
 // See 'options' reference below
 const wsClient = new BitMEXRealtimeAPI({
-  testnet: true,
+  testnet: shoes.test,
   apiKeyID: shoes.key,
   apiKeySecret: shoes.secret,
   maxTableLen: 1
@@ -23,7 +23,7 @@ const wsClient = new BitMEXRealtimeAPI({
 // handle errors here. If no 'error' callback is attached. errors will crash the client.
 wsClient.on('error', console.error);
 wsClient.on('open', () => console.log('Connection opened.'));
-wsClient.on('close', () => console.log('Connection closed.'));
+// wsClient.on('close', () => console.log('Connection closed.'));
 wsClient.on('initialize', () => console.log('Client initialized, data is flowing.'));
 
 wsClient.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
@@ -31,6 +31,7 @@ wsClient.addStream('XBTUSD', 'execution', async function(data, symbol, tableName
   if (exec) {
     console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
     if (exec.ordStatus === 'Filled' && (exec.ordType === 'StopLimit' || exec.ordType === 'LimitIfTouched')) {
+      console.log(exec)
       await client.Order.Order_cancelAll({symbol:'XBTUSD'})
       .catch(function(e) {
         console.log(e.statusText)
@@ -46,7 +47,7 @@ if (!fs.existsSync('log')) {
   fs.mkdirSync('log');
 }
 if (!fs.existsSync('log/condition.csv')) {
-  fs.writeFileSync('log/condition.csv','time,prsi,rsi,close,signalCondition,position,orderType\n',writeFileOptions)
+  fs.writeFileSync('log/condition.csv','time,prsi,rsi,close,signalCondition,orderType,position,balance\n',writeFileOptions)
 }
 if (!fs.existsSync('log/enter.csv')) {
   fs.writeFileSync('log/enter.csv','Time,Capital,Risk,R/R,Type,Entry,Stop,Target,Exit,P/L,StopPercent,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent\n',writeFileOptions)
@@ -362,8 +363,8 @@ async function enter(order,margin) {
 
 function writeLog(rsiSignal,market,bankroll,position,margin,order,didEnter) {
   var isoString = new Date().toISOString()
-  var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + market.closes[market.closes.length-1] + ',' +
-    rsiSignal.condition + ',' + position.currentQty + ',' + order.type + '\n'
+  var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + market.closes[market.closes.length-1].toFixed(1) + ',' +
+    rsiSignal.condition + ',' + order.type + ',' + position.currentQty + ',' + (margin.marginBalance/100000000).toFixed(4) + '\n'
   console.log(signalCSV.replace('\n',''))
   fs.appendFile('log/condition.csv', signalCSV, e => {
     if (e) {
