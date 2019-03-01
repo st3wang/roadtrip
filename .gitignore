@@ -5,3 +5,6 @@ package.json
 roadmap.js
 shoes.js
 journey/log
+shoes_test.js
+sheets_token.json
+credentials.json

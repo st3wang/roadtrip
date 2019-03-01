@@ -97,8 +97,15 @@ async function getLastRowId() {
   })
 }
 
+async function init() {
+  await authorize().catch(e => {
+    console.error(e)
+    debugger
+  })
+}
+
 module.exports = {
-  authorize: authorize,
+  init: init,
   enterTrade: enterTrade,
   exitTrade: exitTrade
 }
