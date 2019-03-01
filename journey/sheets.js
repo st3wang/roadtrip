@@ -75,7 +75,7 @@ async function exitTrade(row) {
     var lastRowId = await getLastRowId()
     sheets.update({
       spreadsheetId: shoes.sheets.sheetsId,
-      range: 'I'+lastRowId,
+      range: 'J'+lastRowId,
       valueInputOption: 'RAW',
       resource: {values:[row]}
     }, (err, res) => {
