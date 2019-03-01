@@ -6,11 +6,12 @@ async function next() {
   let position = await bitmex.getPosition()
   let margin = await bitmex.getMargin()
   let market = await bitmex.getMarket(24*60,15)
-  let rsiSignal = await strategy.getSignal(market.closes,11,57,35)
+  let rsiSignal = await strategy.getSignal(market.closes,11,70,35)
   let bankroll = {
     capitalUSD: 1000,
     riskPerTradePercent: 0.01,
     profitFactor: 1.69,
+    stopMarketFactor: 1.30,
     stopLossLookBack: 2,
     minimumStopLoss: 0.001
   }

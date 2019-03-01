@@ -200,6 +200,15 @@ async function enter(order,margin) {
   })
   console.log('Submitted - TakeProfitLimit Order ')
 
+  let stopMarketOrderResponse = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice',
+    orderQty:-order.positionSizeUSD,
+    stopPx:order.stopMarketTrigger
+  }).catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Submitted - StopMarket Order ')
+
   return true
 }
 
