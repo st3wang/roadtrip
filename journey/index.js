@@ -6,6 +6,7 @@ const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
 const padStart = require('string.prototype.padstart');
 const talib = require('talib');
 const shoes = require('./shoes');
+const sheets = require('./sheets');
 
 const talibExecute = util.promisify(talib.execute)
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
@@ -32,16 +33,16 @@ wsClient.addStream('XBTUSD', 'execution', async function(data, symbol, tableName
     console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
     if (exec.ordStatus === 'Filled' && (exec.ordType === 'StopLimit' || exec.ordType === 'LimitIfTouched')) {
       console.log(exec)
-      await client.Order.Order_cancelAll({symbol:'XBTUSD'})
-      .catch(function(e) {
-        console.log(e.statusText)
-        debugger
-      })
-      let margin = await getMargin()
-      console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
+      let position = await getPosition()
+      if (position.currentQty === 0) {
+        client.Order.Order_cancelAll({symbol:'XBTUSD'})
+        let margin = await getMargin()
+        console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
+        sheets.exitTrade([new Date().toISOString(),exec.price])
+      }
     }
   }
-});
+})
 
 if (!fs.existsSync('log')) {
   fs.mkdirSync('log');
@@ -50,7 +51,7 @@ if (!fs.existsSync('log/condition.csv')) {
   fs.writeFileSync('log/condition.csv','time,prsi,rsi,close,signalCondition,orderType,position,balance\n',writeFileOptions)
 }
 if (!fs.existsSync('log/enter.csv')) {
-  fs.writeFileSync('log/enter.csv','Time,Capital,Risk,R/R,Type,Entry,Stop,Target,Exit,P/L,StopPercent,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent\n',writeFileOptions)
+  fs.writeFileSync('log/enter.csv','Time,Capital,Risk,R/R,Type,Entry,Stop,Target,Time,Exit,P/L,StopPercent,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent\n',writeFileOptions)
 }
 
 async function initClient() {
@@ -384,7 +385,7 @@ function writeLog(rsiSignal,market,bankroll,position,margin,order,didEnter) {
       // Time,Capital,Risk,R/R,
       // Entry,Stop,Target,Exit,P/L,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent
     var enterData = [isoString,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
-      order.type,order.entryPrice,order.stopLoss,order.takeProfit,'','',order.lossDistancePercent,order.lossDistance,order.profitDistance,
+      order.type,order.entryPrice,order.stopLoss,order.takeProfit,'','','',order.lossDistancePercent,order.lossDistance,order.profitDistance,
       order.riskAmountBTC,order.riskAmountUSD,order.positionSizeBTC,order.positionSizeUSD,order.leverage,'','','','']
     var enterCSV = enterData.toString()
     console.log(enterCSV)
@@ -394,6 +395,7 @@ function writeLog(rsiSignal,market,bankroll,position,margin,order,didEnter) {
         debugger
       }
     })
+    sheets.enterTrade(enterData)
   }
 }
 
@@ -425,6 +427,11 @@ async function next() {
 }
 
 async function start() {
+  await sheets.authorize().catch(e => {
+    console.error(e)
+    debugger
+  })
+
   client = await initClient()
   // inspect(client.apis)
   next()
