@@ -48,7 +48,7 @@ function getNewToken(oAuth2Client, callback) {
 
 async function authorize() {
   return new Promise((resolve,reject) => {
-    authorizeWithCallback(shoes.sheetsCredential, a => {
+    authorizeWithCallback(shoes.sheets.credential, a => {
       auth = a
       sheets = google.sheets({version: 'v4', auth}).spreadsheets.values;
       resolve()
@@ -59,7 +59,7 @@ async function authorize() {
 async function enterTrade(row) {
   return new Promise((resolve,reject) => {
     sheets.append({
-      spreadsheetId: shoes.sheetsId,
+      spreadsheetId: shoes.sheets.sheetsId,
       range: 'A1',
       valueInputOption: 'RAW',
       resource: {values:[row]}
@@ -74,7 +74,7 @@ async function exitTrade(row) {
   return new Promise(async (resolve,reject) => {
     var lastRowId = await getLastRowId()
     sheets.update({
-      spreadsheetId: shoes.sheetsId,
+      spreadsheetId: shoes.sheets.sheetsId,
       range: 'I'+lastRowId,
       valueInputOption: 'RAW',
       resource: {values:[row]}
@@ -88,7 +88,7 @@ async function exitTrade(row) {
 async function getLastRowId() {
   return new Promise((resolve,reject) => {
     sheets.get({
-      spreadsheetId: shoes.sheetsId,
+      spreadsheetId: shoes.sheets.sheetsId,
       range: 'A1:A'
     }, (err, res) => {
       if (err) reject(err)
@@ -102,15 +102,3 @@ module.exports = {
   enterTrade: enterTrade,
   exitTrade: exitTrade
 }
-
-// async function test() {
-//   await authorize(shoes.sheet).catch(e => {
-//     console.error(e)
-//     debugger
-//   })
-//   // var response = await enterTrade([1,1,1,1])
-//   var response = await exitTrade([,,6666,,7777])
-//   debugger
-// }
-
-// test()

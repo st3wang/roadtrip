@@ -13,15 +13,13 @@ const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
 var client
 const BitMEXRealtimeAPI = require('bitmex-realtime-api');
-// See 'options' reference below
 const wsClient = new BitMEXRealtimeAPI({
-  testnet: shoes.test,
-  apiKeyID: shoes.key,
-  apiKeySecret: shoes.secret,
+  testnet: shoes.bitmex.test,
+  apiKeyID: shoes.bitmex.key,
+  apiKeySecret: shoes.bitmex.secret,
   maxTableLen: 1
 });
 
-// handle errors here. If no 'error' callback is attached. errors will crash the client.
 wsClient.on('error', console.error);
 wsClient.on('open', () => console.log('Connection opened.'));
 // wsClient.on('close', () => console.log('Connection closed.'));
@@ -58,11 +56,11 @@ async function initClient() {
   let swaggerClient = await new SwaggerClient({
     // Switch this to `www.bitmex.com` when you're ready to try it out for real.
     // Don't forget the `www`!
-    url: shoes.swagger,
+    url: shoes.bitmex.swagger,
     usePromise: true
   })
   // Comment out if you're not requesting any user data.
-  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(shoes.key, shoes.secret));
+  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(shoes.bitmex.key, shoes.bitmex.secret));
   return swaggerClient
 }
 
@@ -74,16 +72,6 @@ function inspect(client) {
   });
   console.log("------------------------\n");
 }
-
-function pad2(v) {
-  return padStart(v,2,'0')
-}
-
-// function getUTCTimeString(ms) {
-//   var local = new Date(ms)
-//   return local.getUTCFullYear() + '-' + pad2(local.getUTCMonth()+1) + '-' + pad2(local.getUTCDate()) + 'T' +
-//     pad2(local.getUTCHours()) + ':' + pad2(local.getUTCMinutes()) + ':00.000Z'
-// }
 
 function getPageTimes(length,interval,binSize) {
   var current = new Date()
@@ -400,11 +388,6 @@ function writeLog(rsiSignal,market,bankroll,position,margin,order,didEnter) {
 }
 
 async function next() {
-  // let results = await Promise.all([
-  //   getMarket(24*60,15),
-  //   getPosition(),
-  //   getMargin()
-  // ]);
   let position = await getPosition()
   let margin = await getMargin()
   let market = await getMarket(24*60,15)
