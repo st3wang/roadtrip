@@ -3,36 +3,46 @@ const SwaggerClient = require("swagger-client")
 const shoes = require('./shoes');
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api');
-const wsClient = new BitMEXRealtimeAPI({
-  testnet: shoes.bitmex.test,
-  apiKeyID: shoes.bitmex.key,
-  apiKeySecret: shoes.bitmex.secret,
-  maxTableLen: 1
-});
 
 var client, exitTradeCallback
 
-wsClient.on('error', console.error);
-wsClient.on('open', () => console.log('Connection opened.'));
-// wsClient.on('close', () => console.log('Connection closed.'));
-wsClient.on('initialize', () => console.log('Client initialized, data is flowing.'));
-
-wsClient.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
-  var exec = data[0]
-  if (exec) {
-    console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
-    if (exec.ordStatus === 'Filled' && (exec.ordType === 'StopLimit' || exec.ordType === 'LimitIfTouched')) {
-      console.log(exec)
-      let position = await getPosition()
-      if (position.currentQty === 0) {
-        client.Order.Order_cancelAll({symbol:'XBTUSD'})
-        let margin = await getMargin()
-        console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
-        exitTradeCallback([exec.timestamp,exec.price])
+function connectWebSocketClient() {
+  const wsClient = new BitMEXRealtimeAPI({
+    testnet: shoes.bitmex.test,
+    apiKeyID: shoes.bitmex.key,
+    apiKeySecret: shoes.bitmex.secret,
+    maxTableLen: 1
+  })
+  wsClient.on('error', console.error);
+  wsClient.on('open', () => console.log('Connection opened.'));
+  // wsClient.on('close', () => console.log('Connection closed.'));
+  wsClient.on('initialize', () => console.log('Client initialized, data is flowing.'));
+  
+  wsClient.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
+    var exec = data[0]
+    if (exec) {
+      console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
+      if (exec.ordStatus === 'Filled' && (exec.ordType === 'StopLimit' || exec.ordType === 'LimitIfTouched')) {
+        console.log(exec)
+        let position = await getPosition()
+        if (position.currentQty === 0) {
+          client.Order.Order_cancelAll({symbol:'XBTUSD'})
+          let margin = await getMargin()
+          console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
+          exitTradeCallback([exec.timestamp,exec.price])
+        }
       }
     }
+  })
+
+  // keep the socket alive
+  wsClient.socket.onmessage = function(event) {
+    // console.log(event)
   }
-})
+  setInterval(_ => {
+    wsClient.socket.send('ping')
+  },60000)
+}
 
 async function authorize() {
   let swaggerClient = await new SwaggerClient({
@@ -218,7 +228,9 @@ async function init(exitTradeCb) {
     console.error(e)
     debugger
   })
+  connectWebSocketClient()
   // inspect(client.apis)
+
 }
 
 module.exports = {
