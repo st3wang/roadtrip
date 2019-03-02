@@ -4,10 +4,10 @@ const shoes = require('./shoes');
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api');
 
-var client, exitTradeCallback
+var client, wsClient, exitTradeCallback
 
 function connectWebSocketClient() {
-  const wsClient = new BitMEXRealtimeAPI({
+  wsClient = new BitMEXRealtimeAPI({
     testnet: shoes.bitmex.test,
     apiKeyID: shoes.bitmex.key,
     apiKeySecret: shoes.bitmex.secret,
@@ -15,7 +15,7 @@ function connectWebSocketClient() {
   })
   wsClient.on('error', console.error);
   wsClient.on('open', () => console.log('Connection opened.'));
-  // wsClient.on('close', () => console.log('Connection closed.'));
+  wsClient.on('close', () => console.log('Connection closed.'));
   wsClient.on('initialize', () => console.log('Client initialized, data is flowing.'));
   
   wsClient.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
@@ -35,10 +35,7 @@ function connectWebSocketClient() {
     }
   })
 
-  // keep the socket alive
-  wsClient.socket.onmessage = function(event) {
-    // console.log(event)
-  }
+  // heartbeat
   setInterval(_ => {
     wsClient.socket.send('ping')
   },60000)
