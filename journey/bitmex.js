@@ -193,7 +193,8 @@ async function getMarket(interval,length) {
       candles: candles.concat(missing.candles),
       opens: opens.concat(missing.opens),
       highs: highs.concat(missing.highs),
-      lows: lows.concat(missing.lows)
+      lows: lows.concat(missing.lows),
+      closes: lows.concat(missing.closes)
     }
   }
   return marketCache
