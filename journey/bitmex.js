@@ -4,21 +4,22 @@ const shoes = require('./shoes');
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api');
 
-var client, wsClient, exitTradeCallback
+var client, wsClient, exitTradeCallback, marketCache
+let binSize = 5
 
-function connectWebSocketClient() {
-  wsClient = new BitMEXRealtimeAPI({
+async function connectWebSocketClient() {
+  var ws = new BitMEXRealtimeAPI({
     testnet: shoes.bitmex.test,
     apiKeyID: shoes.bitmex.key,
     apiKeySecret: shoes.bitmex.secret,
     maxTableLen: 1
   })
-  wsClient.on('error', console.error);
-  wsClient.on('open', () => console.log('Connection opened.'));
-  wsClient.on('close', () => console.log('Connection closed.'));
-  wsClient.on('initialize', () => console.log('Client initialized, data is flowing.'));
+  ws.on('error', console.error);
+  ws.on('open', () => console.log('Connection opened.'));
+  ws.on('close', () => console.log('Connection closed.'));
+  ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
   
-  wsClient.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
+  ws.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
     var exec = data[0]
     if (exec) {
       console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
@@ -37,8 +38,10 @@ function connectWebSocketClient() {
 
   // heartbeat
   setInterval(_ => {
-    wsClient.socket.send('ping')
+    ws.socket.send('ping')
   },60000)
+
+  return ws
 }
 
 async function authorize() {
@@ -62,19 +65,27 @@ function inspect(client) {
   console.log("------------------------\n");
 }
 
-function getPageTimes(length,interval,binSize) {
+function getPageTimes(interval,length,binSize) {
   var current = new Date()
   var currentMS = current.getTime()
-  var offset = (length * 60000) + (currentMS % (interval * 60000))
+  var offset = (length * interval * 60000) + (currentMS % (interval * 60000))
   var bitMexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
   offset -= bitMexOffset
-  var offsetIncrement = 8*60*60000
-  var end = offsetIncrement - bitMexOffset
+  var pageIncrement = 8*60*60000
   var pages = []
-  for (; offset > end; offset-=offsetIncrement) {
+  if (offset > pageIncrement) {
+    var end = pageIncrement - bitMexOffset
+    for (; offset > end; offset-=pageIncrement) {
+      pages.push({
+        startTime: new Date(currentMS - offset).toISOString(),
+        endTime: new Date(currentMS - (offset-pageIncrement+1)).toISOString()
+      })
+    }
+  }
+  else {
     pages.push({
       startTime: new Date(currentMS - offset).toISOString(),
-      endTime: new Date(currentMS - (offset-offsetIncrement+1)).toISOString()
+      endTime: new Date(currentMS - (offset-(length*interval*60000)+1)).toISOString()
     })
   }
   return pages
@@ -105,9 +116,8 @@ function toCandle(group) {
   }
 }
 
-async function getMarket(length,interval) {
-  let binSize = 5
-  let pages = getPageTimes(length,interval,binSize)
+async function getTradeBucketed(interval,length) {
+  let pages = getPageTimes(interval,length,binSize)
   await Promise.all(pages.map(async (page,i) => {
     let response = await client.Trade.Trade_getBucketed({symbol: 'XBTUSD', binSize: binSize+'m', 
       startTime:page.startTime,endTime:page.endTime})
@@ -131,12 +141,62 @@ async function getMarket(length,interval) {
     closes.push(candle.close)
   }
   return {
-    // candles:candles,
+    candles:candles,
     opens:opens,
     highs:highs,
     lows:lows,
     closes:closes
   }
+}
+
+async function getMarket(interval,length) {
+  if (!marketCache) {
+    marketCache = await getTradeBucketed(interval,length)
+  }
+  else {
+    var now = new Date().getTime()
+    var candles = marketCache.candles
+    // candles[candles.length-1] = candles[candles.length-2]
+    var opens = marketCache.opens
+    var highs = marketCache.highs
+    var lows = marketCache.lows
+    var closes = marketCache.closes
+    var lastCandle = candles[candles.length-1]
+    var lastCandleTime = new Date(lastCandle.time).getTime()
+    var missingLength = Math.floor((((now-lastCandleTime)/60000)+binSize)/interval)
+    // includes last candle
+    var missing = await getTradeBucketed(interval,missingLength)
+    
+    var firstMissingCandle = missing.candles[0]
+    if (firstMissingCandle.time !== lastCandle.time || 
+      firstMissingCandle.open !== lastCandle.open || 
+      firstMissingCandle.high !== lastCandle.high || 
+      firstMissingCandle.low !== lastCandle.low || 
+      firstMissingCandle.close !== lastCandle.close) {
+      console.log('last candle data mismatched')
+    }
+    else {
+      console.log('last candle data matched')
+    }
+
+    candles.splice(0,missingLength-1)
+    opens.splice(0,missingLength-1)
+    highs.splice(0,missingLength-1)
+    lows.splice(0,missingLength-1)
+    closes.splice(0,missingLength-1)
+    candles.splice(-1,1)
+    opens.splice(-1,1)
+    highs.splice(-1,1)
+    lows.splice(-1,1)
+    closes.splice(-1,1)
+    marketCache = {
+      candles: candles.concat(missing.candles),
+      opens: opens.concat(missing.opens),
+      highs: highs.concat(missing.highs),
+      lows: lows.concat(missing.lows)
+    }
+  }
+  return marketCache
 }
 
 async function getPosition() {

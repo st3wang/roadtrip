@@ -5,7 +5,7 @@ const strategy = require('./strategy')
 async function next() {
   let position = await bitmex.getPosition()
   let margin = await bitmex.getMargin()
-  let market = await bitmex.getMarket(24*60,15)
+  let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles
   let rsiSignal = await strategy.getSignal(market.closes,11,70,35)
   let bankroll = {
     capitalUSD: 1000,
