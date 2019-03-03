@@ -39,18 +39,26 @@
         stroke: none;
     }
 
-    path.tradearrow.buy {
-        fill: #0000FF;
+    path.tradearrow.ENTER-LONG {
+        fill: #008fff;
     }
 
+    path.tradearrow.EXIT-LONG {
+        fill: #008fff;
+    }
+    
     path.tradearrow.buy-pending {
         fill-opacity: 0.2;
         stroke: #0000FF;
         stroke-width: 1.5;
     }
 
-    path.tradearrow.sell {
-        fill: #9900FF;
+    path.tradearrow.ENTER-SHORT {
+        fill: #cc47ed;
+    }
+
+    path.tradearrow.EXIT-SHORT {
+        fill: #cc47ed;
     }
 
     .tradearrow path.highlight {
@@ -58,7 +66,7 @@
         stroke-width: 2;
     }
 
-    .tradearrow path.highlight.buy,.tradearrow path.highlight.buy-pending {
+    .tradearrow path.highlight.ENTER-LONG,path.highlight.EXIT-LONG,.tradearrow path.highlight.buy-pending {
         stroke: #0000FF;
     }
 
@@ -67,8 +75,8 @@
         fill-opacity: 0.3;
     }
 
-    .tradearrow path.highlight.sell {
-        stroke: #9900FF;
+    .tradearrow path.highlight.ENTER-SHORT,path.highlight.EXIT-SHORT {
+        stroke: #cc47ed;
     }
     .rsi path {
         fill: none;
@@ -87,6 +95,11 @@
     .rsi path.middle, path.zero {
         stroke: #BBBBBB;
         stroke-dasharray: 5, 5;
+    }
+
+    .trendline {
+        stroke: blue;
+        stroke-width: 0.8;
     }
 </style>
 <body>
@@ -115,7 +128,7 @@
     var tradearrow = techan.plot.tradearrow()
             .xScale(x)
             .yScale(y)
-            .orient(function(d) { return d.type.startsWith("buy") ? "up" : "down"; })
+            .orient(function(d) { return (d.type == 'ENTER-LONG' || d.type == 'EXIT-SHORT') ? "up" : "down"; })
             .on("mouseenter", enter)
             .on("mouseout", out);
 
@@ -134,6 +147,10 @@
             .attr("class", "coords")
             .attr("x", width - 5)
             .attr("y", 15);
+
+    var trendline = techan.plot.trendline()
+        .xScale(x)
+        .yScale(y)
 
     d3.csv("market.csv", function(error, data) {
         var accessor = candlestick.accessor();
@@ -168,24 +185,38 @@
                 .style("text-anchor", "end")
                 .text("Price ($)");
 
+        svg.append("g")
+                .attr("class", "trendlines");
+
         d3.csv("trade.csv", function(error, tradeData) {
           var trades = tradeData.map(function(d) {
               return {
                   date: parseDate(d.Date),
                   type: d.Type,
                   price: +d.Price,
-                  quantity: +d.Quantity
+                  quantity: +d.Quantity,
+                  stopLoss: +d.StopLoss,
+                  takeProfit: +d.TakeProfit
               };
           })
-          // Data to display initially
-          draw(data, trades);
+          var lastTrade = trades[trades.length-1]
+          if (lastTrade.type.startsWith('EXIT')) {
+              lastTrade = trades[trades.length-2]
+          }
+          var lastCandle = data[data.length-1]
+          var trendlines = [
+            { start: { date: new Date(lastTrade.date), value: lastTrade.stopLoss }, end: { date: new Date(lastCandle.date), value: lastTrade.stopLoss } },
+            { start: { date: new Date(lastTrade.date), value: lastTrade.takeProfit }, end: { date: new Date(lastCandle.date), value: lastTrade.takeProfit } }
+          ];
+                    // Data to display initially
+          draw(data, trades, trendlines);
         })
 //         draw(data,[])
         // Only want this button to be active if the data has loaded
         // d3.select("button").on("click", function() { draw(data, trades); }).style("display", "inline");
     });
 
-    function draw(data, trades) {
+    function draw(data, trades, trendlines) {
         x.domain(data.map(candlestick.accessor().d));
         y.domain(techan.scale.plot.ohlc(data, candlestick.accessor()).domain());
 
@@ -194,6 +225,8 @@
 
         svg.selectAll("g.x.axis").call(xAxis);
         svg.selectAll("g.y.axis").call(yAxis);
+
+        svg.selectAll("g.trendlines").datum(trendlines).call(trendline)
     }
 
     function enter(d) {
