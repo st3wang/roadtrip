@@ -3,9 +3,10 @@ const fs = require('fs')
 const readline = require('readline')
 const {google} = require('googleapis')
 const shoes = require('./shoes')
+const path = require('path')
 
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-const TOKEN_PATH = 'sheets_token.json'
+const TOKEN_PATH = path.resolve(__dirname, 'sheets_token.json')
 var auth, sheets
 
 function authorizeWithCallback(credentials, callback) {

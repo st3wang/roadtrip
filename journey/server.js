@@ -2,6 +2,7 @@ const http 	= require('http')
 const url = require('url')
 const fs = require('fs')
 const shoes = require('./shoes')
+const path = require('path')
 
 function responseWithFile(response,contentType,fileName) {
   response.writeHead(200, {
@@ -9,7 +10,7 @@ function responseWithFile(response,contentType,fileName) {
     'Access-Control-Allow-Origin': '*',
     'X-Powered-By':'nodejs'
   })
-  fs.readFile(fileName, function(err, content) {
+  fs.readFile(path.resolve(__dirname, fileName), function(err, content) {
       response.write(content)
       response.end()
   })
