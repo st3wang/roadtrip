@@ -30,25 +30,6 @@ async function next() {
   log.writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent)
 }
 
-async function start() {
-  await log.init()
-  await bitmex.init(log.writeExit)
-  await server.init(getMarketCsv,getTradeCsv)
-
-  next()
-  var now = new Date().getTime()
-  var interval = 15*60000
-  var delay = 15000 // bitmex bucket data delay. it will be faster with WS
-  var startIn = interval-now%(interval) + delay
-  var startInSec = startIn % 60000
-  var startInMin = (startIn - startInSec) / 60000
-  console.log('next one in ' + startInMin + ':' + Math.floor(startInSec/1000) + ' minutes')
-  setTimeout(_ => {
-    next()
-    setInterval(next,interval)
-  },startIn)
-}
-
 async function getMarketCsv() {
   var market = await bitmex.getMarket(15,96)
   var csv = 'Date,Open,High,Low,Close,Volume\n'
@@ -72,6 +53,25 @@ async function getTradeCsv() {
     }
   })
   return csv
+}
+
+async function start() {
+  await log.init()
+  await bitmex.init(log.writeExit)
+  await server.init(getMarketCsv,getTradeCsv)
+
+  next()
+  var now = new Date().getTime()
+  var interval = 15*60000
+  var delay = 15000 // bitmex bucket data delay. it will be faster with WS
+  var startIn = interval-now%(interval) + delay
+  var startInSec = startIn % 60000
+  var startInMin = (startIn - startInSec) / 60000
+  console.log('next one in ' + startInMin + ':' + Math.floor(startInSec/1000) + ' minutes')
+  setTimeout(_ => {
+    next()
+    setInterval(next,interval)
+  },startIn)
 }
 
 start()
