@@ -1,6 +1,8 @@
+const sheets = require('./sheets')
 const log = require('./log')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
+const server = require('./server')
 
 async function next() {
   let position = await bitmex.getPosition()
@@ -31,6 +33,7 @@ async function next() {
 async function start() {
   await log.init()
   await bitmex.init(log.writeExit)
+  await server.init(getMarketCsv,getTradeCsv)
 
   next()
   var now = new Date().getTime()
@@ -44,6 +47,31 @@ async function start() {
     next()
     setInterval(next,interval)
   },startIn)
+}
+
+async function getMarketCsv() {
+  var market = await bitmex.getMarket(15,96)
+  var csv = 'Date,Open,High,Low,Close,Volume\n'
+  market.candles.forEach(candle => {
+    csv += //new Date(candle.time).toUTCString()
+    candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+',0\n'
+  })
+  return csv
+}
+
+async function getTradeCsv() {
+  var trades = await sheets.getTrades()
+  var csv = 'Date,Type,Price,Quantity\n'
+  trades.forEach(t => {
+    // { date: data[2].date, type: "buy", price: data[2].low, quantity: 1000 }
+    csv += //new Date(t[0]).toUTCString()
+    t[0]+','+'buy'+','+t[5]+','+t[18]+'\n'
+    if (t[9].length > 0) {
+      csv += //new Date(t[9]).toUTCString()
+      t[9]+','+'sell'+','+t[10]+','+t[18]+'\n'
+    }
+  })
+  return csv
 }
 
 start()

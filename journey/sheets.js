@@ -97,6 +97,22 @@ async function getLastRowId() {
   })
 }
 
+async function getTrades() {
+  return new Promise((resolve,reject) => {
+    sheets.get({
+      spreadsheetId: shoes.sheets.sheetsId,
+      range: 'A1:X'
+    }, (err, res) => {
+      if (err) reject(err)
+      var startTime = new Date().getTime() - 24*60*60000
+      var trades = res.data.values.filter(v => {
+        return new Date(v[0]).getTime() > startTime
+      })
+      resolve(trades)
+    })
+  })
+}
+
 async function init() {
   await authorize().catch(e => {
     console.error(e)
@@ -107,5 +123,6 @@ async function init() {
 module.exports = {
   init: init,
   enterTrade: enterTrade,
-  exitTrade: exitTrade
+  exitTrade: exitTrade,
+  getTrades: getTrades
 }
