@@ -39,6 +39,7 @@
 
     path.tradearrow {
         stroke: none;
+        scale: 2.0;
     }
 
     path.tradearrow.ENTER-LONG {
@@ -130,7 +131,7 @@
     var tradearrow = techan.plot.tradearrow()
             .xScale(x)
             .yScale(y)
-            .orient(function(d) { return (d.type == 'ENTER-LONG' || d.type == 'EXIT-SHORT') ? "up" : "down"; })
+            .orient(function(d) { return d.type.startsWith('ENTER') ? "right" : "left"; })
             .on("mouseenter", enter)
             .on("mouseout", out);
 

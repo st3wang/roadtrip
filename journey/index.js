@@ -47,7 +47,7 @@ async function getTradeCsv() {
     // { date: data[2].date, type: "buy", price: data[2].low, quantity: 1000 }
     csv += //new Date(t[0]).toUTCString()
     t[0]+','+'ENTER-'+t[4]+','+t[5]+','+t[18]+','+t[6]+','+t[7]+'\n'
-    if (t[9].length > 0) {
+    if (t[9] && t[9].length > 0) {
       csv += //new Date(t[9]).toUTCString()
       t[9]+','+'EXIT-'+t[4]+','+t[10]+','+t[18]+','+t[6]+','+t[7]+'\n'
     }

@@ -3525,8 +3525,8 @@ module.exports = function(d3_behavior_drag, d3_event, d3_select, d3_dispatch, ac
           trendlineGroup = group.entry.append('g').attr('class', 'trendline');
 
       trendlineGroup.append('path').attr('class', 'body');
-      trendlineGroup.append('circle').attr('class', 'start').attr('r', 1);
-      trendlineGroup.append('circle').attr('class', 'end').attr('r', 1);
+//       trendlineGroup.append('circle').attr('class', 'start').attr('r', 1);
+//       trendlineGroup.append('circle').attr('class', 'end').attr('r', 1);
 
       var interaction = group.entry.append('g').attr('class', 'interaction').style('opacity', 0).style('fill', 'none')
         .call(plot.interaction.mousedispatch(dispatch));
@@ -4358,8 +4358,8 @@ module.exports = function(d3_functor) {  // Injected dependencies
       var path,
           x = fx(d, i),
           y = fy(d, i),
-          w = width(d, i),
-          h = height(d, i),
+          w = width(d, i)*2,
+          h = height(d, i)*2,
           o = orient(d, i),
           t = tail(d, i),
           neg = o === 'left' || o === 'up' ? 1 : -1,
