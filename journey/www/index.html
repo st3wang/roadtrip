@@ -283,7 +283,7 @@
             // bars
             return {
                 date: parseDate(d.Date),
-                volume: +d.Volume,
+                rsi: +d.Rsi,
                 open: +d.Open,
                 high: +d.High,
                 low: +d.Low,
@@ -315,6 +315,9 @@
 
     function draw(data) {
         var rsiData = techan.indicator.rsi()(data);
+        rsiData.forEach((r,i) => {
+            r.rsi = data[i].rsi
+        })
         x.domain(rsiData.map(rsi.accessor().d));
         y.domain(techan.scale.plot.rsi(rsiData).domain());
 

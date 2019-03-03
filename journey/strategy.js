@@ -134,5 +134,6 @@ function getOrder(signal,market,bankroll,position,margin) {
 
 module.exports = {
   getSignal: getSignal,
-  getOrder: getOrder
+  getOrder: getOrder,
+  getRsi: getRsi
 }

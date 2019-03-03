@@ -32,10 +32,11 @@ async function next() {
 
 async function getMarketCsv() {
   var market = await bitmex.getMarket(15,96)
-  var csv = 'Date,Open,High,Low,Close,Volume\n'
-  market.candles.forEach(candle => {
+  var rsis = await strategy.getRsi(market.closes,11)
+  var csv = 'Date,Open,High,Low,Close,Rsi\n'
+  market.candles.forEach((candle,i) => {
     csv += //new Date(candle.time).toUTCString()
-    candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+',0\n'
+    candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+','+rsis[i]+'\n'
   })
   return csv
 }
