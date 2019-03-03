@@ -193,21 +193,19 @@
                   takeProfit: +d.TakeProfit
               };
           })
-          var lastTrade = trades[trades.length-1]
-          if (lastTrade.type.startsWith('EXIT')) {
-              lastTrade = trades[trades.length-2]
+          if (trades.length > 0) {
+            var lastTrade = trades[trades.length-1]
+            if (lastTrade.type.startsWith('EXIT')) {
+                lastTrade = trades[trades.length-2]
+            }
+            var lastCandle = data[data.length-1]
+            var trendlines = [
+              { start: { date: new Date(lastTrade.date), value: lastTrade.stopLoss }, end: { date: new Date(lastCandle.date), value: lastTrade.stopLoss } },
+              { start: { date: new Date(lastTrade.date), value: lastTrade.takeProfit }, end: { date: new Date(lastCandle.date), value: lastTrade.takeProfit } }
+            ]
           }
-          var lastCandle = data[data.length-1]
-          var trendlines = [
-            { start: { date: new Date(lastTrade.date), value: lastTrade.stopLoss }, end: { date: new Date(lastCandle.date), value: lastTrade.stopLoss } },
-            { start: { date: new Date(lastTrade.date), value: lastTrade.takeProfit }, end: { date: new Date(lastCandle.date), value: lastTrade.takeProfit } }
-          ];
-                    // Data to display initially
           draw(data, trades, trendlines);
         })
-//         draw(data,[])
-        // Only want this button to be active if the data has loaded
-        // d3.select("button").on("click", function() { draw(data, trades); }).style("display", "inline");
     });
 
     function draw(data, trades, trendlines) {
