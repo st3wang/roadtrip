@@ -51,9 +51,9 @@ async function init(getMarketCsv,getTradeCsv) {
       default:
         responseWithFile(response,'application/js','www'+path)
     }
-  }).listen(shores.server.port)
+  }).listen(shoes.server.port)
   
-  console.log("Listening on port " + shores.server.port)
+  console.log("Listening on port " + shoes.server.port)
 }
 
 module.exports = {
