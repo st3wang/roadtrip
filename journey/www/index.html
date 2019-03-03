@@ -11,6 +11,14 @@
         fill: #fff;
     }
 
+    path {
+        stroke: #fff;
+    }
+
+    line {
+        stroke: #fff;
+    }
+
     path.candle {
         stroke: #53B987;
     }
@@ -78,16 +86,16 @@
     }
 
     .rsi {
-        stroke: #000000;
+        stroke: #ff0;
     }
 
     .rsi path.overbought, .rsi path.oversold {
-        stroke: #FF9999;
+        stroke: #f0f;
         stroke-dasharray: 5, 5;
     }
 
     .rsi path.middle, path.zero {
-        stroke: #BBBBBB;
+        stroke: #555;
         stroke-dasharray: 5, 5;
     }
 
@@ -193,13 +201,14 @@
                   takeProfit: +d.TakeProfit
               };
           })
+          var trendlines = []
           if (trades.length > 0) {
             var lastTrade = trades[trades.length-1]
             if (lastTrade.type.startsWith('EXIT')) {
                 lastTrade = trades[trades.length-2]
             }
             var lastCandle = data[data.length-1]
-            var trendlines = [
+            trendlines = [
               { start: { date: new Date(lastTrade.date), value: lastTrade.stopLoss }, end: { date: new Date(lastCandle.date), value: lastTrade.stopLoss } },
               { start: { date: new Date(lastTrade.date), value: lastTrade.takeProfit }, end: { date: new Date(lastCandle.date), value: lastTrade.takeProfit } }
             ]
