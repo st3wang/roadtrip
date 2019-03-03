@@ -293,7 +293,7 @@ async function init(exitTradeCb) {
 
 module.exports = {
   init: init,
-  getMarket: getMarket,
+  getMarket: getTradeBucketed,
   getPosition: getPosition,
   getMargin: getMargin,
   enter: enter
