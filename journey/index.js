@@ -10,9 +10,9 @@ async function next() {
   let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles
   let rsiSignal = await strategy.getSignal(market.closes,11,70,35)
   let bankroll = {
-    capitalUSD: 1000,
+    capitalUSD: 500,
     riskPerTradePercent: 0.01,
-    profitFactor: 1.69,
+    profitFactor: 1.65,
     stopMarketFactor: 1.30,
     stopLossLookBack: 2,
     minimumStopLoss: 0.001

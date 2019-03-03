@@ -1,7 +1,7 @@
 const http 	= require('http')
 const url = require('url')
 const fs = require('fs')
-const port = '3000'
+const shoes = require('./shoes')
 
 function responseWithFile(response,contentType,fileName) {
   response.writeHead(200, {
@@ -51,9 +51,9 @@ async function init(getMarketCsv,getTradeCsv) {
       default:
         responseWithFile(response,'application/js','www'+path)
     }
-  }).listen(port)
+  }).listen(shores.server.port)
   
-  console.log("Listening on port " + port)
+  console.log("Listening on port " + shores.server.port)
 }
 
 module.exports = {
