@@ -1,11 +1,13 @@
 const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
 const SwaggerClient = require("swagger-client")
-const shoes = require('./shoes');
+const shoes = require('./shoes')
+const fs = require('fs')
 
-const BitMEXRealtimeAPI = require('bitmex-realtime-api');
+const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 
 var client, wsClient, exitTradeCallback, marketCache
-let binSize = 5
+var binSize = 5
+var pendingOrder
 
 async function connectWebSocketClient() {
   var ws = new BitMEXRealtimeAPI({
@@ -23,16 +25,23 @@ async function connectWebSocketClient() {
     var exec = data[0]
     if (exec) {
       console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
-      if (exec.ordStatus === 'Filled' && (exec.ordType === 'StopLimit' || exec.ordType === 'LimitIfTouched')) {
+      if (exec.ordStatus === 'Filled' && exec.ordType === 'Limit') {
         console.log(exec)
-        let position = await getPosition()
-        if (position.currentQty === 0) {
-          client.Order.Order_cancelAll({symbol:'XBTUSD'})
-          let margin = await getMargin()
-          console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
-          exitTradeCallback([exec.timestamp,exec.price])
+        if (pendingOrder) {
+          enterStops(pendingOrder)
+          pendingOrder = null
         }
       }
+      // if (exec.ordStatus === 'Filled' && (exec.ordType === 'StopLimit' || exec.ordType === 'LimitIfTouched')) {
+      //   console.log(exec)
+      //   let position = await getPosition()
+      //   if (position.currentQty === 0) {
+      //     client.Order.Order_cancelAll({symbol:'XBTUSD'})
+      //     let margin = await getMargin()
+      //     console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
+      //     exitTradeCallback([exec.timestamp,exec.price])
+      //   }
+      // }
     }
   })
 
@@ -220,10 +229,53 @@ async function getMargin() {
   return margin
 }
 
+// async function getOrders() {
+//   var response = await client.User.Order_getOrders()  
+//   .catch(function(e) {
+//     console.log('Error:', e.statusText)
+//     debugger
+//   })
+//   var orders = JSON.parse(response.data.toString())
+//   return orders
+// }
+
+async function enterStops(order) {
+  let stopLossOrderResponse = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+    orderQty:-order.positionSizeUSD,
+    price:order.stopLoss,
+    stopPx:order.stopLossTrigger
+  }).catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Submitted - StopLimit Order ')
+
+  let takeProfitOrderResponse = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+    orderQty:-order.positionSizeUSD,
+    price:order.takeProfit,
+    stopPx:order.takeProfitTrigger
+  }).catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Submitted - TakeProfitLimit Order ')
+
+  let stopMarketOrderResponse = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+    orderQty:-order.positionSizeUSD,
+    stopPx:order.stopMarketTrigger
+  }).catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Submitted - StopMarket Order ')
+}
+
 async function enter(order,margin) {
   console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
 
   console.log('ENTER ', JSON.stringify(order))
+
+  pendingOrder = order
 
   let candelAllOrdersResponse = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
   .catch(function(e) {
@@ -248,35 +300,6 @@ async function enter(order,margin) {
   })
   console.log('Submitted - Limit Order ')
 
-  let stopLossOrderResponse = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice',
-    orderQty:-order.positionSizeUSD,
-    price:order.stopLoss,
-    stopPx:order.stopLossTrigger
-  }).catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Submitted - StopLimit Order ')
-
-  let takeProfitOrderResponse = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice',
-    orderQty:-order.positionSizeUSD,
-    price:order.takeProfit,
-    stopPx:order.takeProfitTrigger
-  }).catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Submitted - TakeProfitLimit Order ')
-
-  let stopMarketOrderResponse = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice',
-    orderQty:-order.positionSizeUSD,
-    stopPx:order.stopMarketTrigger
-  }).catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Submitted - StopMarket Order ')
-
   return true
 }
 
@@ -287,8 +310,7 @@ async function init(exitTradeCb) {
     debugger
   })
   connectWebSocketClient()
-  // inspect(client.apis)
-
+  inspect(client.apis)
 }
 
 module.exports = {
@@ -296,5 +318,6 @@ module.exports = {
   getMarket: getTradeBucketed,
   getPosition: getPosition,
   getMargin: getMargin,
+  // getOrder: getOrder,
   enter: enter
 }

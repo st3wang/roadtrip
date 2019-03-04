@@ -24,6 +24,26 @@ async function next() {
   
   var order = strategy.getOrder(rsiSignal,market,bankroll,position,margin)
   var orderSent = false
+
+  // test
+  // var distance = 0.5
+  // order.type = 'SHORT'
+  // order.entryPrice = 3802
+  // if (order.type == 'LONG') {
+  //   order.stopLoss = order.entryPrice - distance
+  //   order.stopMarketTrigger = order.entryPrice - distance*4
+  //   order.takeProfit = order.entryPrice + distance
+  //   order.positionSizeUSD = 1
+  // }
+  // else {
+  //   order.stopLoss = order.entryPrice + distance
+  //   order.stopMarketTrigger = order.entryPrice + distance*4
+  //   order.takeProfit = order.entryPrice - distance
+  //   order.positionSizeUSD = -1
+  // }
+  // order.stopLossTrigger = order.stopLoss
+  // order.takeProfitTrigger = order.takeProfit
+
   if (order.type == 'SHORT' || order.type == 'LONG') {
     orderSent = await bitmex.enter(order,margin)
   }
