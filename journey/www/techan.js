@@ -3423,7 +3423,7 @@ module.exports = function(d3_select, d3_functor, d3_mouse, d3_dispatch, accessor
 
       plot.appendPathsGroupBy(group.selection, p.accessor, 'tradearrow', classes);
       group.entry.append('path').attr('class', 'highlight').style('pointer-events', 'none'); // Do not want mouse events on the highlight
-
+      
       group.selection.selectAll('path.tradearrow')
         .on('mouseenter', function(data) {
           var nearest = findNearest(data, d3_mouse(this)[0]);
@@ -3523,8 +3523,19 @@ module.exports = function(d3_behavior_drag, d3_event, d3_select, d3_dispatch, ac
     function trendline(g) {
       var group = p.dataSelector(g),
           trendlineGroup = group.entry.append('g').attr('class', 'trendline');
-
+      
       trendlineGroup.append('path').attr('class', 'body');
+
+      if (group) {
+        var pathBody = trendlineGroup.selectAll('path.body')._groups
+        var text = trendlineGroup.append('text').attr('class','start')
+        var textData = text.data()
+        text._groups[0].forEach((tg,i) => {
+          tg.textContent = textData[i].start.value
+          tg.style.fill = pathBody[i][0].style.stroke = textData[i].color
+
+        })
+      }
 //       trendlineGroup.append('circle').attr('class', 'start').attr('r', 1);
 //       trendlineGroup.append('circle').attr('class', 'end').attr('r', 1);
 
@@ -3609,6 +3620,7 @@ module.exports = function(d3_behavior_drag, d3_event, d3_select, d3_dispatch, ac
 
 function refresh(selection, accessor, x, y) {
   selection.selectAll('path.body').attr('d', trendlinePath(accessor, x, y));
+  selection.selectAll('text.start').attr('x', trendlineEndCX(accessor.ed, x)).attr('y', trendlineEndCY(accessor.ev, y));
   selection.selectAll('circle.start').attr('cx', trendlineEndCX(accessor.sd, x)).attr('cy', trendlineEndCY(accessor.sv, y));
   selection.selectAll('circle.end').attr('cx', trendlineEndCX(accessor.ed, x)).attr('cy', trendlineEndCY(accessor.ev, y));
 }
@@ -3621,11 +3633,11 @@ function trendlinePath(accessor, x, y) {
 }
 
 function trendlineEndCX(accessor_x, x) {
-  return function(d) { return x(accessor_x(d)); };
+  return function(d) { return x(accessor_x(d))+4; };
 }
 
 function trendlineEndCY(accessor_y, y) {
-  return function(d) { return y(accessor_y(d)); };
+  return function(d) { return y(accessor_y(d))+3; };
 }
 },{}],56:[function(require,module,exports){
 'use strict';
@@ -4358,8 +4370,8 @@ module.exports = function(d3_functor) {  // Injected dependencies
       var path,
           x = fx(d, i),
           y = fy(d, i),
-          w = width(d, i)*2,
-          h = height(d, i)*2,
+          w = width(d, i)*1.5,
+          h = height(d, i)*1.5,
           o = orient(d, i),
           t = tail(d, i),
           neg = o === 'left' || o === 'up' ? 1 : -1,

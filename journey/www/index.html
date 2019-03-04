@@ -39,7 +39,6 @@
 
     path.tradearrow {
         stroke: none;
-        scale: 2.0;
     }
 
     path.tradearrow.ENTER-LONG {
@@ -101,9 +100,13 @@
     }
 
     .trendline path.body {
-        stroke: yellow;
-        stroke-width: 1.5;
+        stroke: #cc47ed;
+        stroke-width: 1;
         stroke-dasharray: 4;
+    }
+
+    .trendline text.start {
+        fill: #fff;
     }
 </style>
 <body>
@@ -111,7 +114,7 @@
 <script src="techan.js"></script>
 <script>
 
-    var margin = {top: 20, right: 20, bottom: 30, left: 50},
+    var margin = {top: 20, right: 30, bottom: 30, left: 50},
             width = 960 - margin.left - margin.right,
             height = 500 - margin.top - margin.bottom;
 
@@ -210,9 +213,14 @@
                 lastTrade = trades[trades.length-2]
             }
             var lastCandle = data[data.length-1]
+            var startDate = new Date(lastTrade.date)
+            var endDate = new Date(lastCandle.date)
+            let color = lastTrade.type.endsWith('SHORT') ? '#CC47ED' : '#008fff'
+            
             trendlines = [
-              { start: { date: new Date(lastTrade.date), value: lastTrade.stopLoss }, end: { date: new Date(lastCandle.date), value: lastTrade.stopLoss } },
-              { start: { date: new Date(lastTrade.date), value: lastTrade.takeProfit }, end: { date: new Date(lastCandle.date), value: lastTrade.takeProfit } }
+              { color: color, start: { date: startDate, value: lastTrade.price }, end: { date: endDate, value: lastTrade.price } },
+              { color: color, start: { date: startDate, value: lastTrade.stopLoss }, end: { date: endDate, value: lastTrade.stopLoss } },
+              { color: color, start: { date: startDate, value: lastTrade.takeProfit }, end: { date: endDate, value: lastTrade.takeProfit } }
             ]
           }
           draw(data, trades, trendlines);
@@ -249,7 +257,7 @@
     var rsi = techan.plot.rsi()
             .xScale(x)
             .yScale(y);
-  var margin = {top: 20, right: 20, bottom: 30, left: 50},
+  var margin = {top: 20, right: 30, bottom: 30, left: 50},
             width = 960 - margin.left - margin.right,
             height = 200 - margin.top - margin.bottom;
 
