@@ -209,19 +209,18 @@
           var trendlines = []
           if (trades.length > 0) {
             var lastTrade = trades[trades.length-1]
-            if (lastTrade.type.startsWith('EXIT')) {
-                lastTrade = trades[trades.length-2]
+            if (lastTrade.type.startsWith('ENTER')) {
+                var lastCandle = data[data.length-1]
+                var startDate = new Date(lastTrade.date)
+                var endDate = new Date(lastCandle.date)
+                let color = lastTrade.type.endsWith('SHORT') ? '#CC47ED' : '#008fff'
+
+                trendlines = [
+                  { color: color, start: { date: startDate, value: lastTrade.price }, end: { date: endDate, value: lastTrade.price } },
+                  { color: color, start: { date: startDate, value: lastTrade.stopLoss }, end: { date: endDate, value: lastTrade.stopLoss } },
+                  { color: color, start: { date: startDate, value: lastTrade.takeProfit }, end: { date: endDate, value: lastTrade.takeProfit } }
+                ]
             }
-            var lastCandle = data[data.length-1]
-            var startDate = new Date(lastTrade.date)
-            var endDate = new Date(lastCandle.date)
-            let color = lastTrade.type.endsWith('SHORT') ? '#CC47ED' : '#008fff'
-            
-            trendlines = [
-              { color: color, start: { date: startDate, value: lastTrade.price }, end: { date: endDate, value: lastTrade.price } },
-              { color: color, start: { date: startDate, value: lastTrade.stopLoss }, end: { date: endDate, value: lastTrade.stopLoss } },
-              { color: color, start: { date: startDate, value: lastTrade.takeProfit }, end: { date: endDate, value: lastTrade.takeProfit } }
-            ]
           }
           draw(data, trades, trendlines);
         })
