@@ -3528,12 +3528,12 @@ module.exports = function(d3_behavior_drag, d3_event, d3_select, d3_dispatch, ac
 //       trendlineGroup.append('circle').attr('class', 'start').attr('r', 1);
 //       trendlineGroup.append('circle').attr('class', 'end').attr('r', 1);
 
-      var interaction = group.entry.append('g').attr('class', 'interaction').style('opacity', 0).style('fill', 'none')
-        .call(plot.interaction.mousedispatch(dispatch));
+      // var interaction = group.entry.append('g').attr('class', 'interaction').style('opacity', 0).style('fill', 'none')
+        // .call(plot.interaction.mousedispatch(dispatch));
 
-      interaction.append('path').attr('class', 'body').style('stroke-width', '16px');
-      interaction.append('circle').attr('class', 'start').attr('r', 8);
-      interaction.append('circle').attr('class', 'end').attr('r', 8);
+      // interaction.append('path').attr('class', 'body').style('stroke-width', '16px');
+      // interaction.append('circle').attr('class', 'start').attr('r', 8);
+      // interaction.append('circle').attr('class', 'end').attr('r', 8);
 
       trendline.refresh(g);
     }
