@@ -1014,9 +1014,9 @@ module.exports = function(indicatorMixin, accessor_ohlc) {  // Injected dependen
   return function() { // Closure function
     var p = {},  // Container for private, direct access mixed in variables
         period = 20,
-        overbought = 70,
+        overbought = 55,
         middle = 0,
-        oversold = 35;
+        oversold = 25;
 
     function indicator(data) {
       return data.map(function(d, i) {
@@ -1544,9 +1544,9 @@ function datum(date, macd, signal, difference, zero) {
 module.exports = function(indicatorMixin, accessor_ohlc, indicator_ema) {  // Injected dependencies
   return function() { // Closure function
     var p = {},  // Container for private, direct access mixed in variables
-        overbought = 70,
+        overbought = 55,
         middle = 50,
-        oversold = 35,
+        oversold = 25,
         lossAverage = indicator_ema(),
         gainAverage = indicator_ema();
 
