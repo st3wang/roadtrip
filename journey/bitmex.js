@@ -25,23 +25,29 @@ async function connectWebSocketClient() {
     var exec = data[0]
     if (exec) {
       console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
-      if (exec.ordStatus === 'Filled' && exec.ordType === 'Limit') {
+      if (exec.ordStatus === 'Filled') {
         console.log(exec)
-        if (pendingOrder) {
-          enterStops(pendingOrder)
-          pendingOrder = null
+        switch(exec.ordType) {
+          case 'Limit':
+            if (pendingOrder) {
+              enterStops(pendingOrder)
+              pendingOrder = null
+            }
+            break;
+          case 'StopLimit':
+          case 'LimitIfTouched':
+            exitTradeCallback([exec.timestamp,exec.price])
+            // let position = await getPosition()
+            // if (position.currentQty === 0) {
+              // client.Order.Order_cancelAll({symbol:'XBTUSD'})
+              //let margin = await getMargin()
+              //console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
+              // exitTradeCallback([exec.timestamp,exec.price])
+            // }
+            break;
         }
       }
-      // if (exec.ordStatus === 'Filled' && (exec.ordType === 'StopLimit' || exec.ordType === 'LimitIfTouched')) {
-      //   console.log(exec)
-      //   let position = await getPosition()
-      //   if (position.currentQty === 0) {
-      //     client.Order.Order_cancelAll({symbol:'XBTUSD'})
-      //     let margin = await getMargin()
-      //     console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
-      //     exitTradeCallback([exec.timestamp,exec.price])
-      //   }
-      // }
+
     }
   })
 
