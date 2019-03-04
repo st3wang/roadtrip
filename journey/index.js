@@ -4,31 +4,40 @@ const bitmex = require('./bitmex')
 const strategy = require('./strategy')
 const server = require('./server')
 
+const setup = {
+  rsi: {
+    length: 8,
+    overbought: 55,
+    oversold: 25
+  },
+  bankroll: {
+    capitalUSD: 500,
+    riskPerTradePercent: 0.01,
+    profitFactor: 1.50,
+    stopMarketFactor: 1.30,
+    stopLossLookBack: 4,
+    minimumStopLoss: 0.001
+  }
+}
+
 async function next() {
   let position = await bitmex.getPosition()
   let margin = await bitmex.getMargin()
   let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles
-  let rsiSignal = await strategy.getSignal(market.closes,11,70,35)
-  let bankroll = {
-    capitalUSD: 500,
-    riskPerTradePercent: 0.01,
-    profitFactor: 1.65,
-    stopMarketFactor: 1.30,
-    stopLossLookBack: 2,
-    minimumStopLoss: 0.001
-  }
+  let rsiSignal = await strategy.getSignal(market.closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
 
   // test
   // rsiSignal.condition = 'LONG'
   // position.currentQty = 0
   
-  var order = strategy.getOrder(rsiSignal,market,bankroll,position,margin)
+  var order = strategy.getOrder(rsiSignal,market,setup.bankroll,position,margin)
   var orderSent = false
 
   // test
   // var distance = 0.5
   // order.type = 'SHORT'
-  // order.entryPrice = 3802
+  // order.entryPrice = 3718.5
+  // order.leverage = 1
   // if (order.type == 'LONG') {
   //   order.stopLoss = order.entryPrice - distance
   //   order.stopMarketTrigger = order.entryPrice - distance*4
@@ -47,7 +56,7 @@ async function next() {
   if (order.type == 'SHORT' || order.type == 'LONG') {
     orderSent = await bitmex.enter(order,margin)
   }
-  log.writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent)
+  log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,order,orderSent)
 }
 
 async function getMarketCsv() {

@@ -60,6 +60,18 @@ function highest(values,start,length) {
   return Math.max.apply( Math, array )
 }
 
+function lowestBody(market,start,length) {
+  var lowestOpen = lowest(market.opens,start,length)
+  var lowestClose = lowest(market.closes,start,length)
+  return Math.min(lowestOpen,lowestClose)
+}
+
+function highestBody(market,start,length) {
+  var highestOpen = highest(market.opens,start,length)
+  var highestClose = highest(market.closes,start,length)
+  return Math.min(highestOpen,highestClose)
+}
+
 function getOrder(signal,market,bankroll,position,margin) {
   let signalCondition = signal.condition
   let positionSize = position.currentQty
@@ -73,8 +85,8 @@ function getOrder(signal,market,bankroll,position,margin) {
   let profitFactor = bankroll.profitFactor
   let stopMarketFactor = bankroll.stopMarketFactor
   let stopLossLookBack = bankroll.stopLossLookBack
-  let last = market.closes.length - 1
-  let entryPrice = market.closes[last]
+  let lastIndex = market.closes.length - 1
+  let entryPrice = market.closes[lastIndex]
   let availableMargin = margin.availableMargin*0.000000009
   let riskAmountUSD = capitalUSD * riskPerTradePercent
   let riskAmountBTC = riskAmountUSD / entryPrice
@@ -83,7 +95,7 @@ function getOrder(signal,market,bankroll,position,margin) {
     lossDistancePercent, positionSizeUSD, positionSizeBTC, leverage
   switch(signalCondition) {
     case 'SHORT':
-      stopLoss = highest(market.highs,last,stopLossLookBack)
+      stopLoss = highestBody(market,lastIndex,stopLossLookBack)
       lossDistance = Math.abs(stopLoss - entryPrice)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
       profitDistance = -lossDistance * profitFactor
@@ -96,7 +108,7 @@ function getOrder(signal,market,bankroll,position,margin) {
       positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
-      stopLoss = lowest(market.lows,last,stopLossLookBack)
+      stopLoss = lowestBody(market,lastIndex,stopLossLookBack)
       lossDistance = -Math.abs(entryPrice - stopLoss)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
       profitDistance = -lossDistance * profitFactor
