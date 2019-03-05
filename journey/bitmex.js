@@ -36,6 +36,7 @@ async function connectWebSocketClient() {
             break;
           case 'StopLimit':
           case 'LimitIfTouched':
+          case 'Stop':
             exitTradeCallback([exec.timestamp,exec.price])
             // let position = await getPosition()
             // if (position.currentQty === 0) {
