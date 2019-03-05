@@ -61,7 +61,7 @@ async function next() {
 
 async function getMarketCsv() {
   var market = await bitmex.getMarket(15,96)
-  var rsis = await strategy.getRsi(market.closes,11)
+  var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
   var csv = 'Date,Open,High,Low,Close,Rsi\n'
   market.candles.forEach((candle,i) => {
     csv += //new Date(candle.time).toUTCString()
