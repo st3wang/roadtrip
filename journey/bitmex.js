@@ -1,11 +1,10 @@
 const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
 const SwaggerClient = require("swagger-client")
 const shoes = require('./shoes')
-const fs = require('fs')
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 
-var client, wsClient, exitTradeCallback, marketCache
+var client, exitTradeCallback, marketCache
 var binSize = 5
 var pendingOrder
 
