@@ -16,7 +16,8 @@ const setup = {
     profitFactor: 1.50,
     stopMarketFactor: 1.30,
     stopLossLookBack: 4,
-    minimumStopLoss: 0.001
+    minStopLoss: 0.001,
+    maxStopLoss: 0.01
   }
 }
 
@@ -27,8 +28,8 @@ async function next() {
   let rsiSignal = await strategy.getSignal(market.closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
 
   // test
-  // rsiSignal.condition = 'LONG'
-  // position.currentQty = 0
+  rsiSignal.condition = 'LONG'
+  position.currentQty = 0
   
   var order = strategy.getOrder(rsiSignal,market,setup.bankroll,position,margin)
   var orderSent = false

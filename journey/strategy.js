@@ -125,8 +125,11 @@ function getOrder(signal,market,bankroll,position,margin) {
   positionSizeBTC = positionSizeUSD / entryPrice
   leverage = Math.ceil(Math.abs(positionSizeBTC / availableMargin))
 
+  var absLossDistancePercent = Math.abs(lossDistancePercent)
+  var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
+
   return {
-    type: (Math.abs(lossDistancePercent) < bankroll.minimumStopLoss) ? '-' : signalCondition,
+    type: (goodStopDistance ? signalCondition : '-'),
     entryPrice: entryPrice,
     lossDistance: lossDistance,
     lossDistancePercent: lossDistance/entryPrice,
