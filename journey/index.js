@@ -28,8 +28,8 @@ async function next() {
   let rsiSignal = await strategy.getSignal(market.closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
 
   // test
-  rsiSignal.condition = 'LONG'
-  position.currentQty = 0
+  // rsiSignal.condition = 'LONG'
+  // position.currentQty = 0
   
   var order = strategy.getOrder(rsiSignal,market,setup.bankroll,position,margin)
   var orderSent = false
