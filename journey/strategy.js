@@ -69,7 +69,7 @@ function lowestBody(market,start,length) {
 function highestBody(market,start,length) {
   var highestOpen = highest(market.opens,start,length)
   var highestClose = highest(market.closes,start,length)
-  return Math.min(highestOpen,highestClose)
+  return Math.max(highestOpen,highestClose)
 }
 
 function getOrder(signal,market,bankroll,position,margin) {
