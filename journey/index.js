@@ -94,7 +94,7 @@ async function start() {
   next()
   var now = new Date().getTime()
   var interval = 15*60000
-  var delay = 15000 // bitmex bucket data delay. it will be faster with WS
+  var delay = 20000 // bitmex bucket data delay. it will be faster with WS
   var startIn = interval-now%(interval) + delay
   var startInSec = startIn % 60000
   var startInMin = (startIn - startInSec) / 60000
