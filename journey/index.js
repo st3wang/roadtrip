@@ -6,9 +6,9 @@ const server = require('./server')
 
 const setup = {
   rsi: {
-    length: 8,
-    overbought: 55,
-    oversold: 25
+    length: 2,
+    overbought: 60,
+    oversold: 35
   },
   bankroll: {
     capitalUSD: 500,
