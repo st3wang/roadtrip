@@ -3,23 +3,10 @@ const log = require('./log')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
 const server = require('./server')
+const shoes = require('./shoes')
+const setup = shoes.setup
 
-const setup = {
-  rsi: {
-    length: 2,
-    overbought: 55,
-    oversold: 45
-  },
-  bankroll: {
-    capitalUSD: 500,
-    riskPerTradePercent: 0.01,
-    profitFactor: 1.50,
-    stopMarketFactor: 1.30,
-    stopLossLookBack: 4,
-    minStopLoss: 0.001,
-    maxStopLoss: 0.01
-  }
-}
+console.log('setup', JSON.stringify(setup))
 
 async function next() {
   let position = await bitmex.getPosition()
