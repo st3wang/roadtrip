@@ -83,14 +83,15 @@ function getOrder(signal,market,bankroll,position,margin) {
   let lastIndex = market.closes.length - 1
   let entryPrice = market.closes[lastIndex]
   let availableMargin = margin.availableMargin
-  let capitalBTC = bankroll.outsideCapitalBTC + availableMargin/100000000
+  let outsideCapitalBTC = bankroll.outsideCapitalBTC || 0
+  let outsideCapitalUSD = bankroll.outsideCapitalUSD || 0
+  let capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + availableMargin/100000000
   let capitalUSD = capitalBTC * entryPrice
   let riskPerTradePercent = bankroll.riskPerTradePercent
   let profitFactor = bankroll.profitFactor
   let stopMarketFactor = bankroll.stopMarketFactor
   let stopLossLookBack = bankroll.stopLossLookBack
   let leverageMargin = availableMargin*0.000000009
-  // let riskAmountUSD = capitalUSD * riskPerTradePercent
   let lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger, stopMarketTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
