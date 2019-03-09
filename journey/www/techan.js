@@ -1546,7 +1546,7 @@ module.exports = function(indicatorMixin, accessor_ohlc, indicator_ema) {  // In
     var p = {},  // Container for private, direct access mixed in variables
         overbought = 55,
         middle = 50,
-        oversold = 45,
+        oversold = 50,
         lossAverage = indicator_ema(),
         gainAverage = indicator_ema();
 
@@ -4370,8 +4370,8 @@ module.exports = function(d3_functor) {  // Injected dependencies
       var path,
           x = fx(d, i),
           y = fy(d, i),
-          w = width(d, i)*1.5,
-          h = height(d, i)*1.5,
+          w = width(d, i)*1,
+          h = height(d, i)*1,
           o = orient(d, i),
           t = tail(d, i),
           neg = o === 'left' || o === 'up' ? 1 : -1,

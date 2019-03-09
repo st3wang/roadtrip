@@ -135,7 +135,17 @@
     var tradearrow = techan.plot.tradearrow()
             .xScale(x)
             .yScale(y)
-            .orient(function(d) { return d.type.startsWith('ENTER') ? "right" : "left"; })
+            .orient(function(d) { 
+                if (d.type.startsWith('EXIT')) {
+                    if (d.price == d.takeProfit) {
+                        return 'up'
+                    }
+                    else {
+                        return 'down'
+                    }
+                }
+                return 'right'
+            })
             .on("mouseenter", enter)
             .on("mouseout", out);
 

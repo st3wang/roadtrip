@@ -18,7 +18,7 @@ async function connectWebSocketClient() {
   ws.on('error', console.error);
   ws.on('open', () => console.log('Connection opened.'));
   ws.on('close', () => console.log('Connection closed.'));
-  ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
+  // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
   
   ws.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
     var exec = data[0]
@@ -316,7 +316,7 @@ async function init(exitTradeCb) {
     debugger
   })
   connectWebSocketClient()
-  inspect(client.apis)
+  // inspect(client.apis)
 }
 
 module.exports = {
