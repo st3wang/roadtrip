@@ -80,19 +80,21 @@ function getOrder(signal,market,bankroll,position,margin) {
     return {type:'-'}
   }
   
-  let capitalUSD = bankroll.capitalUSD
+  let lastIndex = market.closes.length - 1
+  let entryPrice = market.closes[lastIndex]
+  let availableMargin = margin.availableMargin
+  let capitalBTC = bankroll.outsideCapitalBTC + availableMargin/100000000
+  let capitalUSD = capitalBTC * entryPrice
   let riskPerTradePercent = bankroll.riskPerTradePercent
   let profitFactor = bankroll.profitFactor
   let stopMarketFactor = bankroll.stopMarketFactor
   let stopLossLookBack = bankroll.stopLossLookBack
-  let lastIndex = market.closes.length - 1
-  let entryPrice = market.closes[lastIndex]
-  let availableMargin = margin.availableMargin*0.000000009
-  let riskAmountUSD = capitalUSD * riskPerTradePercent
-  let riskAmountBTC = riskAmountUSD / entryPrice
+  let leverageMargin = availableMargin*0.000000009
+  // let riskAmountUSD = capitalUSD * riskPerTradePercent
   let lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
-    stopLossTrigger, takeProfitTrigger, stopMarketTrigger,
-    lossDistancePercent, positionSizeUSD, positionSizeBTC, leverage
+    stopLossTrigger, takeProfitTrigger, stopMarketTrigger,lossDistancePercent,
+    riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
+
   switch(signalCondition) {
     case 'SHORT':
       stopLoss = highestBody(market,lastIndex,stopLossLookBack)
@@ -105,7 +107,7 @@ function getOrder(signal,market,bankroll,position,margin) {
       takeProfitTrigger = takeProfit + 0.5
       stopMarketTrigger = entryPrice + stopMarketDistance
       lossDistancePercent = lossDistance/entryPrice
-      positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
+      // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
       stopLoss = lowestBody(market,lastIndex,stopLossLookBack)
@@ -118,17 +120,22 @@ function getOrder(signal,market,bankroll,position,margin) {
       takeProfitTrigger = takeProfit - 0.5
       stopMarketTrigger = entryPrice + stopMarketDistance
       lossDistancePercent = lossDistance/entryPrice
-      positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
+      // positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
       break;
   }
-  
-  positionSizeBTC = positionSizeUSD / entryPrice
-  leverage = Math.ceil(Math.abs(positionSizeBTC / availableMargin))
+
+  riskAmountBTC = capitalBTC * riskPerTradePercent
+  riskAmountUSD = Math.round(riskAmountBTC * entryPrice)
+  positionSizeBTC = riskAmountBTC / -lossDistancePercent
+  positionSizeUSD = Math.round(positionSizeBTC * entryPrice)
+  leverage = Math.ceil(Math.abs(positionSizeBTC / leverageMargin))
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
 
   return {
+    capitalBTC: capitalBTC,
+    capitalUSD: capitalUSD,
     type: (goodStopDistance ? signalCondition : '-'),
     entryPrice: entryPrice,
     lossDistance: lossDistance,
@@ -139,10 +146,10 @@ function getOrder(signal,market,bankroll,position,margin) {
     stopLossTrigger: stopLossTrigger,
     takeProfitTrigger: takeProfitTrigger,
     stopMarketTrigger: stopMarketTrigger,
-    riskAmountUSD: riskAmountUSD,
     riskAmountBTC: riskAmountBTC,
-    positionSizeUSD: positionSizeUSD,
+    riskAmountUSD: riskAmountUSD,
     positionSizeBTC: positionSizeBTC,
+    positionSizeUSD: positionSizeUSD,
     leverage: leverage
   }
 }

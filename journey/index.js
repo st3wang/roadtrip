@@ -14,32 +14,35 @@ async function next() {
   let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles
   let rsiSignal = await strategy.getSignal(market.closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
 
-  // test
-  // rsiSignal.condition = 'LONG'
-  // position.currentQty = 0
+  // if (shoes.test) {
+  //   rsiSignal.condition = 'SHORT'
+  //   position.currentQty = 0
+  // }
   
   var order = strategy.getOrder(rsiSignal,market,setup.bankroll,position,margin)
   var orderSent = false
 
-  // test
-  // var distance = 0.5
-  // order.type = 'SHORT'
-  // order.entryPrice = 3718.5
-  // order.leverage = 1
-  // if (order.type == 'LONG') {
-  //   order.stopLoss = order.entryPrice - distance
-  //   order.stopMarketTrigger = order.entryPrice - distance*4
-  //   order.takeProfit = order.entryPrice + distance
-  //   order.positionSizeUSD = 1
+  // if (shoes.test) {
+  //   debugger
+  //   var distance = 0.5
+  //   order.type = 'SHORT'
+  //   order.entryPrice = 3718.5
+  //   order.leverage = 1
+  //   if (order.type == 'LONG') {
+  //     order.stopLoss = order.entryPrice - distance
+  //     order.stopMarketTrigger = order.entryPrice - distance*4
+  //     order.takeProfit = order.entryPrice + distance
+  //     order.positionSizeUSD = 1
+  //   }
+  //   else {
+  //     order.stopLoss = order.entryPrice + distance
+  //     order.stopMarketTrigger = order.entryPrice + distance*4
+  //     order.takeProfit = order.entryPrice - distance
+  //     order.positionSizeUSD = -1
+  //   }
+  //   order.stopLossTrigger = order.stopLoss
+  //   order.takeProfitTrigger = order.takeProfit
   // }
-  // else {
-  //   order.stopLoss = order.entryPrice + distance
-  //   order.stopMarketTrigger = order.entryPrice + distance*4
-  //   order.takeProfit = order.entryPrice - distance
-  //   order.positionSizeUSD = -1
-  // }
-  // order.stopLossTrigger = order.stopLoss
-  // order.takeProfitTrigger = order.takeProfit
 
   if (order.type == 'SHORT' || order.type == 'LONG') {
     orderSent = await bitmex.enter(order,margin)
