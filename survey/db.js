@@ -29,26 +29,29 @@ async function createTables(minRsiLength,maxRsiLength) {
       SetupRsiOversold tinyint,
       SetupStopLossLookBack tinyint,
       SetupProfitFactor smallint,
-      EnterType varchar(1)not null,
-      EnterCapital smallint,
+
       EnterTime int,
-      EnterSize smallint,
+      EnterType varchar(1),
+      EnterCapital int,
       EnterPrice decimal(9,2),
       StopLoss decimal(9,2),
       TakeProfit decimal(9,2),
+
       ExitTime int,
       ExitPrice decimal(9,2),
-      ExitCapital smallint
+      ExitCapital int
     )`
-    
+
     let results = await con.query(sql).catch(e => console.error(e))
     console.log('done',sql)
   }
 }
 
 function startTradeSetup(setup) {
-  return {sql:`INSERT INTO TradeRsi` + setup.rsiLength + `(SetupRsiOverbought,SetupRsiOversold,SetupStopLossLookBack,SetupProfitFactor,
-    EnterType,EnterCapital,EnterTime,EnterSize,EnterPrice,StopLoss,TakeProfit,
+  return
+  return {sql:`INSERT INTO TradeRsi` + setup.rsiLength + 
+  `(SetupRsiOverbought,SetupRsiOversold,SetupStopLossLookBack,SetupProfitFactor,
+    EnterTime,EnterType,EnterCapital,EnterPrice,StopLoss,TakeProfit,
     ExitTime,ExitPrice,ExitCapital) VALUE`,
     params:[],enterCount:0,exitCount:0}
 }
@@ -56,6 +59,7 @@ function startTradeSetup(setup) {
 var pendingEndTradeSetup
 
 async function endTradeSetup(query) {
+  return
   var sql = query.sql, params = query.params
   sql = sql.slice(0, -1)
   if (params.length % 16 !== 0) {
@@ -87,14 +91,16 @@ async function endTradeSetup(query) {
 }
 
 function enterTrade(query,rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,type,capital,time,size,price,stopLoss,takeProfit) {
+  return
   // query.enterCount++
-  query.sql += ` (?,?,?,?,?,?,?,?,?,?,?,?,?,?),`
+  query.sql += ` (?,?,?,?,?,?,?,?,?,?,?,?,?),`
   query.params.push(rsiOverbought,rsiOversold,stopLossLookBack,profitFactor,
-    type,capital,time/1000,size,price,stopLoss,takeProfit)
+    time/1000,type,capital,price,stopLoss,takeProfit)
   return
 }
 
 function exitTrade(query,time,price,capital) {
+  return
   // query.exitCount++
   query.params.push(time/1000,price,capital)
   return

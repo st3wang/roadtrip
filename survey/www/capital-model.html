@@ -1,0 +1,190 @@
+<head>
+  <!-- Plotly.js -->
+  <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+  <style>
+    body {
+      font-family: Helvetica;
+      font-size: 14px;
+    }
+    input {
+      width: 40px;
+      text-align: right;
+      font-size: 12px;
+    }
+    button {
+      font-size: 12px;
+    }
+    #plotDiv {
+      width: 100%;
+      height: 620px;
+    }
+  </style>
+</head>
+
+<body>
+  <div>
+    <label>Profit : </label><span id="profitSpan">100</span>&nbsp&nbsp&nbsp&nbsp
+    <label>Total Trades : </label><span id="totalTradesSpan">100</span>&nbsp&nbsp&nbsp&nbsp
+
+    <label>Win Rate : </label><span id="winRateSpan">100</span>&nbsp&nbsp&nbsp&nbsp
+    <label>Max Drawdown : </label><span id="maxDrawdownSpan">100</span>&nbsp&nbsp&nbsp&nbsp
+    <label>Average Bars In Trade : </label><span id="averageBarsInTradeSpan">100</span>&nbsp&nbsp&nbsp&nbsp
+    <label>Not In Trade : </label><span id="averageBarsNotInTradeSpan">100</span>
+
+  </div>
+  <div id="plotDiv"></div>
+  <div>
+    <button onclick="decrease(rsiLengthInput)">-</button>
+    <input id="rsiLengthInput" type="text" value="2"></input>
+    <button onclick="increase(rsiLengthInput)">+</button>
+    <label>Length</label>
+  </div>
+<!--   <div>
+    <button onclick="decrease(rsiOverboughtInput)">-</button>
+    <input id="rsiOverboughtInput" type="text" value="70"></input>
+    <button onclick="increase(rsiOverboughtInput)">+</button>
+    <label>Overbought</label>
+  </div> -->
+  <div>
+    <button onclick="decrease(rsiOverboughtExecuteInput)">-</button>
+    <input id="rsiOverboughtExecuteInput" type="text" value="55"></input>
+    <button onclick="increase(rsiOverboughtExecuteInput)">+</button>
+    <label>Overbought Execute</label>
+  </div>
+  <div>
+    <button onclick="decrease(rsiOversoldExecuteInput)">-</button>
+    <input id="rsiOversoldExecuteInput" type="text" value="50"></input>
+    <button onclick="increase(rsiOversoldExecuteInput)">+</button>
+    <label>Oversold Execute</label>
+  </div>
+<!--   <div>
+    <button onclick="decrease(rsiOversoldInput)">-</button>
+    <input id="rsiOversoldInput" type="text" value="30"></input>
+    <button onclick="increase(rsiOversoldInput)">+</button>
+    <label>Oversold</label>
+  </div> -->
+  <div>
+    <button onclick="decrease(stopLossLookBackInput)">-</button>
+    <input id="stopLossLookBackInput" type="text" value="4"></input>
+    <button onclick="increase(stopLossLookBackInput)">+</button>
+    <label>LookBack</label>
+  </div>
+  <div>
+    <button onclick="decrease(profitFactorInput)">-</button>
+    <input id="profitFactorInput" type="text" value="200"></input>
+    <button onclick="increase(profitFactorInput)">+</button>
+    <label>ProfitFactor</label>
+  </div>
+  <div>
+    <input type="checkbox" id="compoundInput" onclick="changeCompound(compoundInput)">
+    <label>Compound</label>
+  </div>
+  <script>
+  var market, plotCloses
+
+  var layout = {
+    autosize: true,
+    margin: {
+      l: 40,
+      r: 40,
+      b: 40,
+      t: 0,
+      pad: 10
+    }
+  }
+  
+  function decrease(input) {
+    var v = parseInt(input.value)
+    input.value = v-1
+    plot()
+  }
+  
+  function increase(input) {
+    var v = parseInt(input.value)
+    input.value = v+1
+    plot()
+  }
+
+  function changeCompound(input) {
+    plot()
+  }
+
+  async function getMarketData() {
+    var response = await fetch('http://localhost:3030/market.json')
+    market = await response.json()
+    var startDate = new Date('2017-01-01T00:00:00.000Z')
+    var t = startDate.getTime()
+    market.dates = market.closes.map(c => {
+      var nt = new Date(t).toISOString()
+      t += 900000
+      return nt
+    })
+
+    plotCloses = {
+      x: market.dates,
+      y: market.closes,
+      type: 'scatter'
+    };
+
+  }
+
+  async function plot() {
+    var setup = {
+      rsiLength: parseInt(rsiLengthInput.value),
+//       rsiOverbought: parseInt(rsiOverboughtInput.value),
+//       rsiOversold: parseInt(rsiOversoldInput.value),
+      rsiOverboughtExecute: parseInt(rsiOverboughtExecuteInput.value),
+      rsiOversoldExecute: parseInt(rsiOversoldExecuteInput.value),
+      stopLossLookBack: parseInt(stopLossLookBackInput.value),
+      profitFactor: parseInt(profitFactorInput.value),
+      compound: (compoundInput.checked)
+    }
+
+    var response = await fetch('http://localhost:3030/overview.json', {
+      method: 'GET',
+      headers: new Headers({setup:JSON.stringify(setup)}),
+    })
+    var overview = await response.json()
+    var overviewDrawdowns = overview.drawdowns
+    var drawdowns = []
+    var capitals = overview.capitals.map((c,i) => {
+      drawdowns[i] = 20000+overviewDrawdowns[i]*50000
+      return c/100
+    })
+
+    var plotCapitals = {
+      x: market.dates,
+      y: capitals,
+      type: 'scatter'
+    };
+
+    var plotDrawdowns = {
+      x: market.dates,
+      y: drawdowns,
+      type: 'scatter'
+    };
+
+    var data = [
+      plotCapitals,
+      plotDrawdowns,
+      plotCloses, 
+    ];
+
+    Plotly.newPlot('plotDiv', data, layout);
+
+    profitSpan.textContent = (capitals[capitals.length-1] / capitals[0] * 100).toFixed(2) + '%'
+    totalTradesSpan.textContent = overview.totalTrades
+    winRateSpan.textContent = (overview.winRate * 100).toFixed(2) + '%'
+    maxDrawdownSpan.textContent = (overview.maxDrawdown * 100).toFixed(0) + '%'
+    averageBarsInTradeSpan.textContent = overview.averageBarsInTrade.toFixed(0)
+    averageBarsNotInTradeSpan.textContent = overview.averageBarsNotInTrade.toFixed(0)
+  }
+
+  async function start() {
+    await getMarketData()
+    await plot()
+  }
+
+  start()
+  </script>
+</body>
