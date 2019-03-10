@@ -35,7 +35,8 @@ async function init(getMarketJson,getOverviewJson) {
         responseWithFile(response,'text/html','www/index.html')
         break;
       case '/market.json':
-        var marketJson = await getMarketJson()
+        var setup = JSON.parse(request.headers.setup)
+        var marketJson = await getMarketJson(setup)
         responseWithData(response,'application/json',marketJson)
         break;
       case '/overview.json':

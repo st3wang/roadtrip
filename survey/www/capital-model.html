@@ -71,7 +71,7 @@
   </div>
   <div>
     <button onclick="decrease(profitFactorInput)">-</button>
-    <input id="profitFactorInput" type="text" value="200"></input>
+    <input id="profitFactorInput" type="text" value="150"></input>
     <button onclick="increase(profitFactorInput)">+</button>
     <label>ProfitFactor</label>
   </div>
@@ -81,7 +81,9 @@
   </div>
   <script>
   var market, plotCloses
-
+  var startDateISO = '2019-01-01T00:00:00.000Z'
+  var startDate = new Date(startDateISO)
+  var startYMD = startDateISO.substring(0,10).replace(/-/g,'')
   var layout = {
     autosize: true,
     margin: {
@@ -95,7 +97,9 @@
   
   function decrease(input) {
     var v = parseInt(input.value)
-    input.value = v-1
+    v--
+    if (v < 2)  v = 2
+    input.value = v
     plot()
   }
   
@@ -110,9 +114,15 @@
   }
 
   async function getMarketData() {
-    var response = await fetch('http://localhost:3030/market.json')
+    var setup = {
+      startYMD: startYMD
+    }
+    var response = await fetch('http://localhost:3030/market.json', {
+      method: 'GET',
+      headers: new Headers({setup:JSON.stringify(setup)}),
+    })
     market = await response.json()
-    var startDate = new Date('2017-01-01T00:00:00.000Z')
+    
     var t = startDate.getTime()
     market.dates = market.closes.map(c => {
       var nt = new Date(t).toISOString()
@@ -130,6 +140,7 @@
 
   async function plot() {
     var setup = {
+      startYMD: startYMD,
       rsiLength: parseInt(rsiLengthInput.value),
 //       rsiOverbought: parseInt(rsiOverboughtInput.value),
 //       rsiOversold: parseInt(rsiOversoldInput.value),
@@ -148,8 +159,8 @@
     var overviewDrawdowns = overview.drawdowns
     var drawdowns = []
     var capitals = overview.capitals.map((c,i) => {
-      drawdowns[i] = 20000+overviewDrawdowns[i]*50000
-      return c/100
+      drawdowns[i] = 10000+overviewDrawdowns[i]*10000
+      return c/20
     })
 
     var plotCapitals = {

@@ -289,28 +289,46 @@ async function test() {
 }
 
 async function initMarketServer() {
-  var startTime = new Date(ymdHelper.YYYY_MM_DD(20170101)).getTime()
-  var market = await bitmex.getMarket(20170101,20190307,15)
-  market.rsis = []
+  let markets = {}
 
-  market.rsis[2] = await strategy.getRsi(market.closes,2)
+  // var setup = {
+  //   rsiLength: 2, rsiOverboughtExecute: 55, rsiOversoldExecute: 50,
+  //   stopLossLookBack: 4, profitFactor: 150, compound: true
+  // }
+  // var overview = await strategy.getRsiCase(startTime,15,market,setup)
+  // debugger
 
-  var getMarketJson = async function() {
+  let getMarketData = async function(setup) {
+    let startYMD = setup.startYMD
+    if (!markets[startYMD]) {
+      markets[startYMD] = await bitmex.getMarket(startYMD,20190307,15)
+      markets[startYMD].rsis = []
+    }
+    return markets[startYMD]
+  }
+  let getMarketJson = async function(setup) {
+    let market = await getMarketData(setup)
     return JSON.stringify({closes:market.closes})
   }
-  var getOverviewJson = async function(setup) {
-    var rsiLength = setup.rsiLength
-    var overviewJson
+  let getOverviewJson = async function(setup) {
+    let rsiLength = setup.rsiLength
+    if (rsiLength < 2) {
+      return '{"errorMessage":"Invalid rsiLength"}'
+    }
+    let startYMD = setup.startYMD
+    let overviewJson
+    let market = await getMarketData(setup)
     if (!market.rsis[rsiLength]) {
       market.rsis[rsiLength] = await strategy.getRsi(market.closes,rsiLength)
     }
-    var key = rsiLength + '_' + setup.rsiOverbought + '_' + setup.rsiOversold + '_' + setup.stopLossLookBack + '_' + setup.profitFactor
-    var fileName = 'data/case/rsi/overview/' + key + '.json'
+    let key = rsiLength + '_' + setup.rsiOverbought + '_' + setup.rsiOversold + '_' + setup.stopLossLookBack + '_' + setup.profitFactor
+    let fileName = 'data/case/rsi/overview/' + key + '.json'
     if (fs.existsSync(fileName)) {
       overviewJson = await readFile(fileName,readFileOptions)
     }
     else {
-      var overview = await strategy.getRsiCase(startTime,15,market,setup)
+      let startTime = new Date(ymdHelper.YYYY_MM_DD(startYMD)).getTime()
+      let overview = await strategy.getRsiCase(startTime,15,market,setup)
       overviewJson = JSON.stringify(overview)
       // await writeFile(fileName, overviewJson, writeFileOptions)
     }

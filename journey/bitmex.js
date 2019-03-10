@@ -246,6 +246,13 @@ async function getMargin() {
 // }
 
 async function enterStops(order) {
+  let candelAllOrdersResponse = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
+  .catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Cancelled - All Orders')
+  
   let stopLossOrderResponse = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
     orderQty:-order.positionSizeUSD,
     price:order.stopLoss,

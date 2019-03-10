@@ -111,7 +111,7 @@ async function getRsiCase(startTime,interval,market,setup) {
 
   var capitals = []
   for (var i = 0; i < startBar; i++) {
-    capitals[i] = capital
+    capitals[i] = capital //* closes[i]
     drawdowns[i] = 0
   }
 
@@ -122,8 +122,8 @@ async function getRsiCase(startTime,interval,market,setup) {
       high = highs[i]
       low = lows[i]
       if (stopLoss >= low && stopLoss <= high) {
-        let profit = -positionSize * lossDistance
-        let profitPercent = profit/capital*100
+        let profit = -positionSize * (lossDistance/close)
+        let profitPercent = profit/capital
         capital += profit
         positionSize = 0
         let drawdown = (capital-highestCapital) / highestCapital 
@@ -136,8 +136,8 @@ async function getRsiCase(startTime,interval,market,setup) {
       }
       else if (takeProfit >= low && takeProfit <= high) {
         winCount++
-        let profit = positionSize * profitDistance
-        let profitPercent = profit/capital*100
+        let profit = positionSize * (profitDistance/close)
+        let profitPercent = profit/capital
         capital += profit
         positionSize = 0
         highestCapital = Math.max(capital,highestCapital)
@@ -168,7 +168,11 @@ async function getRsiCase(startTime,interval,market,setup) {
           profitDistance = lossDistance * profitFactor
           // stopLoss = entryPrice + lossDistance // optimize
           takeProfit = entryPrice - profitDistance
-          positionSize = (compound ? capital : 100000) * riskPerTradePercent / lossDistance
+
+          // positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistance
+          // positionSize = (compound ? capital : startCapital) * entryPrice * riskPerTradePercent / lossDistance
+          positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistancePercent 
+
           barsNotInTrade += i - exitBar
           enterBar = i
           // db.enterTrade(query,
@@ -190,7 +194,11 @@ async function getRsiCase(startTime,interval,market,setup) {
             profitDistance = lossDistance * profitFactor
             stopLoss = entryPrice - lossDistance
             takeProfit = entryPrice + profitDistance
-            positionSize = (compound ? capital : 100000) * riskPerTradePercent / lossDistance
+
+            // positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistance
+            // positionSize = (compound ? capital : startCapital) * entryPrice * riskPerTradePercent / lossDistance
+            positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistancePercent 
+
             barsNotInTrade += i - exitBar
             enterBar = i
             // db.enterTrade(query,
@@ -201,7 +209,7 @@ async function getRsiCase(startTime,interval,market,setup) {
         }
       }
     }
-    capitals[i] = capital
+    capitals[i] = capital //* close
   }
   // console.log(setup)
   // await db.endTradeSetup(query)
