@@ -316,12 +316,40 @@ async function enter(order,margin) {
   return true
 }
 
+async function getTradeHistory() {
+  let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
+  startTime: new Date(1552176000000).toISOString(),
+  columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
+  })
+  .catch(error => {
+    console.log(error)
+    debugger
+  })
+  let data = JSON.parse(response.data)
+  debugger
+}
+
+async function getOrders() {
+  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
+  startTime: new Date(1552176000000).toISOString(),
+  // columns:null
+  })
+  .catch(error => {
+    console.log(error)
+    debugger
+  })
+  let data = JSON.parse(response.data)
+  debugger
+}
+
 async function init(exitTradeCb) {
   exitTradeCallback = exitTradeCb
   client = await authorize().catch(e => {
     console.error(e)
     debugger
   })
+  // await getOrders()
+  // await getTradeHistory()
   connectWebSocketClient()
   // inspect(client.apis)
 }
