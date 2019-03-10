@@ -253,7 +253,7 @@ async function enterStops(order) {
   })
   console.log('Cancelled - All Orders')
   
-  let stopLossOrderResponse = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+  let stopLossOrderResponse = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly,ParticipateDoNotInitiate',
     orderQty:-order.positionSizeUSD,
     price:order.stopLoss,
     stopPx:order.stopLossTrigger
@@ -263,7 +263,7 @@ async function enterStops(order) {
   })
   console.log('Submitted - StopLimit Order ')
 
-  let takeProfitOrderResponse = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+  let takeProfitOrderResponse = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly,ParticipateDoNotInitiate',
     orderQty:-order.positionSizeUSD,
     price:order.takeProfit,
     stopPx:order.takeProfitTrigger
@@ -304,7 +304,7 @@ async function enter(order,margin) {
   })
   console.log('Updated - Leverage ')
 
-  let limitOrderResponse = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
+  let limitOrderResponse = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',execInst:'ParticipateDoNotInitiate',
     orderQty:order.positionSizeUSD,
     price:order.entryPrice
   }).catch(function(e) {
