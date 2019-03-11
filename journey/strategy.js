@@ -1,6 +1,7 @@
 const util = require('util')
 const talib = require('talib')
 const talibExecute = util.promisify(talib.execute)
+const bitmex = require('./bitmex')
 
 async function getRsi(data,length) {
   var result = await talibExecute({
@@ -72,7 +73,7 @@ function highestBody(market,start,length) {
   return Math.max(highestOpen,highestClose)
 }
 
-function getOrder(signal,market,bankroll,position,margin) {
+async function getOrder(signal,market,bankroll,position,margin) {
   let signalCondition = signal.condition
   let positionSize = position.currentQty
 
@@ -81,23 +82,23 @@ function getOrder(signal,market,bankroll,position,margin) {
   }
   
   let lastIndex = market.closes.length - 1
-  let entryPrice = market.closes[lastIndex]
   let availableMargin = margin.availableMargin
   let outsideCapitalBTC = bankroll.outsideCapitalBTC || 0
   let outsideCapitalUSD = bankroll.outsideCapitalUSD || 0
-  let capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + availableMargin/100000000
-  let capitalUSD = capitalBTC * entryPrice
   let riskPerTradePercent = bankroll.riskPerTradePercent
   let profitFactor = bankroll.profitFactor
   let stopMarketFactor = bankroll.stopMarketFactor
   let stopLossLookBack = bankroll.stopLossLookBack
   let leverageMargin = availableMargin*0.000000009
-  let lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
+  let entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger, stopMarketTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
 
+  let orderBook = await bitmex.getOrderBook()
+
   switch(signalCondition) {
     case 'SHORT':
+      entryPrice = orderBook[0].price
       stopLoss = highestBody(market,lastIndex,stopLossLookBack)
       lossDistance = Math.abs(stopLoss - entryPrice)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
@@ -111,6 +112,7 @@ function getOrder(signal,market,bankroll,position,margin) {
       // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
+      entryPrice = orderBook[1].price
       stopLoss = lowestBody(market,lastIndex,stopLossLookBack)
       lossDistance = -Math.abs(entryPrice - stopLoss)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
@@ -124,6 +126,9 @@ function getOrder(signal,market,bankroll,position,margin) {
       // positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
       break;
   }
+
+  let capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + availableMargin/100000000
+  let capitalUSD = capitalBTC * entryPrice
 
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = Math.round(riskAmountBTC * entryPrice)

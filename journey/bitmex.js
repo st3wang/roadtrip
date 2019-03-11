@@ -8,8 +8,22 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 var pendingOrder
 
-async function connectWebSocketClient() {
-  var ws = new BitMEXRealtimeAPI({
+var ws, wsHeartbeatTimeout
+
+function heartbeat() {
+  if (wsHeartbeatTimeout) {
+    clearTimeout(wsHeartbeatTimeout)
+  }
+  wsHeartbeatTimeout = setTimeout(_ => {
+    console.log('ping')
+    ws.socket.send('ping')
+    wsHeartbeatTimeout = null
+    heartbeat()
+  }, 15000)
+}
+
+async function wsConnect() {
+  ws = new BitMEXRealtimeAPI({
     testnet: shoes.bitmex.test,
     apiKeyID: shoes.bitmex.key,
     apiKeySecret: shoes.bitmex.secret,
@@ -19,8 +33,38 @@ async function connectWebSocketClient() {
   ws.on('open', () => console.log('Connection opened.'));
   ws.on('close', () => console.log('Connection closed.'));
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
-  
+  heartbeat()
+  // ws.addStream('XBTUSD', 'quote', function() {
+  //   // console.log(wsGetQuote())
+  //   heartbeat()
+  // })
+  ws.addStream('XBTUSD', 'trade', function() {
+    var data = ws.getData('XBTUSD','trade')
+    console.log(JSON.stringify(data))
+    // console.log(wsGetTrade())
+    heartbeat()
+  })
+}
+
+function wsGetTrade() {
+  return ws._data.trade.XBTUSD[0]
+}
+
+function wsGetQuote() {
+  return ws._data.quote.XBTUSD[0]
+}
+
+/*
+await function  wsAddStreamQuote() {
+  ws.addStream('XBTUSD', 'quote', async function(data, symbol, tableName) {
+    heartbeat()
+    var quote = data[0]
+    console.log(JSON.stringify(quote))
+  })
+}
+
   ws.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
+    heartbeat()
     var exec = data[0]
     if (exec) {
       console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
@@ -52,13 +96,13 @@ async function connectWebSocketClient() {
   })
 
   // heartbeat
-  setInterval(_ => {
-    ws.socket.send('ping')
-  },60000)
+  // setInterval(_ => {
+  //   ws.socket.send('ping')
+  // },60000)
 
   return ws
 }
-
+*/
 async function authorize() {
   let swaggerClient = await new SwaggerClient({
     // Switch this to `www.bitmex.com` when you're ready to try it out for real.
@@ -304,6 +348,34 @@ async function enter(order,margin) {
   })
   console.log('Updated - Leverage ')
 
+  return await orderLimit(order.entryPrice,order.positionSizeUSD)
+}
+
+async function getOrderBook() {
+  let response = await client.OrderBook.OrderBook_getL2({symbol: 'XBTUSD', depth:1})
+  .catch(error => {
+    console.log(error)
+    debugger
+  })
+  return JSON.parse(response.data)
+}
+
+async function orderLimit(price,size) {
+  let orderBook = await getOrderBook()
+  
+  if (size > 0) {
+    if (price > orderBook[1].price) {
+      console.log('Not Submitted - Limit Taker Order')
+      return false
+    }
+  }
+  else {
+    if (price < orderBook[0].price) {
+      console.log('Not Submitted - Limit Taker Order')
+      return false
+    }
+  }
+
   let limitOrderResponse = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',execInst:'ParticipateDoNotInitiate',
     orderQty:order.positionSizeUSD,
     price:order.entryPrice
@@ -311,8 +383,9 @@ async function enter(order,margin) {
     console.log(e.statusText)
     debugger
   })
-  console.log('Submitted - Limit Order ')
 
+  console.log(orderBook)
+  console.log('Submitted - Limit Order ')
   return true
 }
 
@@ -348,10 +421,11 @@ async function init(exitTradeCb) {
     console.error(e)
     debugger
   })
+  // inspect(client.apis)
+  // await getOrderBook()
   // await getOrders()
   // await getTradeHistory()
-  connectWebSocketClient()
-  // inspect(client.apis)
+  wsConnect()
 }
 
 module.exports = {
@@ -359,6 +433,6 @@ module.exports = {
   getMarket: getTradeBucketed,
   getPosition: getPosition,
   getMargin: getMargin,
-  // getOrder: getOrder,
+  getOrderBook: getOrderBook,
   enter: enter
 }

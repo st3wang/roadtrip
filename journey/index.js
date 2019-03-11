@@ -19,7 +19,7 @@ async function next() {
   //   position.currentQty = 0
   // }
   
-  var order = strategy.getOrder(rsiSignal,market,setup.bankroll,position,margin)
+  var order = await strategy.getOrder(rsiSignal,market,setup.bankroll,position,margin)
   var orderSent = false
 
   // if (shoes.test) {
