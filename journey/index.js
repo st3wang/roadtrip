@@ -15,7 +15,7 @@ async function next() {
   let rsiSignal = await strategy.getSignal(market.closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
 
   // if (shoes.test) {
-  //   rsiSignal.condition = 'SHORT'
+  //   rsiSignal.condition = 'LONG'
   //   position.currentQty = 0
   // }
   

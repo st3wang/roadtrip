@@ -82,6 +82,7 @@ async function getOrder(signal,market,bankroll,position,margin) {
   }
   
   let lastIndex = market.closes.length - 1
+  let close = market.closes[lastIndex]
   let availableMargin = margin.availableMargin
   let outsideCapitalBTC = bankroll.outsideCapitalBTC || 0
   let outsideCapitalUSD = bankroll.outsideCapitalUSD || 0
@@ -94,11 +95,11 @@ async function getOrder(signal,market,bankroll,position,margin) {
     stopLossTrigger, takeProfitTrigger, stopMarketTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
 
-  let orderBook = await bitmex.getOrderBook()
+  let quote = bitmex.getQuote()
 
   switch(signalCondition) {
     case 'SHORT':
-      entryPrice = orderBook[0].price
+      entryPrice = quote.askPrice
       stopLoss = highestBody(market,lastIndex,stopLossLookBack)
       lossDistance = Math.abs(stopLoss - entryPrice)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
@@ -112,7 +113,7 @@ async function getOrder(signal,market,bankroll,position,margin) {
       // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
-      entryPrice = orderBook[1].price
+      entryPrice = quote.bidPrice
       stopLoss = lowestBody(market,lastIndex,stopLossLookBack)
       lossDistance = -Math.abs(entryPrice - stopLoss)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2

@@ -11,6 +11,10 @@ var pendingOrder
 var ws, wsHeartbeatTimeout
 
 function heartbeat() {
+  setInterval(_ => {
+    ws.socket.send('ping')
+  },60000)
+  /*
   if (wsHeartbeatTimeout) {
     clearTimeout(wsHeartbeatTimeout)
   }
@@ -20,6 +24,7 @@ function heartbeat() {
     wsHeartbeatTimeout = null
     heartbeat()
   }, 15000)
+  */
 }
 
 async function wsConnect() {
@@ -34,24 +39,23 @@ async function wsConnect() {
   ws.on('close', () => console.log('Connection closed.'));
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
   heartbeat()
-  // ws.addStream('XBTUSD', 'quote', function() {
-  //   // console.log(wsGetQuote())
-  //   heartbeat()
-  // })
-  ws.addStream('XBTUSD', 'trade', function() {
-    var data = ws.getData('XBTUSD','trade')
-    console.log(JSON.stringify(data))
-    // console.log(wsGetTrade())
-    heartbeat()
-  })
+
+  await Promise.all([
+    new Promise((resolve,reject) => {
+      ws.addStream('XBTUSD', 'quote', resolve)
+    }),
+    new Promise((resolve,reject) => {
+      ws.addStream('XBTUSD', 'trade', resolve)
+    }),
+  ])
+}
+
+function getQuote() {
+  return ws._data.quote.XBTUSD[0]
 }
 
 function wsGetTrade() {
   return ws._data.trade.XBTUSD[0]
-}
-
-function wsGetQuote() {
-  return ws._data.quote.XBTUSD[0]
 }
 
 /*
@@ -351,42 +355,34 @@ async function enter(order,margin) {
   return await orderLimit(order.entryPrice,order.positionSizeUSD)
 }
 
-async function getOrderBook() {
-  let response = await client.OrderBook.OrderBook_getL2({symbol: 'XBTUSD', depth:1})
-  .catch(error => {
-    console.log(error)
-    debugger
-  })
-  return JSON.parse(response.data)
-}
-
 async function orderLimit(price,size) {
-  let orderBook = await getOrderBook()
+  return new Promise(async (resolve,reject) => {
+    let quote = getQuote()
   
-  if (size > 0) {
-    if (price > orderBook[1].price) {
-      console.log('Not Submitted - Limit Taker Order')
-      return false
+    if (size > 0) {
+      if (price > quote.bidPrice) {
+        price = quote.bidPrice
+      }
     }
-  }
-  else {
-    if (price < orderBook[0].price) {
-      console.log('Not Submitted - Limit Taker Order')
-      return false
+    else {
+      if (price < quote.askPrice) {
+        price = quote.askPrice
+      }
     }
-  }
-
-  let limitOrderResponse = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',execInst:'ParticipateDoNotInitiate',
-    orderQty:order.positionSizeUSD,
-    price:order.entryPrice
-  }).catch(function(e) {
-    console.log(e.statusText)
+  
+    let limitOrderResponse = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',execInst:'ParticipateDoNotInitiate',
+      orderQty:size,
+      price:price
+    }).catch(function(e) {
+      console.log(e.statusText)
+      debugger
+    })
+  
+    console.log(quote)
+    console.log('Submitted - Limit Order ')
     debugger
+    resolve(true)
   })
-
-  console.log(orderBook)
-  console.log('Submitted - Limit Order ')
-  return true
 }
 
 async function getTradeHistory() {
@@ -425,7 +421,7 @@ async function init(exitTradeCb) {
   // await getOrderBook()
   // await getOrders()
   // await getTradeHistory()
-  wsConnect()
+  await wsConnect()
 }
 
 module.exports = {
@@ -433,6 +429,6 @@ module.exports = {
   getMarket: getTradeBucketed,
   getPosition: getPosition,
   getMargin: getMargin,
-  getOrderBook: getOrderBook,
+  getQuote: getQuote,
   enter: enter
 }
