@@ -1,12 +1,12 @@
 const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
 const SwaggerClient = require("swagger-client")
 const shoes = require('./shoes')
+const log = require('./log')
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 
 var client, exitTradeCallback, marketCache
 var binSize = 5
-var pendingOrder
 
 var ws, wsHeartbeatTimeout
 
@@ -47,28 +47,16 @@ async function wsConnect() {
     new Promise((resolve,reject) => {
       ws.addStream('XBTUSD', 'trade', resolve)
     }),
+    new Promise((resolve,reject) => {
+      ws.addStream('XBTUSD', 'position', () => {
+        var position = getPosition()
+        console.log('position',position.currentQty,'lastPrice',position.lastPrice)
+        resolve()
+      })
+    })
   ])
-}
-
-function getQuote() {
-  return ws._data.quote.XBTUSD[0]
-}
-
-function wsGetTrade() {
-  return ws._data.trade.XBTUSD[0]
-}
-
 /*
-await function  wsAddStreamQuote() {
-  ws.addStream('XBTUSD', 'quote', async function(data, symbol, tableName) {
-    heartbeat()
-    var quote = data[0]
-    console.log(JSON.stringify(quote))
-  })
-}
-
   ws.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
-    heartbeat()
     var exec = data[0]
     if (exec) {
       console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
@@ -76,37 +64,43 @@ await function  wsAddStreamQuote() {
         console.log(exec)
         switch(exec.ordType) {
           case 'Limit':
-            if (pendingOrder) {
-              enterStops(pendingOrder)
-              pendingOrder = null
+            if (position) {
+              position.cumQty = exec.cumQty
             }
+            debugger
             break;
-          case 'StopLimit':
-          case 'LimitIfTouched':
-          case 'Stop':
-            exitTradeCallback([exec.timestamp,exec.price])
-            // let position = await getPosition()
-            // if (position.currentQty === 0) {
-              // client.Order.Order_cancelAll({symbol:'XBTUSD'})
-              //let margin = await getMargin()
-              //console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
-              // exitTradeCallback([exec.timestamp,exec.price])
-            // }
-            break;
+          // case 'StopLimit':
+          // case 'LimitIfTouched':
+          // case 'Stop':
+          //   exitTradeCallback([exec.timestamp,exec.price])
+          //   // let position = await getPosition()
+          //   // if (position.currentQty === 0) {
+          //     // client.Order.Order_cancelAll({symbol:'XBTUSD'})
+          //     //let margin = await getMargin()
+          //     //console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
+          //     // exitTradeCallback([exec.timestamp,exec.price])
+          //   // }
+          //   break;
         }
       }
 
     }
   })
-
-  // heartbeat
-  // setInterval(_ => {
-  //   ws.socket.send('ping')
-  // },60000)
-
-  return ws
+  */
 }
-*/
+
+function getQuote() {
+  return ws._data.quote.XBTUSD[0]
+}
+
+function getTrade() {
+  return ws._data.trade.XBTUSD[0]
+}
+
+function getPosition() {
+  return ws._data.position.XBTUSD[0]
+}
+
 async function authorize() {
   let swaggerClient = await new SwaggerClient({
     // Switch this to `www.bitmex.com` when you're ready to try it out for real.
@@ -263,15 +257,15 @@ async function getMarket(interval,length) {
   return marketCache
 }
 
-async function getPosition() {
-  var response = await client.Position.Position_get()  
-  .catch(function(e) {
-    console.log('Error:', e.statusText)
-    debugger
-  })
-  var positions = JSON.parse(response.data.toString())
-  return positions[0] || {currentQty:0}
-}
+// async function getPosition() {
+//   var response = await client.Position.Position_get()  
+//   .catch(function(e) {
+//     console.log('Error:', e.statusText)
+//     debugger
+//   })
+//   var positions = JSON.parse(response.data.toString())
+//   return positions[0] || {currentQty:0}
+// }
 
 async function getMargin() {
   var response = await client.User.User_getMargin()  
@@ -336,8 +330,6 @@ async function enter(order,margin) {
 
   console.log('ENTER ', JSON.stringify(order))
 
-  pendingOrder = order
-
   let candelAllOrdersResponse = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
   .catch(function(e) {
     console.log(e.statusText)
@@ -380,7 +372,6 @@ async function orderLimit(price,size) {
   
     console.log(quote)
     console.log('Submitted - Limit Order ')
-    debugger
     resolve(true)
   })
 }
