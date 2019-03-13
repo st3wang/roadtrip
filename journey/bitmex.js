@@ -458,6 +458,7 @@ async function enter(order,margin) {
   enterOrder = order
   pendingStopLossOrder = null
   var responseData = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD)
+  console.log('ENTER response status', responseData.ordStatus)
   if (responseData.ordStatus === 'Canceled') {
     return false
   }
