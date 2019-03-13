@@ -9,7 +9,7 @@ const setup = shoes.setup
 console.log('setup', JSON.stringify(setup))
 
 async function next() {
-  let position = await bitmex.getPosition()
+  let position = bitmex.getPosition()
   let margin = await bitmex.getMargin()
   let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles
   let rsiSignal = await strategy.getSignal(market.closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)

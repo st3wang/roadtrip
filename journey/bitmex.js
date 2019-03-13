@@ -9,22 +9,31 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
+var enterOrder
 
 function heartbeat() {
   setInterval(_ => {
     ws.socket.send('ping')
   },60000)
-  /*
-  if (wsHeartbeatTimeout) {
-    clearTimeout(wsHeartbeatTimeout)
-  }
-  wsHeartbeatTimeout = setTimeout(_ => {
-    console.log('ping')
-    ws.socket.send('ping')
-    wsHeartbeatTimeout = null
-    heartbeat()
-  }, 15000)
-  */
+}
+
+async function wsAddStream(table, handler) {
+  ws.addStream('XBTUSD', table, handler)
+  await new Promise((resolve,reject) => {
+    var checkValueInterval = setInterval(_ => {
+      if (ws._data && ws._data[table]) {
+        console.log(table + ' data is flowing')
+        clearInterval(checkValueInterval)
+        clearTimeout(timeout)
+        resolve()
+      }
+    },200)
+    var timeout = setTimeout(_ => {
+      console.log(table + ' timeout')
+      clearInterval(checkValueInterval)
+      resolve()
+    }, 3000)
+  })
 }
 
 async function wsConnect() {
@@ -40,53 +49,149 @@ async function wsConnect() {
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
   heartbeat()
 
-  await Promise.all([
-    new Promise((resolve,reject) => {
-      ws.addStream('XBTUSD', 'quote', resolve)
-    }),
-    new Promise((resolve,reject) => {
-      ws.addStream('XBTUSD', 'trade', resolve)
-    }),
-    new Promise((resolve,reject) => {
-      ws.addStream('XBTUSD', 'position', () => {
-        var position = getPosition()
-        console.log('position',position.currentQty,'lastPrice',position.lastPrice)
-        resolve()
-      })
-    })
-  ])
-/*
-  ws.addStream('XBTUSD', 'execution', async function(data, symbol, tableName) {
-    var exec = data[0]
-    if (exec) {
-      console.log('Execution', exec.ordStatus, exec.ordType, exec.execType, exec.price, exec.stopPx, exec.orderQty)
-      if (exec.ordStatus === 'Filled') {
-        console.log(exec)
-        switch(exec.ordType) {
-          case 'Limit':
-            if (position) {
-              position.cumQty = exec.cumQty
-            }
-            debugger
-            break;
-          // case 'StopLimit':
-          // case 'LimitIfTouched':
-          // case 'Stop':
-          //   exitTradeCallback([exec.timestamp,exec.price])
-          //   // let position = await getPosition()
-          //   // if (position.currentQty === 0) {
-          //     // client.Order.Order_cancelAll({symbol:'XBTUSD'})
-          //     //let margin = await getMargin()
-          //     //console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
-          //     // exitTradeCallback([exec.timestamp,exec.price])
-          //   // }
-          //   break;
-        }
-      }
+  await wsAddStream('order',handleOrder)
+  await wsAddStream('position',handlePosition)
+  await wsAddStream('quote',handleQuote)
+}
 
+function handleOrder(data) {
+}
+
+function handlePosition(data) {
+}
+
+function handleQuote(data) {
+  checkPosition(ws._data.position.XBTUSD[0].currentQty,
+    data[0].bidPrice, data[0].askPrice, enterOrder)
+}
+
+var stopLossOrderRequesting, pendingStopLossOrder
+var takeProfitOrderRequesting
+
+//      if (!pendingStopLossOrder || ask < pendingStopLossOrder.price) {
+//      if (!pendingStopLossOrder || bid > pendingStopLossOrder.price) {
+async function orderStopLoss(created,price,size) {
+  if (stopLossOrderRequesting) {
+    // console.log('stopLossOrderRequesting')
+    return
+  }
+
+  // var cid = created + 'EXIT-'  
+  var cid = ''
+  var openOrder = getOpenOrder()
+  var responseData
+
+  if (openOrder) {
+    if (openOrder.price == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
+      //console.log('Order with the same price and size is already opened')
+      return
     }
+
+    // Different price or size with the same id
+    // if (openOrder.clOrdID == cid) {
+    //   console.log('Amend orderStopLoss',cid,price,size)
+    //   stopLossOrderRequesting = true
+    //   responseData = await amendLimit(cid,price,size) 
+    //   stopLossOrderRequesting = false
+    //   console.log('orderStopLoss response status', responseData.ordStatus)
+    //   return responseData
+    // }
+  }
+
+  console.log('New orderStopLoss',cid,price,size)
+  stopLossOrderRequesting = true
+  var responseData = await orderLimit(cid,price,size,',ReduceOnly')
+  stopLossOrderRequesting = false
+  console.log('orderStopLoss response status', responseData.ordStatus)
+  return responseData
+}
+
+async function orderTakeProfit(created,price,size) {
+  if (takeProfitOrderRequesting) {
+    //console.log('takeProfitOrderRequesting')
+    return
+  }
+
+  var openOrder = getOpenOrder()
+  if (openOrder && openOrder.price == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
+    //console.log('Order already opened')
+    return
+  }
+
+  // var cid = created + 'EXIT+'
+  var cid = ''
+  console.log('orderTakeProfit',cid,price,size)
+
+  takeProfitOrderRequesting = true
+  var responseData = await orderLimitRetry(cid,price,size,',ReduceOnly')
+  takeProfitOrderRequesting = false
+  console.log('orderTakeProfit response status', responseData.ordStatus)
+  return responseData
+}
+
+function testCheckPosition() {
+  var interval = 500
+  var order = {
+    entryPrice: 3900,
+    positionSizeUSD: 1000,
+    stopLossTrigger: 3860.5,
+    stopLoss: 3860,
+    takeProfitTrigger: 4000.5,
+    takeProfit: 40001
+  }
+  var testArgs1 = [
+    [order.positionSizeUSD,order.entryPrice,order.entryPrice+0.5,order],
+    [order.positionSizeUSD,order.entryPrice+1,order.entryPrice+1.5,order],
+    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
+    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
+    [order.positionSizeUSD,order.stopLoss+1,order.stopLoss+1.5,order],
+    // [order.positionSizeUSD,order.stopLoss-2,order.stopLoss-1.5,order]
+  ]
+  testArgs1.forEach((args,i) => {
+    setTimeout(() => {
+      checkPosition.apply(this, args);
+    }, interval*(i+1))
   })
-  */
+}
+
+async function checkPosition(positionSize,bid,ask,order) {
+  if (positionSize > 0) {  
+    if (!order) {
+      throw new Error('Error: No order in the memory. Need to load one up.')
+      // load existing order
+      return
+    }
+
+    // LONG
+    if (ask <= order.stopLoss) {
+      // console.log('LONG STOP LOSS')
+      var responseData = await orderStopLoss(order.created,ask,-positionSize)
+    }
+    else if (ask >= order.takeProfitTrigger) {
+      // console.log('LONG TAKE PROFIT')
+      var responseData = await orderTakeProfit(order.created,order.takeProfit,-positionSize)
+    }
+    else {
+      // console.log('LONG IN POSITION')
+    }
+  } 
+  else if (positionSize < 0) {
+    // SHORT 
+    if (bid >= order.stopLoss) {
+      // console.log('SHORT STOP LOSS')
+      var responseData = await orderStopLoss(order.created,bid,-positionSize)
+    }
+    else if (bid <= order.takeProfitTrigger) {
+      // console.log('SHORT TAKE PROFIT')
+      var responseData = await orderTakeProfit(order.created,order.takeProfit,-positionSize)
+    }
+    else {
+      // console.log('SHORT IN POSITION')
+    }
+  }
+  else {
+    // console.log('no open position')
+  }
 }
 
 function getQuote() {
@@ -99,6 +204,12 @@ function getTrade() {
 
 function getPosition() {
   return ws._data.position.XBTUSD[0]
+}
+
+function getOpenOrder() {
+  if (ws._data.order && ws._data.order.XBTUSD[0].ordStatus == 'New') {
+    return ws._data.order.XBTUSD[0]
+  }
 }
 
 async function authorize() {
@@ -344,10 +455,29 @@ async function enter(order,margin) {
   })
   console.log('Updated - Leverage ')
 
-  return await orderLimit(order.entryPrice,order.positionSizeUSD)
+  enterOrder = order
+  pendingStopLossOrder = null
+  var responseData = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD)
+  if (responseData.ordStatus === 'Canceled') {
+    return false
+  }
+
+  log.writeEnterOrder(order)
+  return true
 }
 
-async function orderLimit(price,size) {
+async function orderLimitRetry(cid,price,size,execInst) {
+  let responseData, count = 0
+  do {
+    responseData = await orderLimit(cid,price,size,execInst)
+    count++
+    // if cancelled retry with new quote 
+    // this means the quote move to a better price before the order reaches bitmex server
+  } while(responseData.ordStatus === 'Canceled' && count < 10)
+  return responseData
+}
+
+async function orderLimit(cid,price,size,execInst) {
   return new Promise(async (resolve,reject) => {
     let quote = getQuote()
   
@@ -362,23 +492,27 @@ async function orderLimit(price,size) {
       }
     }
   
-    let limitOrderResponse = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',execInst:'ParticipateDoNotInitiate',
+    let response 
+    response = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
+      clOrdID: cid,
+      price:price,
       orderQty:size,
-      price:price
+      execInst:'ParticipateDoNotInitiate'+(execInst||'')
     }).catch(function(e) {
       console.log(e.statusText)
       debugger
     })
   
-    console.log(quote)
-    console.log('Submitted - Limit Order ')
-    resolve(true)
+    var data = JSON.parse(response.data)
+    // console.log('Limit Order', response.data, JSON.stringify(quote))
+
+    resolve(data)
   })
 }
 
-async function getTradeHistory() {
+async function getTradeHistory(startTime) {
   let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
-  startTime: new Date(1552176000000).toISOString(),
+  startTime: new Date(startTime).toISOString(),
   columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
   })
   .catch(error => {
@@ -386,6 +520,9 @@ async function getTradeHistory() {
     debugger
   })
   let data = JSON.parse(response.data)
+  data.forEach(d => {
+    console.log(d.timestamp,d.price,d.orderQty)
+  })
   debugger
 }
 
@@ -408,11 +545,19 @@ async function init(exitTradeCb) {
     console.error(e)
     debugger
   })
+  enterOrder = log.readEnterOrder()
+  await wsConnect()
+
   // inspect(client.apis)
   // await getOrderBook()
   // await getOrders()
-  // await getTradeHistory()
-  await wsConnect()
+
+  // var yesterday = new Date().getTime() - (24*60*60000)
+  // await getTradeHistory(yesterday)
+
+  // await orderLimitRetry(3845,-1000)
+  // debugger
+  // testCheckPosition()
 }
 
 module.exports = {

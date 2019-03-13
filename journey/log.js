@@ -1,11 +1,13 @@
 const sheets = require('./sheets')
 const fs = require('fs')
+const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 const path = require('path')
 
 const logDir = path.resolve(__dirname, 'log')
 const conditionFile = logDir + '/condition.csv'
 const enterFile = logDir + '/enter.csv'
+const enterOrderFile = logDir + '/enter_order.json'
 
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir)
@@ -18,7 +20,7 @@ if (!fs.existsSync(enterFile)) {
 }
 
 function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent) {
-  var isoString = new Date().toISOString()
+  var isoString = order.created
   var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + market.closes[market.closes.length-1].toFixed(1) + ',' +
     rsiSignal.condition + ',' + order.type + ',' + position.currentQty + ',' + (margin.marginBalance/100000000).toFixed(4) + '\n'
   console.log(signalCSV.replace('\n',''))
@@ -58,6 +60,18 @@ function writeExit(exitData) {
   })
 }
 
+function writeEnterOrder(order) {
+  fs.writeFileSync(enterOrderFile,JSON.stringify(order),writeFileOptions)
+}
+
+function readEnterOrder() {
+  if (!fs.existsSync(enterOrderFile)) {
+    return
+  }
+  var str = fs.readFileSync(enterOrderFile,readFileOptions)
+  return JSON.parse(str)
+}
+
 async function init() {
   await sheets.init()
 }
@@ -65,5 +79,7 @@ async function init() {
 module.exports = {
   init: init,
   writeInterval: writeInterval,
-  writeExit: writeExit
+  writeExit: writeExit,
+  writeEnterOrder: writeEnterOrder,
+  readEnterOrder: readEnterOrder
 }

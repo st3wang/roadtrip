@@ -74,11 +74,12 @@ function highestBody(market,start,length) {
 }
 
 async function getOrder(signal,market,bankroll,position,margin) {
+  var created = new Date().toISOString()
   let signalCondition = signal.condition
   let positionSize = position.currentQty
 
   if (positionSize != 0 || signalCondition.length < 2) {
-    return {type:'-'}
+    return {created:created,type:'-'}
   }
   
   let lastIndex = market.closes.length - 1
@@ -99,7 +100,7 @@ async function getOrder(signal,market,bankroll,position,margin) {
 
   switch(signalCondition) {
     case 'SHORT':
-      entryPrice = quote.askPrice
+      entryPrice = Math.max(quote.askPrice,close)
       stopLoss = highestBody(market,lastIndex,stopLossLookBack)
       lossDistance = Math.abs(stopLoss - entryPrice)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
@@ -107,13 +108,13 @@ async function getOrder(signal,market,bankroll,position,margin) {
       profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
       stopLossTrigger = stopLoss - 0.5
-      takeProfitTrigger = takeProfit + 0.5
+      takeProfitTrigger = entryPrice - 2 //takeProfit + 0.5
       stopMarketTrigger = entryPrice + stopMarketDistance
       lossDistancePercent = lossDistance/entryPrice
       // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
-      entryPrice = quote.bidPrice
+      entryPrice = Math.min(quote.bidPrice,close)
       stopLoss = lowestBody(market,lastIndex,stopLossLookBack)
       lossDistance = -Math.abs(entryPrice - stopLoss)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
@@ -121,7 +122,7 @@ async function getOrder(signal,market,bankroll,position,margin) {
       profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
       stopLossTrigger = stopLoss + 0.5
-      takeProfitTrigger = takeProfit - 0.5
+      takeProfitTrigger = entryPrice + 2 //takeProfit - 0.5
       stopMarketTrigger = entryPrice + stopMarketDistance
       lossDistancePercent = lossDistance/entryPrice
       // positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
@@ -141,6 +142,7 @@ async function getOrder(signal,market,bankroll,position,margin) {
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
 
   return {
+    created: created,
     capitalBTC: capitalBTC,
     capitalUSD: capitalUSD,
     type: (goodStopDistance ? signalCondition : '-'),
