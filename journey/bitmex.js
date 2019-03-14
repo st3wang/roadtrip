@@ -166,7 +166,7 @@ async function checkPosition(positionSize,bid,ask,order) {
   }
   else {
     var openOrder = getOpenOrder()
-    if (openOrder && openOrder.price == order.entryPrice && openOrder.orderQty == order.size) {
+    if (openOrder && openOrder.price == order.entryPrice && Math.abs(openOrder.orderQty) == Math.abs(order.positionSizeUSD)) {
       // Check our order in the orderbook. Cancel the order if it has reached the target.
       if (order.size > 0) {
         // LONG
