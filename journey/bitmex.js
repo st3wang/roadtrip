@@ -129,31 +129,6 @@ async function orderTakeProfit(created,price,size) {
   return responseData
 }
 
-function testCheckPosition() {
-  var interval = 500
-  var order = {
-    entryPrice: 3900,
-    positionSizeUSD: 1000,
-    stopLossTrigger: 3860.5,
-    stopLoss: 3860,
-    takeProfitTrigger: 4000.5,
-    takeProfit: 40001
-  }
-  var testArgs1 = [
-    [order.positionSizeUSD,order.entryPrice,order.entryPrice+0.5,order],
-    [order.positionSizeUSD,order.entryPrice+1,order.entryPrice+1.5,order],
-    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
-    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
-    [order.positionSizeUSD,order.stopLoss+1,order.stopLoss+1.5,order],
-    // [order.positionSizeUSD,order.stopLoss-2,order.stopLoss-1.5,order]
-  ]
-  testArgs1.forEach((args,i) => {
-    setTimeout(() => {
-      checkPosition.apply(this, args);
-    }, interval*(i+1))
-  })
-}
-
 async function checkPosition(positionSize,bid,ask,order) {
   if (positionSize > 0) {  
     if (!order) {
@@ -190,8 +165,50 @@ async function checkPosition(positionSize,bid,ask,order) {
     }
   }
   else {
-    // console.log('no open position')
+    var openOrder = getOpenOrder()
+    if (openOrder && openOrder.price == order.entryPrice && openOrder.orderQty == order.size) {
+      // Check our order in the orderbook. Cancel the order if it has reached the target.
+      if (order.size > 0) {
+        // LONG
+        if (bid >= order.takeProfit) {
+          console.log('missed the trade')
+          cancelAllOrders()
+        }
+      }
+      else {
+        // SHORT
+        if (ask <= order.takeProfit) {
+          console.log('missed the trade')
+          cancelAllOrders()
+        }
+      }
+    }
   }
+}
+
+function testCheckPosition() {
+  var interval = 500
+  var order = {
+    entryPrice: 3900,
+    positionSizeUSD: 1000,
+    stopLossTrigger: 3860.5,
+    stopLoss: 3860,
+    takeProfitTrigger: 4000.5,
+    takeProfit: 40001
+  }
+  var testArgs1 = [
+    [order.positionSizeUSD,order.entryPrice,order.entryPrice+0.5,order],
+    [order.positionSizeUSD,order.entryPrice+1,order.entryPrice+1.5,order],
+    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
+    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
+    [order.positionSizeUSD,order.stopLoss+1,order.stopLoss+1.5,order],
+    // [order.positionSizeUSD,order.stopLoss-2,order.stopLoss-1.5,order]
+  ]
+  testArgs1.forEach((args,i) => {
+    setTimeout(() => {
+      checkPosition.apply(this, args);
+    }, interval*(i+1))
+  })
 }
 
 function getQuote() {
@@ -398,6 +415,15 @@ async function getMargin() {
 //   return orders
 // }
 
+async function cancelAllOrders() {
+  let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
+  .catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Cancelled - All Orders')
+}
+
 async function enterStops(order) {
   let candelAllOrdersResponse = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
   .catch(function(e) {
@@ -441,12 +467,7 @@ async function enter(order,margin) {
 
   console.log('ENTER ', JSON.stringify(order))
 
-  let candelAllOrdersResponse = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
-  .catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Cancelled - All Orders')
+  cancelAllOrders()
 
   let updateLeverageResponse = await client.Position.Position_updateLeverage({symbol:'XBTUSD',leverage:order.leverage})
   .catch(function(e) {
