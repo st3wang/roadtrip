@@ -103,6 +103,9 @@ async function orderStopLoss(created,price,size) {
   var responseData = await orderLimit(cid,price,size,',ReduceOnly')
   stopLossOrderRequesting = false
   console.log('orderStopLoss response status', responseData.ordStatus)
+  if (responseData.ordStatus == 'Canceled') {
+    console.log('Orderbook jumped right back. No need to stop.')
+  }
   return responseData
 }
 
