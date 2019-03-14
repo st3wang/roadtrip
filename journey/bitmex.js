@@ -171,14 +171,14 @@ async function checkPosition(positionSize,bid,ask,order) {
       if (order.size > 0) {
         // LONG
         if (bid >= order.takeProfit) {
-          console.log('missed the trade')
+          console.log('Missed the trade', JSON.stringify(openOrder))
           cancelAllOrders()
         }
       }
       else {
         // SHORT
         if (ask <= order.takeProfit) {
-          console.log('missed the trade')
+          console.log('Missed the trade', JSON.stringify(openOrder))
           cancelAllOrders()
         }
       }
@@ -526,7 +526,7 @@ async function orderLimit(cid,price,size,execInst) {
     })
   
     var data = JSON.parse(response.data)
-    // console.log('Limit Order', response.data, JSON.stringify(quote))
+    console.log('Limit Order', response.data, JSON.stringify(quote))
 
     resolve(data)
   })
