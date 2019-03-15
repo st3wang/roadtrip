@@ -52,6 +52,11 @@ async function wsConnect() {
   await wsAddStream('order',handleOrder)
   await wsAddStream('position',handlePosition)
   await wsAddStream('quote',handleQuote)
+  await wsAddStream('funding',handleFunding)
+
+  ws.addStream('.XBTUSDPI8H', 'quote', data => {
+    debugger
+  })
 }
 
 function handleOrder(data) {
@@ -63,6 +68,10 @@ function handlePosition(data) {
 function handleQuote(data) {
   checkPosition(ws._data.position.XBTUSD[0].currentQty,
     data[0].bidPrice, data[0].askPrice, enterOrder)
+}
+
+function handleFunding(data) {
+  console.log('FUNDING', new Date().toISOString(), JSON.stringify(data[0]))
 }
 
 var stopLossOrderRequesting, pendingStopLossOrder
@@ -553,9 +562,37 @@ async function getTradeHistory(startTime) {
   debugger
 }
 
+async function getFundingHistory(startTime) {
+  let response = await client.Funding.Funding_get({symbol: 'XBTUSD',
+  startTime: new Date(startTime).toISOString()
+  })
+  .catch(error => {
+    console.log(error)
+    debugger
+  })
+  let data = JSON.parse(response.data)
+  data.forEach(d => {
+    console.log(d.timestamp,d.price,d.orderQty)
+  })
+  debugger
+}
+
 async function getOrders() {
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
   startTime: new Date(1552176000000).toISOString(),
+  // columns:null
+  })
+  .catch(error => {
+    console.log(error)
+    debugger
+  })
+  let data = JSON.parse(response.data)
+  debugger
+}
+
+async function getFundingQuote() {
+  let response = await client.Quote.Quote_get({symbol: '.XBTUSDPI8H',
+  // startTime: new Date(1552176000000).toISOString(),
   // columns:null
   })
   .catch(error => {
@@ -580,7 +617,9 @@ async function init(exitTradeCb) {
   // await getOrders()
 
   // var yesterday = new Date().getTime() - (24*60*60000)
-  // await getTradeHistory(yesterday)
+  //await getTradeHistory(yesterday)
+  // await getFundingHistory(yesterday)
+  // await getFundingQuote()
 
   // await orderLimitRetry(3845,-1000)
   // debugger
