@@ -9,6 +9,7 @@ const setup = shoes.setup
 console.log('setup', JSON.stringify(setup))
 
 async function next() {
+  // TODO: move position logic from strategy.js to bitmex.js
   let position = bitmex.getPosition()
   let margin = await bitmex.getMargin()
   let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles

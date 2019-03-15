@@ -12,7 +12,8 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
-var enterOrder
+var entryOrder
+var lastQuote = {}
 
 function heartbeat() {
   setInterval(_ => {
@@ -71,21 +72,35 @@ function handlePosition(data) {
 // function handleQuote(data) {
 //   console.log('QUOTE', data[0].bidPrice, data[0].askPrice)
 //   checkPosition(ws._data.position.XBTUSD[0].currentQty,
-//     data[0].bidPrice, data[0].askPrice, enterOrder)
+//     data[0].bidPrice, data[0].askPrice, entryOrder)
 // }
 
-var lastQuote = {}
-
-function handleInstrument(data) {
+async function handleInstrument(data) {
+  var instrument = data[0]
+  var bid = instrument.bidPrice
+  var ask = instrument.askPrice
   var quote = {
-    bidPrice: data[0].bidPrice,
-    askPrice: data[0].askPrice
+    bidPrice: instrument.bidPrice,
+    askPrice: instrument.askPrice
   }
-  if (quote.bidPrice !== lastQuote.bidPrice || quote.askPrice !== lastQuote.askPrice) {
-    checkPosition(ws._data.position.XBTUSD[0].currentQty, quote.bidPrice, quote.askPrice, enterOrder)
+  if (bid !== lastQuote.bidPrice || ask !== lastQuote.askPrice) {
+    checkPosition(ws._data.position.XBTUSD[0].currentQty, bid, ask, entryOrder)
+  }
+  lastQuote = {
+    bidPrice: bid,
+    askPrice: ask
   }
 
-  lastQuote = quote
+  var fundingTime = new Date(instrument.fundingTime).getTime()
+  var checkFundingPositionTime = fundingTime - 1800000
+  var now = new Date().getTime()
+  if (now > checkFundingPositionTime) {
+    var position = _data.position.XBTUSD[0]
+    var fundingStopLoss = await checkFundingPosition(position.currentQty, instrument.fundingRate, bid, ask, entryOrder)
+    if (fundingStopLoss) {
+      await orderStopLoss('',stopFundingLoss.price,stopFundingLoss.size)
+    }
+  }
 }
 
 function getQuote() {
@@ -100,14 +115,8 @@ function getFunding(instrument) {
   }
 }
 
-function getLastPrice(instrument) {
-  return {
-    lastPrice: instrument.lastPrice
-  }
-}
-
-function getTrade() {
-  return ws._data.trade.XBTUSD[0]
+function getInstrument() {
+  return ws._data.instrument.XBTUSD[0]
 }
 
 function getPosition() {
@@ -120,26 +129,18 @@ function getOpenOrder() {
   }
 }
 
+function getOpenOrderMatching(price,size) {
+  var openOrder = getOpenOrder()
+  if (openOrder && openOrder.price == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
+    return openOrder
+  }
+}
 
+var stopLossOrderRequesting, takeProfitOrderRequesting
 
-// function getInstrument(data) {
-//   data = data || ws._data.instrument.XBTUSD[0]
-//   return {
-//     timestamp: data.timestamp,
-//     lastPrice: data.lastPrice,
-//     bidPrice: data.bidPrice,
-//     askPrice: data.askPrice,
-//     fundingRate: data.fundingRate,
-//     fundingTimestamp: data.fundingTimestamp
-//   }
-// }
-
-var stopLossOrderRequesting, pendingStopLossOrder
-var takeProfitOrderRequesting
-
-//      if (!pendingStopLossOrder || ask < pendingStopLossOrder.price) {
-//      if (!pendingStopLossOrder || bid > pendingStopLossOrder.price) {
 async function orderStopLoss(created,price,size) {
+  // FIXME: need to check price and size. if different request new order
+  // TODO: implement order queue and only send the latest request
   if (stopLossOrderRequesting) {
     // console.log('stopLossOrderRequesting')
     return
@@ -147,14 +148,12 @@ async function orderStopLoss(created,price,size) {
 
   // var cid = created + 'EXIT-'  
   var cid = ''
-  var openOrder = getOpenOrder()
   var responseData
+  var openStopLossOrder = getOpenOrderMatching(price,size)
 
-  if (openOrder) {
-    if (openOrder.price == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
-      //console.log('Order with the same price and size is already opened')
-      return
-    }
+  if (openStopLossOrder) {
+    //console.log('Order with the same price and size is already opened')
+    return
 
     // Different price or size with the same id
     // if (openOrder.clOrdID == cid) {
@@ -184,8 +183,8 @@ async function orderTakeProfit(created,price,size) {
     return
   }
 
-  var openOrder = getOpenOrder()
-  if (openOrder && openOrder.price == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
+  var openTakeProfitOrder = getOpenOrderMatching(price,size)
+  if (openTakeProfitOrder) {
     //console.log('Order already opened')
     return
   }
@@ -237,24 +236,51 @@ async function checkPosition(positionSize,bid,ask,order) {
     }
   }
   else {
-    var openOrder = getOpenOrder()
-    if (openOrder && openOrder.price == order.entryPrice && Math.abs(openOrder.orderQty) == Math.abs(order.positionSizeUSD)) {
+    var openEntryOrder = getOpenOrderMatching(order.entryPrice,order.positionSizeUSD)
+    if (openEntryOrder) {
       // Check our order in the orderbook. Cancel the order if it has reached the target.
       if (order.size > 0) {
         // LONG
-        if (ask >= order.takeProfit) {
+        if (ask <= order.takeProfit) {
           console.log('Missed LONG trade', bid, ask, JSON.stringify(openOrder), order)
           debugger
-          cancelAllOrders()
+          await cancelAllOrders()
         }
       }
       else {
         // SHORT
-        if (bid <= order.takeProfit) {
+        if (bid >= order.takeProfit) {
           console.log('Missed SHORT trade', bid, ask, JSON.stringify(openOrder), order)
           debugger
-          cancelAllOrders()
+          await cancelAllOrders()
         }
+      }
+    }
+  }
+}
+
+async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,order) {
+  if (positionSizeUSD > 0) {  
+    if (fundingRate > 0) {
+      console.log('FUNDING LONG has to pay')
+      return {price:ask,size:-positionSizeUSD,fundingRate:fundingRate}
+    }
+  } 
+  else if (positionSizeUSD < 0) {
+    if (fundingRate < 0) {
+      console.log('FUNDING SHORT has to pay')
+      return {price:bid,size:-positionSizeUSD,fundingRate:fundingRate}
+    }
+  }
+  else {
+    // Check if there is an open entry order that has to pay funding
+    var openEntryOrder = getOpenOrderMatching(order.entryPrice,order.positionSizeUSD)
+    if (openEntryOrder && 
+      // to avoid stakeoverflow
+      openEntryOrder.orderQty !== 0) {
+      var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,fundingRate,bid,ask,order)
+      if (fundingStopLoss) {
+        await cancelAllOrders()
       }
     }
   }
@@ -519,9 +545,16 @@ async function enterStops(order) {
 }
 
 async function enter(order,margin) {
+  console.log('ENTER ', JSON.stringify(order))
+
   console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
 
-  console.log('ENTER ', JSON.stringify(order))
+  var instrument = getInstrument()
+  var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,instrument.fundingRate)
+  if (fundingStopLoss) {
+    console.log('FUNDING STOP ENTER',JSON.stringify(fundingStopLoss))
+    return
+  }
 
   cancelAllOrders()
 
@@ -532,7 +565,7 @@ async function enter(order,margin) {
   })
   console.log('Updated - Leverage ')
 
-  enterOrder = order
+  entryOrder = order
   pendingStopLossOrder = null
   var responseData = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD,'',RETRYON_CANCELED)
   console.log('ENTER response status', responseData.ordStatus)
@@ -540,7 +573,7 @@ async function enter(order,margin) {
     return false
   }
 
-  log.writeEnterOrder(order)
+  log.writeEntryOrder(order)
   return true
 }
 
@@ -615,7 +648,7 @@ async function getTradeHistory(startTime) {
   })
   let data = JSON.parse(response.data)
   data.forEach(d => {
-    console.log(d.timestamp,d.price,d.orderQty)
+    console.log(d.timestamp,d.execType,d.price,d.orderQty)
   })
   debugger
 }
@@ -654,19 +687,22 @@ async function init(exitTradeCb) {
     console.error(e)
     debugger
   })
-  enterOrder = log.readEnterOrder()
+  entryOrder = log.readEntryOrder()
   await wsConnect()
 
   // inspect(client.apis)
   // await getOrderBook()
   // await getOrders()
 
-  // var yesterday = new Date().getTime() - (24*60*60000)
-  //await getTradeHistory(yesterday)
+  // var openOrder = getOpenOrder()
+  // debugger
+
+  var yesterday = new Date().getTime() - (48*60*60000)
+  // await getTradeHistory(yesterday)
   // await getFundingHistory(yesterday)
   // await getInstrument()
 
-  // await orderLimitRetry('',3895,1,'',RETRYON_CANCELED)
+  // await orderLimitRetry('',3888,1000,'',RETRYON_CANCELED)
   // debugger
   // testCheckPosition()
 }

@@ -7,7 +7,7 @@ const path = require('path')
 const logDir = path.resolve(__dirname, 'log')
 const conditionFile = logDir + '/condition.csv'
 const enterFile = logDir + '/enter.csv'
-const enterOrderFile = logDir + '/enter_order.json'
+const entryOrderFile = logDir + '/enter_order.json'
 
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir)
@@ -60,15 +60,15 @@ function writeExit(exitData) {
   })
 }
 
-function writeEnterOrder(order) {
-  fs.writeFileSync(enterOrderFile,JSON.stringify(order),writeFileOptions)
+function writeEntryOrder(order) {
+  fs.writeFileSync(entryOrderFile,JSON.stringify(order),writeFileOptions)
 }
 
-function readEnterOrder() {
-  if (!fs.existsSync(enterOrderFile)) {
+function readEntryOrder() {
+  if (!fs.existsSync(entryOrderFile)) {
     return
   }
-  var str = fs.readFileSync(enterOrderFile,readFileOptions)
+  var str = fs.readFileSync(entryOrderFile,readFileOptions)
   return JSON.parse(str)
 }
 
@@ -80,6 +80,6 @@ module.exports = {
   init: init,
   writeInterval: writeInterval,
   writeExit: writeExit,
-  writeEnterOrder: writeEnterOrder,
-  readEnterOrder: readEnterOrder
+  writeEntryOrder: writeEntryOrder,
+  readEntryOrder: readEntryOrder
 }
