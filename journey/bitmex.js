@@ -5,6 +5,9 @@ const log = require('./log')
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 
+const EXECINST_REDUCEONLY = ',ReduceOnly'
+const RETRYON_CANCELED = 'Canceled'
+
 var client, exitTradeCallback, marketCache
 var binSize = 5
 
@@ -166,7 +169,7 @@ async function orderStopLoss(created,price,size) {
 
   console.log('New orderStopLoss',cid,price,size)
   stopLossOrderRequesting = true
-  var responseData = await orderLimit(cid,price,size,',ReduceOnly')
+  var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY)
   stopLossOrderRequesting = false
   console.log('orderStopLoss response status', responseData.ordStatus)
   if (responseData.ordStatus == 'Canceled') {
@@ -192,7 +195,7 @@ async function orderTakeProfit(created,price,size) {
   console.log('orderTakeProfit',cid,price,size)
 
   takeProfitOrderRequesting = true
-  var responseData = await orderLimitRetry(cid,price,size,',ReduceOnly')
+  var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
   takeProfitOrderRequesting = false
   console.log('orderTakeProfit response status', responseData.ordStatus)
   return responseData
@@ -531,7 +534,7 @@ async function enter(order,margin) {
 
   enterOrder = order
   pendingStopLossOrder = null
-  var responseData = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD)
+  var responseData = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD,'',RETRYON_CANCELED)
   console.log('ENTER response status', responseData.ordStatus)
   if (responseData.ordStatus === 'Canceled') {
     return false
@@ -541,14 +544,24 @@ async function enter(order,margin) {
   return true
 }
 
-async function orderLimitRetry(cid,price,size,execInst) {
-  let responseData, count = 0
+async function wait(ms) {
+  return new Promise((resolve,reject) => {
+    setTimeout(_ => resolve(true), ms)
+  })
+}
+
+async function orderLimitRetry(cid,price,size,execInst,retryOn) {
+  retryOn += 'Overloaded'
+  let responseData, 
+      count = 0,
+      waitTime = 2
   do {
     responseData = await orderLimit(cid,price,size,execInst)
     count++
+    waitTime *= 2
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
-  } while(responseData.ordStatus === 'Canceled' && count < 10)
+  } while((retryOn.indexOf(responseData.ordStatus) >= 0) && count < 10 && await wait(waitTime))
   return responseData
 }
 
@@ -573,13 +586,21 @@ async function orderLimit(cid,price,size,execInst) {
       execInst:'ParticipateDoNotInitiate'+(execInst||'')
     }).catch(function(e) {
       console.log(e.statusText)
-      debugger
+      if (e.statusText && e.statusText.indexOf('The system is currently overloaded') >= 0) {
+        resolve({ordStatus:'Overloaded'})
+      }
+      else {
+        debugger
+      }
     })
-  
-    var data = JSON.parse(response.data)
-    console.log('Limit Order', response.data, JSON.stringify(quote))
 
-    resolve(data)
+    if (response && response.data) {
+      var data = JSON.parse(response.data)
+      console.log('Limit Order', response.data, JSON.stringify(lastQuote))
+      resolve(data)
+    }
+
+    resolve({})
   })
 }
 
@@ -645,7 +666,7 @@ async function init(exitTradeCb) {
   // await getFundingHistory(yesterday)
   // await getInstrument()
 
-  // await orderLimitRetry(3845,-1000)
+  // await orderLimitRetry('',3895,1,'',RETRYON_CANCELED)
   // debugger
   // testCheckPosition()
 }
