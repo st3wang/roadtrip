@@ -51,8 +51,8 @@ async function wsConnect() {
 
   await wsAddStream('order',handleOrder)
   await wsAddStream('position',handlePosition)
-  await wsAddStream('quote',handleQuote)
-  await wsAddStream('funding',handleFunding)
+  // await wsAddStream('quote',handleQuote)
+  await wsAddStream('instrument',handleInstrument)
 
   ws.addStream('.XBTUSDPI8H', 'quote', data => {
     debugger
@@ -65,14 +65,71 @@ function handleOrder(data) {
 function handlePosition(data) {
 }
 
-function handleQuote(data) {
-  checkPosition(ws._data.position.XBTUSD[0].currentQty,
-    data[0].bidPrice, data[0].askPrice, enterOrder)
+// function handleQuote(data) {
+//   console.log('QUOTE', data[0].bidPrice, data[0].askPrice)
+//   checkPosition(ws._data.position.XBTUSD[0].currentQty,
+//     data[0].bidPrice, data[0].askPrice, enterOrder)
+// }
+
+var lastQuote = {}
+
+function handleInstrument(data) {
+  var quote = {
+    bidPrice: data[0].bidPrice,
+    askPrice: data[0].askPrice
+  }
+  if (quote.bidPrice !== lastQuote.bidPrice || quote.askPrice !== lastQuote.askPrice) {
+    checkPosition(ws._data.position.XBTUSD[0].currentQty, quote.bidPrice, quote.askPrice, enterOrder)
+  }
+
+  lastQuote = quote
 }
 
-function handleFunding(data) {
-  console.log('FUNDING', new Date().toISOString(), JSON.stringify(data[0]))
+function getQuote() {
+  return lastQuote
+  // return ws._data.quote.XBTUSD[0]
 }
+
+function getFunding(instrument) {
+  return {
+    fundingRate: instrument.fundingRate,
+    fundingTimestamp: instrument.fundingTimestamp
+  }
+}
+
+function getLastPrice(instrument) {
+  return {
+    lastPrice: instrument.lastPrice
+  }
+}
+
+function getTrade() {
+  return ws._data.trade.XBTUSD[0]
+}
+
+function getPosition() {
+  return ws._data.position.XBTUSD[0]
+}
+
+function getOpenOrder() {
+  if (ws._data.order && ws._data.order.XBTUSD[0].ordStatus == 'New') {
+    return ws._data.order.XBTUSD[0]
+  }
+}
+
+
+
+// function getInstrument(data) {
+//   data = data || ws._data.instrument.XBTUSD[0]
+//   return {
+//     timestamp: data.timestamp,
+//     lastPrice: data.lastPrice,
+//     bidPrice: data.bidPrice,
+//     askPrice: data.askPrice,
+//     fundingRate: data.fundingRate,
+//     fundingTimestamp: data.fundingTimestamp
+//   }
+// }
 
 var stopLossOrderRequesting, pendingStopLossOrder
 var takeProfitOrderRequesting
@@ -223,24 +280,6 @@ function testCheckPosition() {
       checkPosition.apply(this, args);
     }, interval*(i+1))
   })
-}
-
-function getQuote() {
-  return ws._data.quote.XBTUSD[0]
-}
-
-function getTrade() {
-  return ws._data.trade.XBTUSD[0]
-}
-
-function getPosition() {
-  return ws._data.position.XBTUSD[0]
-}
-
-function getOpenOrder() {
-  if (ws._data.order && ws._data.order.XBTUSD[0].ordStatus == 'New') {
-    return ws._data.order.XBTUSD[0]
-  }
 }
 
 async function authorize() {
@@ -515,16 +554,14 @@ async function orderLimitRetry(cid,price,size,execInst) {
 
 async function orderLimit(cid,price,size,execInst) {
   return new Promise(async (resolve,reject) => {
-    let quote = getQuote()
-  
     if (size > 0) {
-      if (price > quote.bidPrice) {
-        price = quote.bidPrice
+      if (price > lastQuote.bidPrice) {
+        price = lastQuote.bidPrice
       }
     }
     else {
-      if (price < quote.askPrice) {
-        price = quote.askPrice
+      if (price < lastQuote.askPrice) {
+        price = lastQuote.askPrice
       }
     }
   
@@ -590,19 +627,6 @@ async function getOrders() {
   debugger
 }
 
-async function getFundingQuote() {
-  let response = await client.Quote.Quote_get({symbol: '.XBTUSDPI8H',
-  // startTime: new Date(1552176000000).toISOString(),
-  // columns:null
-  })
-  .catch(error => {
-    console.log(error)
-    debugger
-  })
-  let data = JSON.parse(response.data)
-  debugger
-}
-
 async function init(exitTradeCb) {
   exitTradeCallback = exitTradeCb
   client = await authorize().catch(e => {
@@ -619,7 +643,7 @@ async function init(exitTradeCb) {
   // var yesterday = new Date().getTime() - (24*60*60000)
   //await getTradeHistory(yesterday)
   // await getFundingHistory(yesterday)
-  // await getFundingQuote()
+  // await getInstrument()
 
   // await orderLimitRetry(3845,-1000)
   // debugger
