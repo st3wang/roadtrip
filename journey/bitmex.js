@@ -550,10 +550,15 @@ async function enter(order,margin) {
   console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
 
   var instrument = getInstrument()
-  var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,instrument.fundingRate)
-  if (fundingStopLoss) {
-    console.log('FUNDING STOP ENTER',JSON.stringify(fundingStopLoss))
-    return
+  var fundingTime = new Date(instrument.fundingTime).getTime()
+  var checkFundingPositionTime = fundingTime - 1800000
+  var now = new Date().getTime()
+  if (now > checkFundingPositionTime) {
+    var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,instrument.fundingRate)
+    if (fundingStopLoss) {
+      console.log('FUNDING STOP ENTER',JSON.stringify(fundingStopLoss))
+      return
+    }
   }
 
   cancelAllOrders()
