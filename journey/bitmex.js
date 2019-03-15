@@ -242,7 +242,7 @@ async function checkPosition(positionSize,bid,ask,order) {
       if (order.positionSizeUSD > 0) {
         // LONG
         if (ask >= order.takeProfit) {
-          console.log('Missed LONG trade', bid, ask, JSON.stringify(openOrder), order)
+          console.log('Missed LONG trade', bid, ask, JSON.stringify(openEntryOrder), order)
           debugger
           await cancelAllOrders()
         }
@@ -250,7 +250,7 @@ async function checkPosition(positionSize,bid,ask,order) {
       else {
         // SHORT
         if (bid <= order.takeProfit) {
-          console.log('Missed SHORT trade', bid, ask, JSON.stringify(openOrder), order)
+          console.log('Missed SHORT trade', bid, ask, JSON.stringify(openEntryOrder), order)
           debugger
           await cancelAllOrders()
         }
