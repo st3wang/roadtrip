@@ -239,9 +239,9 @@ async function checkPosition(positionSize,bid,ask,order) {
     var openEntryOrder = getOpenOrderMatching(order.entryPrice,order.positionSizeUSD)
     if (openEntryOrder) {
       // Check our order in the orderbook. Cancel the order if it has reached the target.
-      if (order.size > 0) {
+      if (order.positionSizeUSD > 0) {
         // LONG
-        if (ask <= order.takeProfit) {
+        if (ask >= order.takeProfit) {
           console.log('Missed LONG trade', bid, ask, JSON.stringify(openOrder), order)
           debugger
           await cancelAllOrders()
@@ -249,7 +249,7 @@ async function checkPosition(positionSize,bid,ask,order) {
       }
       else {
         // SHORT
-        if (bid >= order.takeProfit) {
+        if (bid <= order.takeProfit) {
           console.log('Missed SHORT trade', bid, ask, JSON.stringify(openOrder), order)
           debugger
           await cancelAllOrders()
