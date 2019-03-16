@@ -1,5 +1,9 @@
 var padStart = require('string.prototype.padstart');
 
+function YYYYMMDD(time) {
+  return (new Date(time).toISOString()).substring(0,10).replace(/-/g,'')
+}
+
 function getYmd(ymd) {
   var y = Math.floor(ymd / 10000)
   var m = Math.floor((ymd - y * 10000) / 100)
@@ -45,5 +49,6 @@ function nextDay(ymd) {
 module.exports = {
   nextDay: nextDay,
   getYmd: getYmd,
-  YYYY_MM_DD: YYYY_MM_DD
+  YYYY_MM_DD: YYYY_MM_DD,
+  YYYYMMDD: YYYYMMDD
 }

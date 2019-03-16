@@ -193,7 +193,7 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) {
   }
 }
 
-async function updateMarketData() {
+async function updateCandleFiles() {
   var interval = 15
   var startYmd = historyStartYmd
   var endYmd = 20190307
@@ -238,5 +238,5 @@ function fillMarketNull(market) {
 module.exports = {
   historyStartYmd, historyStartYmd,
   getMarket: getMarket,
-  updateMarketData: updateMarketData
+  updateCandleFiles: updateCandleFiles
 }

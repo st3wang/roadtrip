@@ -4,7 +4,8 @@ const fs = require('fs')
 const ymdHelper = require('./ymdHelper')
 const server = require('./server')
 const bitmex = require('./bitmex')
-// const binance = require('./binance')
+const binance = require('./binance')
+const marketHelper = require('./marketHelper')
 const strategy = require('./strategy')
 
 const readFile = util.promisify(fs.readFile)
@@ -301,7 +302,7 @@ async function initMarketServer() {
   let getMarketData = async function(setup) {
     let startYMD = setup.startYMD
     if (!markets[startYMD]) {
-      markets[startYMD] = await bitmex.getMarket(startYMD,20190307,15)
+      markets[startYMD] = await marketHelper.getMarket('bitmex',15,startYMD,20190307)
       markets[startYMD].rsis = []
     }
     return markets[startYMD]
@@ -338,7 +339,8 @@ async function initMarketServer() {
 }
 
 async function start() {
-  // await bitmex.updateMarketData()
+  // await bitmex.updateCandleFiles()
+  // await binance.updateCandleFiles()
 
   await initMarketServer()
 }

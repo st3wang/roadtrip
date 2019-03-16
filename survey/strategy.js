@@ -81,6 +81,10 @@ function highestBody(market,start,length) {
   return Math.max(highestOpen,highestClose)
 }
 
+function getRandomInt(max) {
+  return Math.floor(Math.random() * Math.floor(max));
+}
+
 async function getRsiCase(startTime,interval,market,setup) {
   var rsiLength = setup.rsiLength,
       rsiOverbought = setup.rsiOverbought,
@@ -102,7 +106,7 @@ async function getRsiCase(startTime,interval,market,setup) {
   var lows = market.lows
   var closes = market.closes
   var high, low, close, positionSize, entryPrice, stopLoss, takeProfit, lossDistance, profitDistance, lossDistancePercent
-  var rsi, prsi, longCondition, shortCondition
+  var rsi, prsi, longCondition, shortCondition, fee
   var trades = [], drawdowns = [], winCount = 0, highestCapital = capital, maxDrawdown = 0, barsInTrade = 0, barsNotInTrade = 0, enterBar = 0, exitBar = startBar
 
   // var query = db.startTradeSetup(setup)
@@ -115,6 +119,8 @@ async function getRsiCase(startTime,interval,market,setup) {
     drawdowns[i] = 0
   }
 
+  var feeRate = 0.0001
+
   for (var i = startBar; i < rsis.length; i++) {
     time += timeIncrement
     drawdowns[i] = drawdowns[i-1]
@@ -122,6 +128,9 @@ async function getRsiCase(startTime,interval,market,setup) {
       high = highs[i]
       low = lows[i]
       if (stopLoss >= low && stopLoss <= high) {
+        fee = positionSize * feeRate
+        capital -= fee
+
         let profit = -positionSize * (lossDistance/close)
         let profitPercent = profit/capital
         capital += profit
@@ -135,6 +144,9 @@ async function getRsiCase(startTime,interval,market,setup) {
         pushExit(trades,time,stopLoss,profitPercent,capital)
       }
       else if (takeProfit >= low && takeProfit <= high) {
+        fee = positionSize * feeRate
+        capital -= fee
+
         winCount++
         let profit = positionSize * (profitDistance/close)
         let profitPercent = profit/capital
@@ -160,7 +172,7 @@ async function getRsiCase(startTime,interval,market,setup) {
       shortCondition = prsi > rsiOverboughtExecute && rsi <= rsiOverboughtExecute //&& overbought
       if (shortCondition) {
         overbought = oversold = false
-        entryPrice = close
+        entryPrice = close * (1 - (getRandomInt(5)*0.0001))
         stopLoss = highestBody(market,i,stopLossLookBack)
         lossDistance = Math.abs(stopLoss - close)
         lossDistancePercent = lossDistance/close
@@ -172,6 +184,9 @@ async function getRsiCase(startTime,interval,market,setup) {
           // positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistance
           // positionSize = (compound ? capital : startCapital) * entryPrice * riskPerTradePercent / lossDistance
           positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistancePercent 
+
+          fee = positionSize * feeRate
+          capital -= fee
 
           barsNotInTrade += i - exitBar
           enterBar = i
@@ -186,7 +201,7 @@ async function getRsiCase(startTime,interval,market,setup) {
         longCondition = prsi < rsiOversoldExecute && rsi >= rsiOversoldExecute //&& oversold
         if (longCondition) {
           overbought = oversold = false
-          entryPrice = close
+          entryPrice = close * (1 + (getRandomInt(5)*0.0001))
           stopLoss = lowestBody(market,i,stopLossLookBack)
           lossDistance = Math.abs(close - stopLoss)
           lossDistancePercent = lossDistance/close
@@ -198,6 +213,9 @@ async function getRsiCase(startTime,interval,market,setup) {
             // positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistance
             // positionSize = (compound ? capital : startCapital) * entryPrice * riskPerTradePercent / lossDistance
             positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistancePercent 
+
+            fee = positionSize * feeRate
+            capital -= fee
 
             barsNotInTrade += i - exitBar
             enterBar = i

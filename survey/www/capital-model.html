@@ -81,7 +81,7 @@
   </div>
   <script>
   var market, plotCloses
-  var startDateISO = '2019-01-01T00:00:00.000Z'
+  var startDateISO = '2017-08-18T00:00:00.000Z'
   var startDate = new Date(startDateISO)
   var startYMD = startDateISO.substring(0,10).replace(/-/g,'')
   var layout = {
@@ -159,7 +159,7 @@
     var overviewDrawdowns = overview.drawdowns
     var drawdowns = []
     var capitals = overview.capitals.map((c,i) => {
-      drawdowns[i] = 10000+overviewDrawdowns[i]*10000
+      drawdowns[i] = 20000+overviewDrawdowns[i]*10000
       return c/20
     })
 
