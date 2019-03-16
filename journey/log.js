@@ -6,8 +6,8 @@ const path = require('path')
 
 const logDir = path.resolve(__dirname, 'log')
 const conditionFile = logDir + '/condition.csv'
-const enterFile = logDir + '/enter.csv'
-const entryOrderFile = logDir + '/enter_order.json'
+const entryFile = logDir + '/entry.csv'
+const entryOrderFile = logDir + '/entry_order.json'
 
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir)
@@ -15,8 +15,14 @@ if (!fs.existsSync(logDir)) {
 if (!fs.existsSync(conditionFile)) {
   fs.writeFileSync(conditionFile,'time,prsi,rsi,close,signalCondition,orderType,position,balance\n',writeFileOptions)
 }
-if (!fs.existsSync(enterFile)) {
-  fs.writeFileSync(enterFile,'Time,Capital,Risk,R/R,Type,Entry,Stop,Target,StopMarket,Time,Exit,P/L,StopPercent,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent\n',writeFileOptions)
+if (!fs.existsSync(entryFile)) {
+  fs.writeFileSync(entryFile,'Time,Capital,Risk,R/R,Type,Entry,Stop,Target,StopMarket,Time,Exit,P/L,StopPercent,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent\n',writeFileOptions)
+}
+
+function csvToArray(csv) {
+  return csv.split('\n').map(row => {
+    return row.split(',')
+  })
 }
 
 function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent) {
@@ -39,17 +45,18 @@ function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent
   if (orderSent) {
     // Time,Capital,Risk,R/R,
     // Entry,Stop,Target,Exit,P/L,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent
-    var enterData = [isoString,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
+    entryOrdersCache = null
+    var entryData = [isoString,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
       order.type,order.entryPrice,order.stopLoss,order.takeProfit,order.stopMarketTrigger,'','','',order.lossDistancePercent,order.lossDistance,order.profitDistance,
       order.riskAmountBTC,order.riskAmountUSD,order.positionSizeBTC,order.positionSizeUSD,order.leverage,'','','','']
-    var enterCSV = enterData.toString()
-    console.log(enterCSV)
-    fs.appendFile(logDir+'/enter.csv', enterCSV+'\n', e => {
+    var entryCSV = entryData.toString()
+    console.log(entryCSV)
+    fs.appendFile(entryFile, entryCSV+'\n', e => {
       if (e) {
         console.log(e)
       }
     })
-    sheets.enterTrade(enterData).catch(e => {
+    sheets.entryTrade(entryData).catch(e => {
       console.log(e)
     })
   }
@@ -72,6 +79,37 @@ function readEntryOrder() {
   return JSON.parse(str)
 }
 
+var entryOrdersCache
+
+function readEntryOrders() {
+  if (!entryOrdersCache) {
+    if (!fs.existsSync(entryFile)) {
+      return
+    }
+    var csv = fs.readFileSync(entryFile,readFileOptions)
+    entryOrdersCache = csvToArray(csv)
+  }
+  
+  return entryOrdersCache
+}
+
+function findEntryOrder(price,sizeUSD) {
+  var orders = readEntryOrders()
+  var found
+  orders.forEach(order => {
+    if (order[5] == ''+price && order[18] == ''+sizeUSD) {
+      found = {
+        timestamp: order[0],
+        price: price,
+        size: sizeUSD,
+        stopLoss: order[6],
+        takeProfit: order[7]
+      }
+    }
+  })
+  return found
+}
+
 async function init() {
   await sheets.init()
 }
@@ -81,5 +119,7 @@ module.exports = {
   writeInterval: writeInterval,
   writeExit: writeExit,
   writeEntryOrder: writeEntryOrder,
-  readEntryOrder: readEntryOrder
+  readEntryOrder: readEntryOrder,
+  readEntryOrders: readEntryOrders,
+  findEntryOrder: findEntryOrder
 }

@@ -7,6 +7,8 @@ const shoes = require('./shoes')
 const setup = shoes.setup
 
 global.bitmex = bitmex
+global.log = log
+
 console.log('setup', JSON.stringify(setup))
 
 async function next() {
@@ -63,21 +65,21 @@ async function getMarketCsv() {
   return csv
 }
 
-function getOrderCsv(order,execution,enterOrder) {
+function getOrderCsv(order,execution,stopLoss,takeProfit) {
   var status = order.ordStatus.toUpperCase()
   var side = execution=='ENTER'?(order.side=='Buy'?'LONG':'SHORT'):(order.side=='Buy'?'SHORT':'LONG')
-  var takeProfit = 0
-  if (execution == 'EXIT') {
-    if (side == 'LONG' && order.price > enterOrder.price) {
-      takeProfit = order.price
-    }
-    else if (side == 'SHORT' && order.price < enterOrder.price) {
-      takeProfit = order.price
-    }
-  }
+  // var takeProfit = 0
+  // if (execution == 'EXIT') {
+  //   if (side == 'LONG' && order.price > entryPrice) {
+  //     takeProfit = order.price
+  //   }
+  //   else if (side == 'SHORT' && order.price < entryPrice) {
+  //     takeProfit = order.price
+  //   }
+  // }
   return (status=='NEW'?order.timestamp:order.transactTime)+','+
     execution+'-'+side+'-'+status+','+
-    order.price+','+order.orderQty+',0,'+takeProfit+'\n'
+    order.price+','+order.orderQty+','+stopLoss+','+takeProfit+'\n'
 }
 
 // function getOrderNewFilledCsv(order,execution) {
@@ -94,11 +96,14 @@ async function getTradeCsv() {
   var orders = await bitmex.getOrders(yesterday)
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit\n'
   for (var i = 0; i < orders.length; i++) {
-    var order = orders[i]
-    var nextOrder = orders[i+1]
-    csv += getOrderCsv(order,'ENTER')
-    if (nextOrder && nextOrder.orderQty === order.orderQty && nextOrder.side !== order.side) {
-      csv += getOrderCsv(nextOrder,'EXIT',order)
+    var entryOrder = orders[i]
+    var exitOrder = orders[i+1]
+    var entryOrderRecord = log.findEntryOrder(entryOrder.price,entryOrder.orderQty*(entryOrder.side=='Buy'?1:-1))
+    var stopLoss = entryOrderRecord ? entryOrderRecord.stopLoss : 0
+    var takeProfit = entryOrderRecord ? entryOrderRecord.takeProfit : 0
+    csv += getOrderCsv(entryOrder,'ENTER',stopLoss,takeProfit)
+    if (exitOrder && exitOrder.orderQty === entryOrder.orderQty && exitOrder.side !== entryOrder.side) {
+      csv += getOrderCsv(exitOrder,'EXIT',stopLoss,takeProfit)
       i++
     }
   }

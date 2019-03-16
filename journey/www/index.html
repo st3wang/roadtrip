@@ -217,21 +217,21 @@
               };
           })
           var trendlines = []
-          if (trades.length > 0) {
-            var lastTrade = trades[trades.length-1]
-            if (lastTrade.type.startsWith('ENTER')) {
-                var lastCandle = data[data.length-1]
-                var startDate = new Date(lastTrade.date)
-                var endDate = new Date(lastCandle.date)
-                let color = lastTrade.type.endsWith('SHORT') ? '#CC47ED' : '#008fff'
+          var lastCandle = data[data.length-1]
+          trades.forEach((trade,i) => {
+            if (trade.type.startsWith('ENTER')) {
+                var exitTrade = trades[i+1]
+                var endCandle = (exitTrade && (exitTrade.type.indexOf('FILLED') != -1)) ? exitTrade : lastCandle
+                var startDate = new Date(trade.date)
+                var endDate = new Date(endCandle.date)
+                let color = trade.type.indexOf('SHORT') != -1 ? '#CC47ED' : '#008fff'
 
-                trendlines = [
-                  { color: color, start: { date: startDate, value: lastTrade.price }, end: { date: endDate, value: lastTrade.price } },
-                  { color: color, start: { date: startDate, value: lastTrade.stopLoss }, end: { date: endDate, value: lastTrade.stopLoss } },
-                  { color: color, start: { date: startDate, value: lastTrade.takeProfit }, end: { date: endDate, value: lastTrade.takeProfit } }
-                ]
+                trendlines.push({ color: color, start: { date: startDate, value: trade.price }, end: { date: endDate, value: trade.price } })
+                trendlines.push({ color: color, start: { date: startDate, value: trade.stopLoss }, end: { date: endDate, value: trade.stopLoss } })
+                trendlines.push({ color: color, start: { date: startDate, value: trade.takeProfit }, end: { date: endDate, value: trade.takeProfit } })
             }
-          }
+          })
+
 
           d3.csv("funding.csv", function(error, fundingData) {
             var fundings = fundingData.map(function(d) {

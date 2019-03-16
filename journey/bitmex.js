@@ -65,7 +65,7 @@ async function wsConnect() {
 
 function handleOrder(data) {
   var order = data[0]
-  console.log('order.ordStatus',order.ordStatus)
+  console.log('ORDER',order.ordStatus,order.price,order.orderQty)
 }
 
 function handlePosition(data) {
