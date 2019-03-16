@@ -722,6 +722,7 @@ async function getOrders(startTime) {
   startTime = startTime || (new Date().getTime() - (24*60*60000))
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
+    filter: '{"ordType":"Limit"}',
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
   })
   .catch(error => {

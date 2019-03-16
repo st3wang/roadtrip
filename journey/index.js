@@ -77,7 +77,7 @@ function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
   //     takeProfit = order.price
   //   }
   // }
-  return (status=='NEW'?order.timestamp:order.transactTime)+','+
+  return order.timestamp+','+
     execution+'-'+side+'-'+status+','+
     order.price+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
 }
