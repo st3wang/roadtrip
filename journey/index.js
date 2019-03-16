@@ -6,6 +6,7 @@ const server = require('./server')
 const shoes = require('./shoes')
 const setup = shoes.setup
 
+global.bitmex = bitmex
 console.log('setup', JSON.stringify(setup))
 
 async function next() {
@@ -114,10 +115,19 @@ async function getTradeCsv() {
   return csv
 }
 
+async function getFundingCsv() {
+  var csv = 'Date,Rate\n'
+  var fundings = await bitmex.getFundingHistory()
+  fundings.forEach(funding => {
+    csv += funding.timestamp+','+funding.fundingRate+'\n'
+  })
+  return csv
+}
+
 async function start() {
   await log.init()
   await bitmex.init(log.writeExit)
-  await server.init(getMarketCsv,getTradeCsv)
+  await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
 
   next()
   var now = new Date().getTime()

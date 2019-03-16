@@ -26,7 +26,7 @@ function responseWithData(response,contentType,data) {
   response.end()
 }
 
-async function init(getMarketCsv,getTradeCsv) {
+async function init(getMarketCsv,getTradeCsv,getFundingCsv) {
   http.createServer(async (request, response) => {
     let path = url.parse(request.url).pathname
     switch(path) {
@@ -40,6 +40,10 @@ async function init(getMarketCsv,getTradeCsv) {
       case '/trade.csv':
         var tradeCsv = await getTradeCsv()
         responseWithData(response,'text/csv',tradeCsv)
+        break;
+      case '/funding.csv':
+        var fundingCsv = await getFundingCsv()
+        responseWithData(response,'text/csv',fundingCsv)
         break;
       case '/data.csv':
         responseWithFile(response,'text/html','www/data.csv')

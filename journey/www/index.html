@@ -232,7 +232,23 @@
                 ]
             }
           }
-          draw(data, trades, trendlines);
+
+          d3.csv("funding.csv", function(error, fundingData) {
+            var fundings = fundingData.map(function(d) {
+              return {
+                  date: parseDate(d.Date),
+                  rate: d.Rate
+              };
+            })
+            fundings.forEach(funding => {
+                trendlines.push({ 
+                    color: funding.rate < 0 ? '#CC47ED' : '#008fff', 
+                    start: { date: funding.date, value: 2000 }, 
+                    end: { date: funding.date, value: 7000 } }
+                )
+            })
+            draw(data, trades, trendlines);
+          })
         })
     });
 

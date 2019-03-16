@@ -651,6 +651,7 @@ async function getTradeHistory(startTime) {
 }
 
 async function getFundingHistory(startTime) {
+  startTime = startTime || (new Date().getTime() - (24*60*60000))
   let response = await client.Funding.Funding_get({symbol: 'XBTUSD',
   startTime: new Date(startTime).toISOString()
   })
@@ -659,10 +660,11 @@ async function getFundingHistory(startTime) {
     debugger
   })
   let data = JSON.parse(response.data)
-  data.forEach(d => {
-    console.log(d.timestamp,d.price,d.orderQty)
-  })
-  debugger
+  // data.forEach(d => {
+  //   console.log(d.timestamp,d.fundingRate)
+  // })
+  // debugger
+  return data
 }
 
 async function getOrders(startTime) {
@@ -716,5 +718,6 @@ module.exports = {
   getQuote: getQuote,
   enter: enter,
   getOrders: getOrders,
-  getTradeHistory: getTradeHistory
+  getTradeHistory: getTradeHistory,
+  getFundingHistory: getFundingHistory
 }
