@@ -64,6 +64,8 @@ async function wsConnect() {
 }
 
 function handleOrder(data) {
+  var order = data[0]
+  console.log('order.ordStatus',order.ordStatus)
 }
 
 function handlePosition(data) {
@@ -487,16 +489,6 @@ async function getMargin() {
   return margin
 }
 
-// async function getOrders() {
-//   var response = await client.User.Order_getOrders()  
-//   .catch(function(e) {
-//     console.log('Error:', e.statusText)
-//     debugger
-//   })
-//   var orders = JSON.parse(response.data.toString())
-//   return orders
-// }
-
 async function cancelAllOrders() {
   let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
   .catch(function(e) {
@@ -673,17 +665,18 @@ async function getFundingHistory(startTime) {
   debugger
 }
 
-async function getOrders() {
+async function getOrders(startTime) {
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
-  startTime: new Date(1552176000000).toISOString(),
-  // columns:null
+    startTime: new Date(startTime).toISOString(),
+    columns: 'transactTime,price,orderQty,ordStatus,side'
   })
   .catch(error => {
     console.log(error)
     debugger
   })
   let data = JSON.parse(response.data)
-  debugger
+  // debugger
+  return data
 }
 
 async function init(exitTradeCb) {
@@ -697,15 +690,15 @@ async function init(exitTradeCb) {
 
   // inspect(client.apis)
   // await getOrderBook()
-  // await getOrders()
 
   // var openOrder = getOpenOrder()
   // debugger
 
-  var yesterday = new Date().getTime() - (48*60*60000)
+  // var yesterday = new Date().getTime() - (48*60*60000)
   // await getTradeHistory(yesterday)
   // await getFundingHistory(yesterday)
   // await getInstrument()
+  // await getOrders(yesterday)
 
   // await orderLimitRetry('',3888,1000,'',RETRYON_CANCELED)
   // debugger
@@ -718,5 +711,6 @@ module.exports = {
   getPosition: getPosition,
   getMargin: getMargin,
   getQuote: getQuote,
-  enter: enter
+  enter: enter,
+  getOrders: getOrders
 }
