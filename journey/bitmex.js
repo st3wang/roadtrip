@@ -65,7 +65,7 @@ async function wsConnect() {
 
 function handleOrder(data) {
   var order = data[0]
-  console.log('ORDER',order.ordStatus,order.price,order.orderQty)
+  console.log('ORDER',order.ordStatus,order.side,order.price,order.orderQty)
 }
 
 function handlePosition(data) {
@@ -174,12 +174,12 @@ async function orderStopLoss(created,price,size) {
 
   console.log('New orderStopLoss',cid,price,size)
   stopLossOrderRequesting = true
-  var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY)
+  var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
   stopLossOrderRequesting = false
   console.log('orderStopLoss response status', responseData.ordStatus)
-  if (responseData.ordStatus == 'Canceled') {
-    console.log('Orderbook jumped right back. No need to stop.')
-  }
+  // if (responseData.ordStatus == 'Canceled') {
+  //   console.log('Orderbook jumped right back. No need to stop.')
+  // }
   return responseData
 }
 
@@ -197,7 +197,7 @@ async function orderTakeProfit(created,price,size) {
 
   // var cid = created + 'EXIT+'
   var cid = ''
-  console.log('orderTakeProfit',cid,price,size)
+  console.log('New orderTakeProfit',cid,price,size)
 
   takeProfitOrderRequesting = true
   var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
@@ -217,7 +217,8 @@ async function checkPosition(positionSize,bid,ask,order) {
     // LONG
     if (ask <= order.stopLoss) {
       // console.log('LONG STOP LOSS')
-      var responseData = await orderStopLoss(order.created,ask,-positionSize)
+      // use ask for chasing stop loss
+      var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
     }
     else if (ask >= order.takeProfitTrigger) {
       // console.log('LONG TAKE PROFIT')
@@ -231,7 +232,8 @@ async function checkPosition(positionSize,bid,ask,order) {
     // SHORT 
     if (bid >= order.stopLoss) {
       // console.log('SHORT STOP LOSS')
-      var responseData = await orderStopLoss(order.created,bid,-positionSize)
+      // use bid for chasing stop loss
+      var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
     }
     else if (bid <= order.takeProfitTrigger) {
       // console.log('SHORT TAKE PROFIT')

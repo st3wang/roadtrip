@@ -103,9 +103,8 @@ async function getOrder(signal,market,bankroll,position,margin) {
       entryPrice = Math.max(quote.askPrice,close)
       stopLoss = highestBody(market,lastIndex,stopLossLookBack)
       lossDistance = Math.abs(stopLoss - entryPrice)
-      stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
-      profitDistance = -lossDistance * profitFactor
-      profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
+      stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2 // round to 0.5
+      profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
       stopLossTrigger = stopLoss - 0.5
       takeProfitTrigger = entryPrice - 2 //takeProfit + 0.5

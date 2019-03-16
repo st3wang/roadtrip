@@ -65,7 +65,7 @@ async function getMarketCsv() {
   return csv
 }
 
-function getOrderCsv(order,execution,stopLoss,takeProfit) {
+function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
   var status = order.ordStatus.toUpperCase()
   var side = execution=='ENTER'?(order.side=='Buy'?'LONG':'SHORT'):(order.side=='Buy'?'SHORT':'LONG')
   // var takeProfit = 0
@@ -79,7 +79,7 @@ function getOrderCsv(order,execution,stopLoss,takeProfit) {
   // }
   return (status=='NEW'?order.timestamp:order.transactTime)+','+
     execution+'-'+side+'-'+status+','+
-    order.price+','+order.orderQty+','+stopLoss+','+takeProfit+'\n'
+    order.price+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
 }
 
 // function getOrderNewFilledCsv(order,execution) {
@@ -94,16 +94,22 @@ async function getTradeCsv() {
   // var trades = await sheets.getTrades()
   var yesterday = new Date().getTime() - (48*60*60000)
   var orders = await bitmex.getOrders(yesterday)
-  var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit\n'
+  var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
   for (var i = 0; i < orders.length; i++) {
     var entryOrder = orders[i]
     var exitOrder = orders[i+1]
     var entryOrderRecord = log.findEntryOrder(entryOrder.price,entryOrder.orderQty*(entryOrder.side=='Buy'?1:-1))
-    var stopLoss = entryOrderRecord ? entryOrderRecord.stopLoss : 0
-    var takeProfit = entryOrderRecord ? entryOrderRecord.takeProfit : 0
-    csv += getOrderCsv(entryOrder,'ENTER',stopLoss,takeProfit)
+    var stopLoss = 0
+    var takeProfit = 0 
+    var stopMarket = 0 
+    if (entryOrderRecord) {
+      stopLoss = entryOrderRecord.stopLoss
+      takeProfit = entryOrderRecord.takeProfit
+      stopMarket = entryOrderRecord.stopMarket
+    }
+    csv += getOrderCsv(entryOrder,'ENTER',stopLoss,takeProfit,stopMarket)
     if (exitOrder && exitOrder.orderQty === entryOrder.orderQty && exitOrder.side !== entryOrder.side) {
-      csv += getOrderCsv(exitOrder,'EXIT',stopLoss,takeProfit)
+      csv += getOrderCsv(exitOrder,'EXIT',stopLoss,takeProfit,stopMarket)
       i++
     }
   }

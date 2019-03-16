@@ -3,7 +3,7 @@
 <style>
 
     body {
-        font: 10px sans-serif;
+        font: 8px sans-serif;
         background-color: #131722;
     }
 
@@ -213,7 +213,8 @@
                   price: +d.Price,
                   quantity: +d.Quantity,
                   stopLoss: +d.StopLoss,
-                  takeProfit: +d.TakeProfit
+                  takeProfit: +d.TakeProfit,
+                  stopMarket: +d.StopMarket
               };
           })
           var trendlines = []
@@ -225,10 +226,11 @@
                 var startDate = new Date(trade.date)
                 var endDate = new Date(endCandle.date)
                 let color = trade.type.indexOf('SHORT') != -1 ? '#CC47ED' : '#008fff'
-
+                let stopMarketColor = trade.type.indexOf('SHORT') != -1 ? 'pink' : 'lightskyblue'
                 trendlines.push({ color: color, start: { date: startDate, value: trade.price }, end: { date: endDate, value: trade.price } })
                 trendlines.push({ color: color, start: { date: startDate, value: trade.stopLoss }, end: { date: endDate, value: trade.stopLoss } })
                 trendlines.push({ color: color, start: { date: startDate, value: trade.takeProfit }, end: { date: endDate, value: trade.takeProfit } })
+                trendlines.push({ color: stopMarketColor, start: { date: startDate, value: trade.stopMarket }, end: { date: endDate, value: trade.stopMarket } })
             }
           })
 

@@ -16,7 +16,7 @@ if (!fs.existsSync(conditionFile)) {
   fs.writeFileSync(conditionFile,'time,prsi,rsi,close,signalCondition,orderType,position,balance\n',writeFileOptions)
 }
 if (!fs.existsSync(entryFile)) {
-  fs.writeFileSync(entryFile,'Time,Capital,Risk,R/R,Type,Entry,Stop,Target,StopMarket,Time,Exit,P/L,StopPercent,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent\n',writeFileOptions)
+  fs.writeFileSync(entryFile,'Time,Capital,Risk,R/R,Type,Entry,Stop,Target,StopMarket,StopPercent,StopDistance,TargetDistance,RiskBTC,RiskUSD,SizeBTC,SizeUSD,Leverage\n',writeFileOptions)
 }
 
 function csvToArray(csv) {
@@ -44,11 +44,12 @@ function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent
   })
   if (orderSent) {
     // Time,Capital,Risk,R/R,
-    // Entry,Stop,Target,Exit,P/L,Stop,Target,BTC,USD,BTC,USD,Leverage,BTC,Price,USD,Percent
+    // Type,Entry,Stop,Target,StopMarket,StopPercent,StopDistance,TargetDistance,
+    // RiskBTC,RiskUSD,SizeBTC,SizeUSD,Leverage
     entryOrdersCache = null
     var entryData = [isoString,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
-      order.type,order.entryPrice,order.stopLoss,order.takeProfit,order.stopMarketTrigger,'','','',order.lossDistancePercent,order.lossDistance,order.profitDistance,
-      order.riskAmountBTC,order.riskAmountUSD,order.positionSizeBTC,order.positionSizeUSD,order.leverage,'','','','']
+      order.type,order.entryPrice,order.stopLoss,order.takeProfit,order.stopMarketTrigger,order.lossDistancePercent,order.lossDistance,order.profitDistance,
+      order.riskAmountBTC,order.riskAmountUSD,order.positionSizeBTC,order.positionSizeUSD,order.leverage]
     var entryCSV = entryData.toString()
     console.log(entryCSV)
     fs.appendFile(entryFile, entryCSV+'\n', e => {
@@ -97,13 +98,14 @@ function findEntryOrder(price,sizeUSD) {
   var orders = readEntryOrders()
   var found
   orders.forEach(order => {
-    if (order[5] == ''+price && order[18] == ''+sizeUSD) {
+    if (order[5] == ''+price && order[15] == ''+sizeUSD) {
       found = {
         timestamp: order[0],
         price: price,
         size: sizeUSD,
         stopLoss: order[6],
-        takeProfit: order[7]
+        takeProfit: order[7],
+        stopMarket: order[8]
       }
     }
   })
