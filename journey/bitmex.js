@@ -77,6 +77,13 @@ function handlePosition(data) {
 //     data[0].bidPrice, data[0].askPrice, entryOrder)
 // }
 
+function isFundingWindow(instrument) {
+  var fundingTime = new Date(instrument.fundingTimestamp).getTime()
+  var checkFundingPositionTime = fundingTime - 3600000
+  var now = new Date().getTime()
+  return (now > checkFundingPositionTime)
+}
+
 async function handleInstrument(data) {
   var instrument = data[0]
   var bid = instrument.bidPrice
@@ -93,10 +100,7 @@ async function handleInstrument(data) {
     askPrice: ask
   }
 
-  var fundingTime = new Date(instrument.fundingTimestamp).getTime()
-  var checkFundingPositionTime = fundingTime - 1800000
-  var now = new Date().getTime()
-  if (now > checkFundingPositionTime) {
+  if (isFundingWindow(instrument)) {
     var position = ws._data.position.XBTUSD[0]
     var fundingStopLoss = await checkFundingPosition(position.currentQty, instrument.fundingRate, bid, ask, entryOrder)
     if (fundingStopLoss) {
@@ -542,10 +546,7 @@ async function enter(order,margin) {
   console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
 
   var instrument = getInstrument()
-  var fundingTime = new Date(instrument.fundingTimestamp).getTime()
-  var checkFundingPositionTime = fundingTime - 1800000
-  var now = new Date().getTime()
-  if (now > checkFundingPositionTime) {
+  if (isFundingWindow(instrument)) {
     var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,instrument.fundingRate)
     if (fundingStopLoss) {
       console.log('FUNDING STOP ENTER',JSON.stringify(fundingStopLoss))
