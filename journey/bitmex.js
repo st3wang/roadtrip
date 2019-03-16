@@ -674,9 +674,12 @@ async function getOrders(startTime) {
     console.log(error)
     debugger
   })
-  let data = JSON.parse(response.data)
+  let orders = JSON.parse(response.data)
+  orders = orders.filter(order => {
+    return (order.ordStatus != 'Canceled')
+  })
   // debugger
-  return data
+  return orders
 }
 
 async function init(exitTradeCb) {
@@ -712,5 +715,6 @@ module.exports = {
   getMargin: getMargin,
   getQuote: getQuote,
   enter: enter,
-  getOrders: getOrders
+  getOrders: getOrders,
+  getTradeHistory: getTradeHistory
 }
