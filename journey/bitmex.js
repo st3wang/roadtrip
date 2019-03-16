@@ -71,6 +71,9 @@ function handleOrder(data) {
       if (openOrder.orderID == order.orderID) {
         openOrders[j] = order
       }
+      else {
+        openOrders.push(order)
+      }
     })
   })
   openOrders = openOrders.filter(order => {
@@ -263,7 +266,6 @@ async function checkPosition(positionSize,bid,ask,order) {
       // console.log('LONG STOP LOSS')
       // use ask for chasing stop loss
       var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
-      await orderStopMarket(order.stopMarketTrigger,-positionSize)
     }
     else if (ask >= order.takeProfitTrigger) {
       // console.log('LONG TAKE PROFIT')
@@ -279,7 +281,6 @@ async function checkPosition(positionSize,bid,ask,order) {
       // console.log('SHORT STOP LOSS')
       // use bid for chasing stop loss
       var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
-      await orderStopMarket(order.stopMarketTrigger,-positionSize)
     }
     else if (bid <= order.takeProfitTrigger) {
       // console.log('SHORT TAKE PROFIT')
@@ -789,5 +790,7 @@ module.exports = {
   getOrders: getOrders,
   getNewOrders: getNewOrders,
   getTradeHistory: getTradeHistory,
-  getFundingHistory: getFundingHistory
+  getFundingHistory: getFundingHistory,
+  getOpenOrder: getOpenOrder,
+  openOrders: openOrders
 }
