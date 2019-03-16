@@ -56,7 +56,7 @@ function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent
         console.log(e)
       }
     })
-    sheets.entryTrade(entryData).catch(e => {
+    sheets.enterTrade(entryData).catch(e => {
       console.log(e)
     })
   }
