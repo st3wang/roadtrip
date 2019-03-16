@@ -93,14 +93,14 @@ async function handleInstrument(data) {
     askPrice: ask
   }
 
-  var fundingTime = new Date(instrument.fundingTime).getTime()
+  var fundingTime = new Date(instrument.fundingTimestamp).getTime()
   var checkFundingPositionTime = fundingTime - 1800000
   var now = new Date().getTime()
   if (now > checkFundingPositionTime) {
-    var position = _data.position.XBTUSD[0]
+    var position = ws._data.position.XBTUSD[0]
     var fundingStopLoss = await checkFundingPosition(position.currentQty, instrument.fundingRate, bid, ask, entryOrder)
     if (fundingStopLoss) {
-      await orderStopLoss('',stopFundingLoss.price,stopFundingLoss.size)
+      await orderStopLoss('',fundingStopLoss.price,fundingStopLoss.size)
     }
   }
 }
@@ -264,13 +264,13 @@ async function checkPosition(positionSize,bid,ask,order) {
 async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,order) {
   if (positionSizeUSD > 0) {  
     if (fundingRate > 0) {
-      console.log('FUNDING LONG has to pay')
+      // console.log('FUNDING LONG has to pay')
       return {price:ask,size:-positionSizeUSD,fundingRate:fundingRate}
     }
   } 
   else if (positionSizeUSD < 0) {
     if (fundingRate < 0) {
-      console.log('FUNDING SHORT has to pay')
+      // console.log('FUNDING SHORT has to pay')
       return {price:bid,size:-positionSizeUSD,fundingRate:fundingRate}
     }
   }
@@ -542,7 +542,7 @@ async function enter(order,margin) {
   console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
 
   var instrument = getInstrument()
-  var fundingTime = new Date(instrument.fundingTime).getTime()
+  var fundingTime = new Date(instrument.fundingTimestamp).getTime()
   var checkFundingPositionTime = fundingTime - 1800000
   var now = new Date().getTime()
   if (now > checkFundingPositionTime) {
