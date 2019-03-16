@@ -12,7 +12,7 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
-var entryOrder
+var entryOrder, openOrders
 var lastQuote = {}
 
 function heartbeat() {
@@ -64,8 +64,21 @@ async function wsConnect() {
 }
 
 function handleOrder(data) {
-  var order = data[0]
-  console.log('ORDER',order.ordStatus,order.side,order.price,order.orderQty)
+  // var order = data[0]
+  data.forEach((order,i) => {
+    console.log('ORDER',i,order.ordStatus,order.side,order.price,order.orderQty)
+    openOrders.forEach((openOrder,j) => {
+      if (openOrder.orderID == order.orderID) {
+        openOrders[j] = order
+      }
+    })
+  })
+  openOrders = openOrders.filter(order => {
+    return (order.ordStatus == 'New')
+  })
+  openOrders.forEach((order,i) => {
+    console.log('filtered openOrders',i,order.ordStatus,order.side,order.price,order.orderQty)
+  })
 }
 
 function handlePosition(data) {
@@ -129,15 +142,30 @@ function getPosition() {
   return ws._data.position.XBTUSD[0]
 }
 
-function getOpenOrder() {
-  if (ws._data.order && ws._data.order.XBTUSD[0].ordStatus == 'New') {
-    return ws._data.order.XBTUSD[0]
+// function getOpenOrder() {
+//   if (ws._data.order && ws._data.order.XBTUSD[0].ordStatus == 'New') {
+//     return ws._data.order.XBTUSD[0]
+//   }
+// }
+
+function getOpenOrder(type) {
+  for (var i = 0; i < openOrders.length; i++) {
+    if (openOrders[i].ordType == type) {
+      return openOrders[i]
+    }
   }
 }
 
-function getOpenOrderMatching(price,size) {
-  var openOrder = getOpenOrder()
+function getOpenLimitOrderMatching(price,size) {
+  var openOrder = getOpenOrder('Limit')
   if (openOrder && openOrder.price == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
+    return openOrder
+  }
+}
+
+function getOpenStopOrderMatching(price,size) {
+  var openOrder = getOpenOrder('Stop')
+  if (openOrder && openOrder.stopPx == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
     return openOrder
   }
 }
@@ -155,7 +183,7 @@ async function orderStopLoss(created,price,size) {
   // var cid = created + 'EXIT-'  
   var cid = ''
   var responseData
-  var openStopLossOrder = getOpenOrderMatching(price,size)
+  var openStopLossOrder = getOpenLimitOrderMatching(price,size)
 
   if (openStopLossOrder) {
     //console.log('Order with the same price and size is already opened')
@@ -189,7 +217,7 @@ async function orderTakeProfit(created,price,size) {
     return
   }
 
-  var openTakeProfitOrder = getOpenOrderMatching(price,size)
+  var openTakeProfitOrder = getOpenLimitOrderMatching(price,size)
   if (openTakeProfitOrder) {
     //console.log('Order already opened')
     return
@@ -206,6 +234,22 @@ async function orderTakeProfit(created,price,size) {
   return responseData
 }
 
+async function orderStopMarket(price,size) {
+  // var openStopMarketOrder = getOpenStopOrderMatching(price,size)
+  // if (openStopMarketOrder) {
+  //   //console.log('Order already opened')
+  //   return
+  // }
+  let stopMarketOrderResponse = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+    orderQty:size,
+    stopPx:price 
+  }).catch(function(e) {
+    console.log(e.statusText)
+    debugger
+  })
+  console.log('Submitted - StopMarket Order ')
+}
+
 async function checkPosition(positionSize,bid,ask,order) {
   if (positionSize > 0) {  
     if (!order) {
@@ -219,6 +263,7 @@ async function checkPosition(positionSize,bid,ask,order) {
       // console.log('LONG STOP LOSS')
       // use ask for chasing stop loss
       var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
+      await orderStopMarket(order.stopMarketTrigger,-positionSize)
     }
     else if (ask >= order.takeProfitTrigger) {
       // console.log('LONG TAKE PROFIT')
@@ -234,6 +279,7 @@ async function checkPosition(positionSize,bid,ask,order) {
       // console.log('SHORT STOP LOSS')
       // use bid for chasing stop loss
       var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
+      await orderStopMarket(order.stopMarketTrigger,-positionSize)
     }
     else if (bid <= order.takeProfitTrigger) {
       // console.log('SHORT TAKE PROFIT')
@@ -244,7 +290,7 @@ async function checkPosition(positionSize,bid,ask,order) {
     }
   }
   else {
-    var openEntryOrder = getOpenOrderMatching(order.entryPrice,order.positionSizeUSD)
+    var openEntryOrder = getOpenLimitOrderMatching(order.entryPrice,order.positionSizeUSD)
     if (openEntryOrder) {
       // Check our order in the orderbook. Cancel the order if it has reached the target.
       if (order.positionSizeUSD > 0) {
@@ -282,7 +328,7 @@ async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,order) {
   }
   else {
     // Check if there is an open entry order that has to pay funding
-    var openEntryOrder = getOpenOrderMatching(order.entryPrice,order.positionSizeUSD)
+    var openEntryOrder = getOpenLimitOrderMatching(order.entryPrice,order.positionSizeUSD)
     if (openEntryOrder && 
       // to avoid stakeoverflow
       openEntryOrder.orderQty !== 0) {
@@ -573,6 +619,8 @@ async function enter(order,margin) {
     return false
   }
 
+  orderStopMarket(order.stopMarketTrigger,-order.positionSizeUSD)
+
   log.writeEntryOrder(order)
   return true
 }
@@ -671,9 +719,10 @@ async function getFundingHistory(startTime) {
 }
 
 async function getOrders(startTime) {
+  startTime = startTime || (new Date().getTime() - (24*60*60000))
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
-    columns: 'transactTime,price,orderQty,ordStatus,side'
+    columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
   })
   .catch(error => {
     console.log(error)
@@ -683,7 +732,21 @@ async function getOrders(startTime) {
   orders = orders.filter(order => {
     return (order.ordStatus != 'Canceled')
   })
-  // debugger
+  return orders
+}
+
+async function getNewOrders(startTime) {
+  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
+    startTime: new Date(startTime).toISOString(),
+    filter: '{"ordStatus":"New"}',
+    columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
+  })
+  .catch(error => {
+    console.log(error)
+    debugger
+  })
+  let orders = JSON.parse(response.data)
   return orders
 }
 
@@ -694,6 +757,8 @@ async function init(exitTradeCb) {
     debugger
   })
   entryOrder = log.readEntryOrder()
+  openOrders = await getNewOrders()
+  // var s = getOpenStopOrderMatching(4000,1)
   await wsConnect()
 
   // inspect(client.apis)
@@ -721,6 +786,7 @@ module.exports = {
   getQuote: getQuote,
   enter: enter,
   getOrders: getOrders,
+  getNewOrders: getNewOrders,
   getTradeHistory: getTradeHistory,
   getFundingHistory: getFundingHistory
 }
