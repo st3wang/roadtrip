@@ -12,7 +12,7 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
-var entryOrder, openOrders
+var entryOrder, openOrders = {}
 var lastQuote = {}
 
 function heartbeat() {
@@ -64,24 +64,9 @@ async function wsConnect() {
 }
 
 function handleOrder(data) {
-  console.log('handleOrder',JSON.stringify(data))
   data.forEach((order,i) => {
     console.log('ORDER',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
-    var j = openOrders.findIndex(openOrder => {
-      return openOrder.orderID == order.orderID
-    })
-    if (j >= 0) {
-      openOrders[j] = order
-    }
-    else {
-      openOrders.push(order)
-    }
-  })
-  openOrders = openOrders.filter(order => {
-    return (order.ordStatus == 'New')
-  })
-  openOrders.forEach((order,i) => {
-    console.log('filtered openOrders',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
+    openOrders[order.ordType] = order
   })
 }
 
@@ -153,13 +138,7 @@ function getPosition() {
 // }
 
 function getOpenOrder(type) {
-  console.log('getOpenOrder',type,JSON.stringify(openOrders))
-  for (var i = 0; i < openOrders.length; i++) {
-    if (openOrders[i].ordType == type) {
-      console.log('getOpenOrder return',openOrders[i])
-      return openOrders[i]
-    }
-  }
+  return openOrders[type]
 }
 
 function getOpenLimitOrderMatching(price,size) {
@@ -740,11 +719,11 @@ async function getOrders(startTime) {
   return orders
 }
 
-async function getNewOrders(startTime) {
+async function getOpenOrders(startTime) {
   startTime = startTime || (new Date().getTime() - (24*60*60000))
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
-    filter: '{"ordStatus":"New"}',
+    filter: '{"ordStatus":"New","ordType":"Limit"}',
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
   })
   .catch(error => {
@@ -752,7 +731,10 @@ async function getNewOrders(startTime) {
     debugger
   })
   let orders = JSON.parse(response.data)
-  return orders
+  orders.forEach(order => {
+    openOrders[order.ordType] = order
+  })
+  return openOrders
 }
 
 async function init(exitTradeCb) {
@@ -762,7 +744,7 @@ async function init(exitTradeCb) {
     debugger
   })
   entryOrder = log.readEntryOrder()
-  openOrders = await getNewOrders()
+  await getOpenOrders()
   // var s = getOpenStopOrderMatching(4000,1)
   await wsConnect()
 
@@ -791,7 +773,6 @@ module.exports = {
   getQuote: getQuote,
   enter: enter,
   getOrders: getOrders,
-  getNewOrders: getNewOrders,
   getTradeHistory: getTradeHistory,
   getFundingHistory: getFundingHistory,
   getOpenOrder: getOpenOrder,
