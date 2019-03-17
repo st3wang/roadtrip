@@ -87,6 +87,35 @@ function isFundingWindow(instrument) {
   return (now > checkFundingPositionTime)
 }
 
+function startNextCandle() {
+  var now = new Date().getTime()
+  var candleTimeOffset = now % 900000
+  var currentCandleTime = now - candleTimeOffset
+  var currentCandleISOString = new Date(currentCandleTime).toISOString()
+
+  if (marketCache.candles[marketCache.candles.length-1].time == currentCandleISOString) {
+    return
+  }
+
+  marketCache.opens.shift()
+  marketCache.highs.shift()
+  marketCache.lows.shift()
+  marketCache.closes.shift()
+  marketCache.candles.shift()
+
+  marketCache.opens.push(currentCandle.open)
+  marketCache.highs.push(currentCandle.high)
+  marketCache.lows.push(currentCandle.low)
+  marketCache.closes.push(currentCandle.close)
+  marketCache.candles.push(currentCandle)
+
+  let open = currentCandle.close
+  currentCandle = {
+    time:currentCandleISOString,
+    open:open, high:open, low:open, close: open
+  }
+}
+
 async function handleInstrument(data) {
   var instrument = data[0]
   var bid = instrument.bidPrice
@@ -105,25 +134,7 @@ async function handleInstrument(data) {
     }
   }
   else {
-    // start new candle
-    marketCache.opens.shift()
-    marketCache.highs.shift()
-    marketCache.lows.shift()
-    marketCache.closes.shift()
-    marketCache.candles.shift()
-
-    marketCache.opens.push(currentCandle.open)
-    marketCache.highs.push(currentCandle.high)
-    marketCache.lows.push(currentCandle.low)
-    marketCache.closes.push(currentCandle.close)
-    marketCache.candles.push(currentCandle)
-
-    var candleTime = new Date(now-candleTimeOffset).toISOString()
-    let open = currentCandle.close
-    currentCandle = {
-      time:candleTime,
-      open:open, high:open, low:open, close: open
-    }
+    startNextCandle()
   }
   currentCandleTimeOffset = candleTimeOffset
   
@@ -432,7 +443,7 @@ function toCandle(group) {
   try {
     var open = group[0].open
     let candle = {
-      time: group[0].timestamp,
+      time: new Date(new Date(group[0].timestamp).getTime()-300000).toISOString(),
       open: open,
       high: open,
       low: open,
@@ -457,7 +468,7 @@ async function getCurrentTradeBucketed(interval) {
   interval = interval || 15
   let now = new Date().getTime()
   let candleTimeOffset = now % (interval*60000)
-  let startTime = new Date(now - candleTimeOffset - 60000).toISOString()
+  let startTime = new Date(now - candleTimeOffset + 60000).toISOString()
   // debugger
   let response = await client.Trade.Trade_getBucketed({symbol:'XBTUSD', binSize:'1m', 
     startTime:startTime
@@ -511,6 +522,7 @@ async function getMarket(interval,length) {
   if (!marketCache) {
     marketCache = await getTradeBucketed(interval,length)
   }
+  handleInstrument(ws._data.instrument.XBTUSD)
   return marketCache
   // else {
     // var now = new Date().getTime()
