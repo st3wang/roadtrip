@@ -460,6 +460,7 @@ function toCandle(group) {
     return candle
   }
   catch(e) {
+    console.error(e)
     debugger
   }
 }
