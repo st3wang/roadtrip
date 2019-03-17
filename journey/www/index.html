@@ -6,7 +6,6 @@
         margin: 0;
         font: 8px sans-serif;
         background-color: #131722;
-/*         overflow:hidden; */
     }
 
     text {
@@ -115,7 +114,6 @@
 <script src="http://d3js.org/d3.v4.min.js"></script>
 <script src="techan.js"></script>
 <script>
-
     var margin = {top: 30, right: 50, bottom: 40, left: 50},
             width = 1400 - margin.left - margin.right,
             height = 600 - margin.top - margin.bottom;
@@ -171,10 +169,37 @@
         .xScale(x)
         .yScale(y)
 
+    svg.append("g")
+            .attr("class", "candlestick");
+
+    svg.append("g")
+            .attr("class", "tradearrow");
+
+    svg.append("g")
+            .attr("class", "x axis")
+            .attr("transform", "translate(0," + height + ")");
+
+    svg.append("g")
+            .attr("class", "y axis")
+            .append("text")
+            .attr("transform", "rotate(-90)")
+            .attr("y", 6)
+            .attr("dy", ".71em")
+            .style("text-anchor", "end")
+            .text("Price ($)");
+
+    svg.append("g")
+            .attr("class", "trendlines");
+
+    svg.selectAll("g.x.axis").call(xAxis);
+    svg.selectAll("g.y.axis").call(yAxis);
+
+    var candles,trades,fundings, drawRsi
+    var trendlines = []
+
     d3.csv("market.csv", function(error, data) {
         var accessor = candlestick.accessor();
-
-        data = data.slice(0, 200).map(function(d) {
+        candles = data.map(function(d) {
             return {
                 date: parseDate(d.Date),
                 open: +d.Open,
@@ -185,89 +210,64 @@
             };
         }).sort(function(a, b) { return d3.ascending(accessor.d(a), accessor.d(b)); });
 
-        svg.append("g")
-                .attr("class", "candlestick");
+        x.domain(candles.map(candlestick.accessor().d));
+        y.domain(techan.scale.plot.ohlc(candles, candlestick.accessor()).domain());
 
-        svg.append("g")
-                .attr("class", "tradearrow");
+        svg.selectAll("g.candlestick").datum(candles).call(candlestick);
 
-        svg.append("g")
-                .attr("class", "x axis")
-                .attr("transform", "translate(0," + height + ")");
+        drawRsi(error,data)
+    })
+      
+    d3.csv("trade.csv", function(error, tradeData) {
+      trades = tradeData.map(function(d) {
+          return {
+              date: parseDate(d.Date),
+              type: d.Type,
+              price: +d.Price,
+              quantity: +d.Quantity,
+              stopLoss: +d.StopLoss,
+              takeProfit: +d.TakeProfit,
+              stopMarket: +d.StopMarket
+          };
+      })
+      trades.forEach((trade,i) => {
+        if (trade.type.startsWith('ENTER')) {
+            var exitTrade = trades[i+1]
+            var startDate = new Date(trade.date)
+            var endDate = (exitTrade && (exitTrade.type.indexOf('FILLED') != -1)) ? exitTrade.date : new Date()
+            let color = trade.type.indexOf('SHORT') != -1 ? '#CC47ED' : '#008fff'
+            let stopMarketColor = trade.type.indexOf('SHORT') != -1 ? 'pink' : 'lightskyblue'
+            trendlines.push({ color: color, start: { date: startDate, value: trade.price }, end: { date: endDate, value: trade.price } })
+            trendlines.push({ color: color, start: { date: startDate, value: trade.stopLoss }, end: { date: endDate, value: trade.stopLoss } })
+            trendlines.push({ color: color, start: { date: startDate, value: trade.takeProfit }, end: { date: endDate, value: trade.takeProfit } })
+            trendlines.push({ color: stopMarketColor, start: { date: startDate, value: trade.stopMarket }, end: { date: endDate, value: trade.stopMarket } })
+        }
+      })
 
-        svg.append("g")
-                .attr("class", "y axis")
-                .append("text")
-                .attr("transform", "rotate(-90)")
-                .attr("y", 6)
-                .attr("dy", ".71em")
-                .style("text-anchor", "end")
-                .text("Price ($)");
-
-        svg.append("g")
-                .attr("class", "trendlines");
-
-        d3.csv("trade.csv", function(error, tradeData) {
-          var trades = tradeData.map(function(d) {
-              return {
-                  date: parseDate(d.Date),
-                  type: d.Type,
-                  price: +d.Price,
-                  quantity: +d.Quantity,
-                  stopLoss: +d.StopLoss,
-                  takeProfit: +d.TakeProfit,
-                  stopMarket: +d.StopMarket
-              };
-          })
-          var trendlines = []
-          var lastCandle = data[data.length-1]
-          trades.forEach((trade,i) => {
-            if (trade.type.startsWith('ENTER')) {
-                var exitTrade = trades[i+1]
-                var endCandle = (exitTrade && (exitTrade.type.indexOf('FILLED') != -1)) ? exitTrade : lastCandle
-                var startDate = new Date(trade.date)
-                var endDate = new Date(endCandle.date)
-                let color = trade.type.indexOf('SHORT') != -1 ? '#CC47ED' : '#008fff'
-                let stopMarketColor = trade.type.indexOf('SHORT') != -1 ? 'pink' : 'lightskyblue'
-                trendlines.push({ color: color, start: { date: startDate, value: trade.price }, end: { date: endDate, value: trade.price } })
-                trendlines.push({ color: color, start: { date: startDate, value: trade.stopLoss }, end: { date: endDate, value: trade.stopLoss } })
-                trendlines.push({ color: color, start: { date: startDate, value: trade.takeProfit }, end: { date: endDate, value: trade.takeProfit } })
-                trendlines.push({ color: stopMarketColor, start: { date: startDate, value: trade.stopMarket }, end: { date: endDate, value: trade.stopMarket } })
-            }
-          })
-
-
-          d3.csv("funding.csv", function(error, fundingData) {
-            var fundings = fundingData.map(function(d) {
-              return {
-                  date: parseDate(d.Date),
-                  rate: d.Rate
-              };
-            })
-            fundings.forEach(funding => {
-                trendlines.push({ 
-                    color: funding.rate < 0 ? '#CC47ED' : '#008fff', 
-                    start: { date: funding.date, value: 2000 }, 
-                    end: { date: funding.date, value: 7000 } }
-                )
-            })
-            draw(data, trades, trendlines);
-          })
-        })
-    });
-
-    function draw(data, trades, trendlines) {
-        x.domain(data.map(candlestick.accessor().d));
-        y.domain(techan.scale.plot.ohlc(data, candlestick.accessor()).domain());
-
-        svg.selectAll("g.candlestick").datum(data).call(candlestick);
-        svg.selectAll("g.tradearrow").datum(trades).call(tradearrow);
-
-        svg.selectAll("g.x.axis").call(xAxis);
-        svg.selectAll("g.y.axis").call(yAxis);
-
+      svg.selectAll("g.tradearrow").datum(trades).call(tradearrow);
+      if (fundings) {
         svg.selectAll("g.trendlines").datum(trendlines).call(trendline)
-    }
+      }
+    })
+
+    d3.csv("funding.csv", function(error, fundingData) {
+        fundings = fundingData.map(function(d) {
+          return {
+              date: parseDate(d.Date),
+              rate: d.Rate
+          };
+        })
+        fundings.forEach(funding => {
+            trendlines.push({ 
+                color: funding.rate < 0 ? '#CC47ED' : '#008fff', 
+                start: { date: funding.date, value: 2000 }, 
+                end: { date: funding.date, value: 7000 } }
+            )
+        })
+        if (trades) {
+            svg.selectAll("g.trendlines").datum(trendlines).call(trendline)
+        }
+    })
 
     function enter(d) {
         valueText.style("display", "inline");
@@ -286,7 +286,7 @@
     var rsi = techan.plot.rsi()
             .xScale(x)
             .yScale(y);
-  var margin = {top: 10, right: 30, bottom: 30, left: 50},
+  var margin = {top: 10, right: 50, bottom: 30, left: 50},
             width = 1400 - margin.left - margin.right,
             height = 200 - margin.top - margin.bottom;
 
@@ -313,7 +313,7 @@
         .append("g")
             .attr("transform", "translate(" + margin.left + "," + margin.top + ")");
 
-    d3.csv("market.csv", function(error, data) {
+    drawRsi = function(error, data) {
         var accessor = rsi.accessor();
 
         data = data.slice(0, 200).map(function(d) {
@@ -344,12 +344,8 @@
                 .attr("dy", ".71em")
                 .style("text-anchor", "end")
                 .text("RSI");
-
-        // Data to display initially
         draw(data);
-        // Only want this button to be active if the data has loaded
-        d3.select("button").on("click", function() { draw(data); }).style("display", "inline");
-    });
+    }
 
     function draw(data) {
         var rsiData = techan.indicator.rsi()(data);
