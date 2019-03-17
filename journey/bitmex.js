@@ -14,12 +14,7 @@ var binSize = 5
 var ws, wsHeartbeatTimeout
 var entryOrder, openOrders = {}
 var lastQuote = {}
-var currentCandle = {
-  open: 0,
-  high: 0,
-  low: 9999999,
-  close: 0
-}
+var currentCandle, currentCandleTimeOffset
 
 function heartbeat() {
   setInterval(_ => {
@@ -96,8 +91,25 @@ async function handleInstrument(data) {
   var instrument = data[0]
   var bid = instrument.bidPrice
   var ask = instrument.askPrice
-  // var price = instrument.lastPrice
-  // console.log(price)
+  var price = instrument.lastPrice
+
+  var candleTimeOffset = (new Date().getTime()) % 900000
+  if (candleTimeOffset >= currentCandleTimeOffset) {
+    currentCandle.close = price
+    if (price > currentCandle.high) {
+      currentCandle.high = price
+    }
+    else if (price < currentCandle.low) {
+      currentCandle.low = price
+    }
+  }
+  else {
+    currentCandle = {
+      open:price, high:price, low:price, close: price
+    }
+  }
+  currentCandleTimeOffset = candleTimeOffset
+  
   if (bid !== lastQuote.bidPrice || ask !== lastQuote.askPrice) {
     checkPosition(ws._data.position.XBTUSD[0].currentQty, bid, ask, entryOrder)
   }
@@ -427,9 +439,9 @@ function toCandle(group) {
 async function getCurrentTradeBucketed(interval) {
   interval = interval || 15
   let now = new Date().getTime()
-  let currentCandleTimeOffset = now % (interval*60000)
-  let startTime = new Date(now - currentCandleTimeOffset - 60000).toISOString()
-  debugger
+  let candleTimeOffset = now % (interval*60000)
+  let startTime = new Date(now - candleTimeOffset - 60000).toISOString()
+  // debugger
   let response = await client.Trade.Trade_getBucketed({symbol:'XBTUSD', binSize:'1m', 
     startTime:startTime
     // ,endTime:page.endTime
@@ -439,7 +451,9 @@ async function getCurrentTradeBucketed(interval) {
     debugger
   })
   var buckets = JSON.parse(response.data.toString());
-  debugger
+  let candle = toCandle(buckets)
+  // debugger
+  return {candle:candle,candleTimeOffset:candleTimeOffset}
 }
 
 async function getTradeBucketed(interval,length) {
@@ -759,6 +773,10 @@ async function getOpenOrders(startTime) {
   return openOrders
 }
 
+async function getCurrentCandle() {
+  return currentCandle
+}
+
 async function init(exitTradeCb) {
   exitTradeCallback = exitTradeCb
   client = await authorize().catch(e => {
@@ -766,8 +784,10 @@ async function init(exitTradeCb) {
     debugger
   })
   // inspect(client.apis)
-  // await getCurrentTradeBucketed()
-  // debugger
+  let currentTradeBucketed = await getCurrentTradeBucketed()
+  currentCandle = currentTradeBucketed.candle
+  currentCandleTimeOffset = currentTradeBucketed.candleTimeOffset
+
   entryOrder = log.readEntryOrder()
   await getOpenOrders()
   await wsConnect()
@@ -799,5 +819,6 @@ module.exports = {
   getTradeHistory: getTradeHistory,
   getFundingHistory: getFundingHistory,
   getOpenOrder: getOpenOrder,
-  openOrders: openOrders
+  openOrders: openOrders,
+  getCurrentCandle: getCurrentCandle
 }
