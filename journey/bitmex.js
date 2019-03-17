@@ -93,7 +93,8 @@ async function handleInstrument(data) {
   var ask = instrument.askPrice
   var price = instrument.lastPrice
 
-  var candleTimeOffset = (new Date().getTime()) % 900000
+  var now = new Date().getTime()
+  var candleTimeOffset = now % 900000
   if (candleTimeOffset >= currentCandleTimeOffset) {
     currentCandle.close = price
     if (price > currentCandle.high) {
@@ -117,7 +118,9 @@ async function handleInstrument(data) {
     marketCache.closes.push(currentCandle.close)
     marketCache.candles.push(currentCandle)
 
+    var candleTime = new Date(now-candleTimeOffset).toISOString()
     currentCandle = {
+      time:candleTime,
       open:price, high:price, low:price, close: price
     }
   }
@@ -465,6 +468,7 @@ async function getCurrentTradeBucketed(interval) {
   })
   var buckets = JSON.parse(response.data.toString());
   let candle = toCandle(buckets)
+  candle.time = new Date(now-candleTimeOffset).toISOString()
   // debugger
   return {candle:candle,candleTimeOffset:candleTimeOffset}
 }
