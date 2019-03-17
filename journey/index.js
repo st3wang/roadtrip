@@ -85,7 +85,7 @@ function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
   // }
   return order.timestamp+','+
     execution+'-'+side+'-'+status+','+
-    order.price+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
+    (order.price||order.stopPx)+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
 }
 
 // function getOrderNewFilledCsv(order,execution) {
@@ -103,7 +103,6 @@ async function getTradeCsv() {
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
   for (var i = 0; i < orders.length; i++) {
     var entryOrder = orders[i]
-    var exitOrder = orders[i+1]
     var entryOrderRecord = log.findEntryOrder(entryOrder.price,entryOrder.orderQty*(entryOrder.side=='Buy'?1:-1))
     var stopLoss = 0
     var takeProfit = 0 
@@ -114,9 +113,12 @@ async function getTradeCsv() {
       stopMarket = entryOrderRecord.stopMarket
     }
     csv += getOrderCsv(entryOrder,'ENTER',stopLoss,takeProfit,stopMarket)
-    if (exitOrder && exitOrder.orderQty === entryOrder.orderQty && exitOrder.side !== entryOrder.side) {
+
+    var exitOrder = orders[i+1]
+    while (exitOrder && exitOrder.orderQty === entryOrder.orderQty && exitOrder.side !== entryOrder.side) {
       csv += getOrderCsv(exitOrder,'EXIT',stopLoss,takeProfit,stopMarket)
       i++
+      exitOrder = orders[i+1]
     }
   }
   /*
