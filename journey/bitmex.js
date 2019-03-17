@@ -64,17 +64,18 @@ async function wsConnect() {
 }
 
 function handleOrder(data) {
-  console.log('handleOrder',data)
+  console.log('handleOrder',JSON.stringify(data))
   data.forEach((order,i) => {
     console.log('ORDER',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
-    openOrders.forEach((openOrder,j) => {
-      if (openOrder.orderID == order.orderID) {
-        openOrders[j] = order
-      }
-      else {
-        openOrders.push(order)
-      }
+    var j = openOrders.findIndex(openOrder => {
+      return openOrder.orderID == order.orderID
     })
+    if (j >= 0) {
+      openOrders[j] = order
+    }
+    else {
+      openOrders.push(order)
+    }
   })
   openOrders = openOrders.filter(order => {
     return (order.ordStatus == 'New')
