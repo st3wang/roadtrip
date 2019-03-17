@@ -14,6 +14,12 @@ var binSize = 5
 var ws, wsHeartbeatTimeout
 var entryOrder, openOrders = {}
 var lastQuote = {}
+var currentCandle = {
+  open: 0,
+  high: 0,
+  low: 9999999,
+  close: 0
+}
 
 function heartbeat() {
   setInterval(_ => {
@@ -81,7 +87,7 @@ function handlePosition(data) {
 
 function isFundingWindow(instrument) {
   var fundingTime = new Date(instrument.fundingTimestamp).getTime()
-  var checkFundingPositionTime = fundingTime - 3600000
+  var checkFundingPositionTime = fundingTime - 1800000
   var now = new Date().getTime()
   return (now > checkFundingPositionTime)
 }
@@ -90,10 +96,8 @@ async function handleInstrument(data) {
   var instrument = data[0]
   var bid = instrument.bidPrice
   var ask = instrument.askPrice
-  var quote = {
-    bidPrice: instrument.bidPrice,
-    askPrice: instrument.askPrice
-  }
+  // var price = instrument.lastPrice
+  // console.log(price)
   if (bid !== lastQuote.bidPrice || ask !== lastQuote.askPrice) {
     checkPosition(ws._data.position.XBTUSD[0].currentQty, bid, ask, entryOrder)
   }
@@ -420,6 +424,24 @@ function toCandle(group) {
   }
 }
 
+async function getCurrentTradeBucketed(interval) {
+  interval = interval || 15
+  let now = new Date().getTime()
+  let currentCandleTimeOffset = now % (interval*60000)
+  let startTime = new Date(now - currentCandleTimeOffset - 60000).toISOString()
+  debugger
+  let response = await client.Trade.Trade_getBucketed({symbol:'XBTUSD', binSize:'1m', 
+    startTime:startTime
+    // ,endTime:page.endTime
+  })
+  .catch(error => {
+    console.log(error)
+    debugger
+  })
+  var buckets = JSON.parse(response.data.toString());
+  debugger
+}
+
 async function getTradeBucketed(interval,length) {
   let pages = getPageTimes(interval,length,binSize)
   await Promise.all(pages.map(async (page,i) => {
@@ -705,7 +727,7 @@ async function getOrders(startTime) {
   startTime = startTime || (new Date().getTime() - (24*60*60000))
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
-    filter: '{"ordType":"Limit"}',
+    // filter: '{"ordType":"Limit"}',
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
   })
   .catch(error => {
@@ -714,7 +736,7 @@ async function getOrders(startTime) {
   })
   let orders = JSON.parse(response.data)
   orders = orders.filter(order => {
-    return (order.ordStatus != 'Canceled')
+    return (order.ordStatus != 'Canceled' && order.ordType != 'Funding')
   })
   return orders
 }
@@ -743,12 +765,13 @@ async function init(exitTradeCb) {
     console.error(e)
     debugger
   })
+  // inspect(client.apis)
+  // await getCurrentTradeBucketed()
+  // debugger
   entryOrder = log.readEntryOrder()
   await getOpenOrders()
-  // var s = getOpenStopOrderMatching(4000,1)
   await wsConnect()
 
-  // inspect(client.apis)
   // await getOrderBook()
 
   // var openOrder = getOpenOrder()
