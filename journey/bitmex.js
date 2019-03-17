@@ -64,9 +64,9 @@ async function wsConnect() {
 }
 
 function handleOrder(data) {
-  // var order = data[0]
+  console.log('handleOrder',data)
   data.forEach((order,i) => {
-    console.log('ORDER',i,order.ordStatus,order.side,order.price,order.orderQty)
+    console.log('ORDER',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
     openOrders.forEach((openOrder,j) => {
       if (openOrder.orderID == order.orderID) {
         openOrders[j] = order
@@ -80,7 +80,7 @@ function handleOrder(data) {
     return (order.ordStatus == 'New')
   })
   openOrders.forEach((order,i) => {
-    console.log('filtered openOrders',i,order.ordStatus,order.side,order.price,order.orderQty)
+    console.log('filtered openOrders',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
   })
 }
 
@@ -152,8 +152,10 @@ function getPosition() {
 // }
 
 function getOpenOrder(type) {
+  console.log('getOpenOrder',type,JSON.stringify(openOrders))
   for (var i = 0; i < openOrders.length; i++) {
     if (openOrders[i].ordType == type) {
+      console.log('getOpenOrder return',openOrders[i])
       return openOrders[i]
     }
   }
