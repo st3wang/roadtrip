@@ -3,8 +3,10 @@
 <style>
 
     body {
+        margin: 0;
         font: 8px sans-serif;
         background-color: #131722;
+        overflow:hidden;
     }
 
     text {
@@ -114,9 +116,9 @@
 <script src="techan.js"></script>
 <script>
 
-    var margin = {top: 20, right: 30, bottom: 30, left: 50},
-            width = 960 - margin.left - margin.right,
-            height = 500 - margin.top - margin.bottom;
+    var margin = {top: 10, right: 20, bottom: 20, left: 40},
+            width = 1380 - margin.left - margin.right,
+            height = 600 - margin.top - margin.bottom;
 
     var dateFormat = d3.timeFormat("%Y-%m-%dT%H:%M:%S.%LZ"),
         parseDate = d3.timeParse("%Y-%m-%dT%H:%M:%S.%LZ"),
@@ -284,8 +286,8 @@
     var rsi = techan.plot.rsi()
             .xScale(x)
             .yScale(y);
-  var margin = {top: 20, right: 30, bottom: 30, left: 50},
-            width = 960 - margin.left - margin.right,
+  var margin = {top: 10, right: 20, bottom: 50, left: 40},
+            width = 1380 - margin.left - margin.right,
             height = 200 - margin.top - margin.bottom;
 
     var parseDate = d3.timeParse("%Y-%m-%dT%H:%M:%S.%LZ");
