@@ -56,6 +56,12 @@ async function next() {
 
 async function getMarketCsv() {
   var market = await bitmex.getMarket(15,96)
+  var currentCandle = await bitmex.getCurrentCandle()
+  market.candles.shift()
+  market.candles.push(currentCandle)
+  market.closes.shift()
+  market.closes.push(currentCandle.close)
+
   var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
   var csv = 'Date,Open,High,Low,Close,Rsi\n'
   market.candles.forEach((candle,i) => {
@@ -92,7 +98,7 @@ function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
 
 async function getTradeCsv() {
   // var trades = await sheets.getTrades()
-  var yesterday = new Date().getTime() - (48*60*60000)
+  var yesterday = new Date().getTime() - (24*60*60000)
   var orders = await bitmex.getOrders(yesterday)
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
   for (var i = 0; i < orders.length; i++) {
