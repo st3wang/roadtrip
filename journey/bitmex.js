@@ -119,9 +119,10 @@ async function handleInstrument(data) {
     marketCache.candles.push(currentCandle)
 
     var candleTime = new Date(now-candleTimeOffset).toISOString()
+    let open = currentCandle.close
     currentCandle = {
       time:candleTime,
-      open:price, high:price, low:price, close: price
+      open:open, high:open, low:open, close: open
     }
   }
   currentCandleTimeOffset = candleTimeOffset
