@@ -57,14 +57,14 @@ async function next() {
 async function getMarketCsv() {
   var market = await bitmex.getMarket(15,96)
   var currentCandle = await bitmex.getCurrentCandle()
-  market.candles.shift()
-  market.candles.push(currentCandle)
-  market.closes.shift()
-  market.closes.push(currentCandle.close)
+  var candles = market.candles.slice(1)
+  var closes = market.closes.slice(1)
+  candles.push(currentCandle)
+  closes.push(currentCandle.close)
 
-  var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
+  var rsis = await strategy.getRsi(closes,setup.rsi.length)
   var csv = 'Date,Open,High,Low,Close,Rsi\n'
-  market.candles.forEach((candle,i) => {
+  candles.forEach((candle,i) => {
     csv += //new Date(candle.time).toUTCString()
     candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+','+rsis[i]+'\n'
   })
@@ -74,30 +74,13 @@ async function getMarketCsv() {
 function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
   var status = order.ordStatus.toUpperCase()
   var side = execution=='ENTER'?(order.side=='Buy'?'LONG':'SHORT'):(order.side=='Buy'?'SHORT':'LONG')
-  // var takeProfit = 0
-  // if (execution == 'EXIT') {
-  //   if (side == 'LONG' && order.price > entryPrice) {
-  //     takeProfit = order.price
-  //   }
-  //   else if (side == 'SHORT' && order.price < entryPrice) {
-  //     takeProfit = order.price
-  //   }
-  // }
+
   return order.timestamp+','+
     execution+'-'+side+'-'+status+','+
     (order.price||order.stopPx)+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
 }
 
-// function getOrderNewFilledCsv(order,execution) {
-//   var csv = getOrderCsv(order,execution,'NEW')
-//   if (order.ordStatus == 'Filled') {
-//     csv += getOrderCsv(order,execution,'FILLED')
-//   }
-//   return csv
-// }
-
 async function getTradeCsv() {
-  // var trades = await sheets.getTrades()
   var yesterday = new Date().getTime() - (24*60*60000)
   var orders = await bitmex.getOrders(yesterday)
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
@@ -121,16 +104,6 @@ async function getTradeCsv() {
       exitOrder = orders[i+1]
     }
   }
-  /*
-  trades.forEach(t => {
-    // { date: data[2].date, type: "buy", price: data[2].low, quantity: 1000 }
-    csv += //new Date(t[0]).toUTCString()
-    t[0]+','+'ENTER-'+t[4]+','+t[5]+','+t[18]+','+t[6]+','+t[7]+'\n'
-    if (t[9] && t[9].length > 0) {
-      csv += //new Date(t[9]).toUTCString()
-      t[9]+','+'EXIT-'+t[4]+','+t[10]+','+t[18]+','+t[6]+','+t[7]+'\n'
-    }
-  })*/
   return csv
 }
 
@@ -151,7 +124,7 @@ async function start() {
   next()
   var now = new Date().getTime()
   var interval = 15*60000
-  var delay = 20000 // bitmex bucket data delay. it will be faster with WS
+  var delay = 1000 // delay after candle close
   var startIn = interval-now%(interval) + delay
   var startInSec = startIn % 60000
   var startInMin = (startIn - startInSec) / 60000

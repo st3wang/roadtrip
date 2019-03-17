@@ -104,6 +104,19 @@ async function handleInstrument(data) {
     }
   }
   else {
+    // start new candle
+    marketCache.opens.shift()
+    marketCache.highs.shift()
+    marketCache.lows.shift()
+    marketCache.closes.shift()
+    marketCache.candles.shift()
+
+    marketCache.opens.push(currentCandle.open)
+    marketCache.highs.push(currentCandle.high)
+    marketCache.lows.push(currentCandle.low)
+    marketCache.closes.push(currentCandle.close)
+    marketCache.candles.push(currentCandle)
+
     currentCandle = {
       open:price, high:price, low:price, close: price
     }
@@ -493,51 +506,52 @@ async function getMarket(interval,length) {
   if (!marketCache) {
     marketCache = await getTradeBucketed(interval,length)
   }
-  else {
-    var now = new Date().getTime()
-    var candles = marketCache.candles
-    // candles[candles.length-1] = candles[candles.length-2]
-    var opens = marketCache.opens
-    var highs = marketCache.highs
-    var lows = marketCache.lows
-    var closes = marketCache.closes
-    var lastCandle = candles[candles.length-1]
-    var lastCandleTime = new Date(lastCandle.time).getTime()
-    var missingLength = Math.floor((((now-lastCandleTime)/60000)+binSize)/interval)
-    // includes last candle
-    var missing = await getTradeBucketed(interval,missingLength)
-    
-    var firstMissingCandle = missing.candles[0]
-    if (firstMissingCandle.time !== lastCandle.time || 
-      firstMissingCandle.open !== lastCandle.open || 
-      firstMissingCandle.high !== lastCandle.high || 
-      firstMissingCandle.low !== lastCandle.low || 
-      firstMissingCandle.close !== lastCandle.close) {
-      console.log('last candle data mismatched')
-    }
-    else {
-      console.log('last candle data matched')
-    }
-
-    candles.splice(0,missingLength-1)
-    opens.splice(0,missingLength-1)
-    highs.splice(0,missingLength-1)
-    lows.splice(0,missingLength-1)
-    closes.splice(0,missingLength-1)
-    candles.splice(-1,1)
-    opens.splice(-1,1)
-    highs.splice(-1,1)
-    lows.splice(-1,1)
-    closes.splice(-1,1)
-    marketCache = {
-      candles: candles.concat(missing.candles),
-      opens: opens.concat(missing.opens),
-      highs: highs.concat(missing.highs),
-      lows: lows.concat(missing.lows),
-      closes: lows.concat(missing.closes)
-    }
-  }
   return marketCache
+  // else {
+    // var now = new Date().getTime()
+    // var candles = marketCache.candles
+    // // candles[candles.length-1] = candles[candles.length-2]
+    // var opens = marketCache.opens
+    // var highs = marketCache.highs
+    // var lows = marketCache.lows
+    // var closes = marketCache.closes
+    // var lastCandle = candles[candles.length-1]
+    // var lastCandleTime = new Date(lastCandle.time).getTime()
+    // var missingLength = Math.floor((((now-lastCandleTime)/60000)+binSize)/interval)
+    // // includes last candle
+    // var missing = await getTradeBucketed(interval,missingLength)
+    
+    // var firstMissingCandle = missing.candles[0]
+    // if (firstMissingCandle.time !== lastCandle.time || 
+    //   firstMissingCandle.open !== lastCandle.open || 
+    //   firstMissingCandle.high !== lastCandle.high || 
+    //   firstMissingCandle.low !== lastCandle.low || 
+    //   firstMissingCandle.close !== lastCandle.close) {
+    //   console.log('last candle data mismatched')
+    // }
+    // else {
+    //   console.log('last candle data matched')
+    // }
+
+    // candles.splice(0,missingLength-1)
+    // opens.splice(0,missingLength-1)
+    // highs.splice(0,missingLength-1)
+    // lows.splice(0,missingLength-1)
+    // closes.splice(0,missingLength-1)
+    // candles.splice(-1,1)
+    // opens.splice(-1,1)
+    // highs.splice(-1,1)
+    // lows.splice(-1,1)
+    // closes.splice(-1,1)
+    // marketCache = {
+    //   candles: candles.concat(missing.candles),
+    //   opens: opens.concat(missing.opens),
+    //   highs: highs.concat(missing.highs),
+    //   lows: lows.concat(missing.lows),
+    //   closes: lows.concat(missing.closes)
+    // }
+  // }
+  // return marketCache
 }
 
 // async function getPosition() {
@@ -810,7 +824,7 @@ async function init(exitTradeCb) {
 
 module.exports = {
   init: init,
-  getMarket: getTradeBucketed,
+  getMarket: getMarket,
   getPosition: getPosition,
   getMargin: getMargin,
   getQuote: getQuote,
