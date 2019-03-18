@@ -221,7 +221,7 @@
     d3.csv("trade.csv", function(error, tradeData) {
       trades = tradeData.map(function(d) {
           return {
-              date: parseDate(d.Date),
+              date: new Date(parseDate(d.Date).getTime()-900000),
               type: d.Type,
               price: +d.Price,
               quantity: +d.Quantity,
