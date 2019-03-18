@@ -123,7 +123,7 @@ async function start() {
   next()
   var now = new Date().getTime()
   var interval = 15*60000
-  var delay = 1000 // delay after candle close
+  var delay = 3000 // delay after candle close
   var startIn = interval-now%(interval) + delay
   var startInSec = startIn % 60000
   var startInMin = (startIn - startInSec) / 60000

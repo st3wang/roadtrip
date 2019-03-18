@@ -22,7 +22,7 @@ function heartbeat() {
   },60000)
 }
 
-async function wsAddStream(table, handler) {
+async function wsAddStream(table, handler) { try {
   ws.addStream('XBTUSD', table, handler)
   await new Promise((resolve,reject) => {
     var checkValueInterval = setInterval(_ => {
@@ -39,9 +39,9 @@ async function wsAddStream(table, handler) {
       resolve()
     }, 3000)
   })
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function wsConnect() {
+async function wsConnect() { try {
   ws = new BitMEXRealtimeAPI({
     testnet: shoes.bitmex.test,
     apiKeyID: shoes.bitmex.key,
@@ -56,13 +56,12 @@ async function wsConnect() {
 
   await wsAddStream('order',handleOrder)
   await wsAddStream('position',handlePosition)
-  // await wsAddStream('quote',handleQuote)
   await wsAddStream('instrument',handleInstrument)
 
   ws.addStream('.XBTUSDPI8H', 'quote', data => {
     debugger
   })
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 function handleOrder(data) {
   data.forEach((order,i) => {
@@ -72,13 +71,10 @@ function handleOrder(data) {
 }
 
 function handlePosition(data) {
+  if (data[0].leverage !== entryOrder.leverage) {
+    updateLeverage(entryOrder.leverage)
+  }
 }
-
-// function handleQuote(data) {
-//   console.log('QUOTE', data[0].bidPrice, data[0].askPrice)
-//   checkPosition(ws._data.position.XBTUSD[0].currentQty,
-//     data[0].bidPrice, data[0].askPrice, entryOrder)
-// }
 
 function isFundingWindow(instrument) {
   var fundingTime = new Date(instrument.fundingTimestamp).getTime()
@@ -112,11 +108,48 @@ function startNextCandle() {
   let open = currentCandle.close
   currentCandle = {
     time:currentCandleISOString,
+    startTimeMs: currentCandleTime,
+    endTimeMs: currentCandleTime + 899999,
+    lastTradeTimeMs: currentCandleTime,
     open:open, high:open, low:open, close: open
   }
 }
 
-async function handleInstrument(data) {
+function addTradeToCandle(time,price) {
+  if (time >= currentCandle.startTimeMs && time <= currentCandle.endTimeMs) {
+    if (price > currentCandle.high) {
+      currentCandle.high = price
+    }
+    else if (price < currentCandle.low) {
+      currentCandle.low = price
+    }
+    if (time > currentCandle.lastTradeTimeMs) {
+      currentCandle.lastTradeTimeMs = time
+      currentCandle.close = price
+    }
+  }
+  else {
+    let lastIndex = marketCache.candles.length - 1
+    let lastCandle = marketCache.candles[lastIndex]
+    console.log('add trade to lastCandle', new Date(time).toISOString(), price, JSON.stringify(lastCandle))
+    if (time >= lastCandle.startTimeMs && time <= lastCandle.endTimeMs) {
+      if (price > lastCandle.high) {
+        lastCandle.high = price
+        marketCache.highs = price
+      }
+      else if (price < lastCandle.low) {
+        lastCandle.low = price
+        lastCandle.lows = price
+      }
+      if (time >= lastCandle.lastTradeTimeMs) {
+        lastCandle.lastTradeTimeMs = time
+        lastCandle.close = price
+      }
+    }
+  }
+}
+
+async function handleInstrument(data) { try {
   var instrument = data[0]
   var bid = instrument.bidPrice
   var ask = instrument.askPrice
@@ -125,13 +158,7 @@ async function handleInstrument(data) {
   var now = new Date().getTime()
   var candleTimeOffset = now % 900000
   if (candleTimeOffset >= currentCandleTimeOffset) {
-    currentCandle.close = price
-    if (price > currentCandle.high) {
-      currentCandle.high = price
-    }
-    else if (price < currentCandle.low) {
-      currentCandle.low = price
-    }
+    addTradeToCandle(new Date(instrument.timestamp).getTime(),price)
   }
   else {
     startNextCandle()
@@ -153,11 +180,10 @@ async function handleInstrument(data) {
       await orderStopLoss('',fundingStopLoss.price,fundingStopLoss.size)
     }
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 function getQuote() {
   return lastQuote
-  // return ws._data.quote.XBTUSD[0]
 }
 
 function getFunding(instrument) {
@@ -174,12 +200,6 @@ function getInstrument() {
 function getPosition() {
   return ws._data.position.XBTUSD[0]
 }
-
-// function getOpenOrder() {
-//   if (ws._data.order && ws._data.order.XBTUSD[0].ordStatus == 'New') {
-//     return ws._data.order.XBTUSD[0]
-//   }
-// }
 
 function getOpenOrder(type) {
   return openOrders[type]
@@ -201,7 +221,7 @@ function getOpenStopOrderMatching(price,size) {
 
 var stopLossOrderRequesting, takeProfitOrderRequesting
 
-async function orderStopLoss(created,price,size) {
+async function orderStopLoss(created,price,size) { try {
   // FIXME: need to check price and size. if different request new order
   // TODO: implement order queue and only send the latest request
   if (stopLossOrderRequesting) {
@@ -238,9 +258,9 @@ async function orderStopLoss(created,price,size) {
   //   console.log('Orderbook jumped right back. No need to stop.')
   // }
   return responseData
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function orderTakeProfit(created,price,size) {
+async function orderTakeProfit(created,price,size) { try {
   if (takeProfitOrderRequesting) {
     //console.log('takeProfitOrderRequesting')
     return
@@ -261,25 +281,9 @@ async function orderTakeProfit(created,price,size) {
   takeProfitOrderRequesting = false
   console.log('orderTakeProfit response status', responseData.ordStatus)
   return responseData
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function orderStopMarket(price,size) {
-  // var openStopMarketOrder = getOpenStopOrderMatching(price,size)
-  // if (openStopMarketOrder) {
-  //   //console.log('Order already opened')
-  //   return
-  // }
-  let stopMarketOrderResponse = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
-    orderQty:size,
-    stopPx:price 
-  }).catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Submitted - StopMarket Order ')
-}
-
-async function checkPosition(positionSize,bid,ask,order) {
+async function checkPosition(positionSize,bid,ask,order) { try {
   if (positionSize > 0) {  
     if (!order) {
       throw new Error('Error: No order in the memory. Need to load one up.')
@@ -338,18 +342,16 @@ async function checkPosition(positionSize,bid,ask,order) {
       }
     }
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,order) {
+async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,order) { try {
   if (positionSizeUSD > 0) {  
     if (fundingRate > 0) {
-      // console.log('FUNDING LONG has to pay')
       return {price:ask,size:-positionSizeUSD,fundingRate:fundingRate}
     }
   } 
   else if (positionSizeUSD < 0) {
     if (fundingRate < 0) {
-      // console.log('FUNDING SHORT has to pay')
       return {price:bid,size:-positionSizeUSD,fundingRate:fundingRate}
     }
   }
@@ -365,7 +367,7 @@ async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,order) {
       }
     }
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 function testCheckPosition() {
   var interval = 500
@@ -392,7 +394,7 @@ function testCheckPosition() {
   })
 }
 
-async function authorize() {
+async function authorize() { try {
   let swaggerClient = await new SwaggerClient({
     // Switch this to `www.bitmex.com` when you're ready to try it out for real.
     // Don't forget the `www`!
@@ -402,7 +404,7 @@ async function authorize() {
   // Comment out if you're not requesting any user data.
   swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(shoes.bitmex.key, shoes.bitmex.secret));
   return swaggerClient
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 function inspect(client) {
   console.log("Inspecting BitMEX API...");
@@ -440,61 +442,53 @@ function getPageTimes(interval,length,binSize) {
 }
 
 function toCandle(group) {
-  try {
-    var open = group[0].open
-    let candle = {
-      time: new Date(new Date(group[0].timestamp).getTime()-300000).toISOString(),
-      open: open,
-      high: open,
-      low: open,
-      close: group[group.length-1].close
-    }
-    candle = group.reduce((a,c) => {
-      if (c.high > a.high) a.high = c.high
-      if (c.low < a.low) a.low = c.low
-      return a
-    },candle)
-    if (!candle || !candle.open || !candle.close || !candle.high || !candle.low) {
-      debugger
-    }
-    return candle
+  var open = group[0].open
+  let timeMs = new Date(group[0].timestamp).getTime()-300000
+  let candle = {
+    time: new Date(timeMs).toISOString(),
+    startTimeMs: timeMs,
+    endTimeMs: timeMs + 899999,
+    lastTradeTimeMs: timeMs + 899999,
+    open: open,
+    high: open,
+    low: open,
+    close: group[group.length-1].close
   }
-  catch(e) {
-    console.error(e)
+  candle = group.reduce((a,c) => {
+    if (c.high > a.high) a.high = c.high
+    if (c.low < a.low) a.low = c.low
+    return a
+  },candle)
+  if (!candle || !candle.open || !candle.close || !candle.high || !candle.low) {
     debugger
   }
+  return candle
 }
 
-async function getCurrentTradeBucketed(interval) {
+async function getCurrentTradeBucketed(interval) { try {
   interval = interval || 15
   let now = new Date().getTime()
   let candleTimeOffset = now % (interval*60000)
   let startTime = new Date(now - candleTimeOffset + 60000).toISOString()
-  // debugger
   let response = await client.Trade.Trade_getBucketed({symbol:'XBTUSD', binSize:'1m', 
     startTime:startTime
-    // ,endTime:page.endTime
-  })
-  .catch(error => {
-    console.log(error)
-    debugger
   })
   var buckets = JSON.parse(response.data.toString());
   let candle = toCandle(buckets)
-  candle.time = new Date(now-candleTimeOffset).toISOString()
+  let timeMs = now-candleTimeOffset
+  candle.time = new Date(timeMs).toISOString()
+  candle.startTimeMs = timeMs
+  candle.endTimeMs = timeMs + 899999
+  candle.lastTradeTimeMs = timeMs // accepting new trade data
   // debugger
   return {candle:candle,candleTimeOffset:candleTimeOffset}
-}
+} catch(e) {console.error(e.stack||e); debugger} }
 
-async function getTradeBucketed(interval,length) {
+async function getTradeBucketed(interval,length) { try {
   let pages = getPageTimes(interval,length,binSize)
   await Promise.all(pages.map(async (page,i) => {
     let response = await client.Trade.Trade_getBucketed({symbol: 'XBTUSD', binSize: binSize+'m', 
       startTime:page.startTime,endTime:page.endTime})
-      .catch(error => {
-        console.log(error)
-        debugger
-      })
     page.buckets = JSON.parse(response.data.toString());
   }))
   let buckets = pages.reduce((a,c) => a.concat(c.buckets),[])
@@ -517,136 +511,98 @@ async function getTradeBucketed(interval,length) {
     lows:lows,
     closes:closes
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function getMarket(interval,length) {
+async function getMarket(interval,length) { try {
   if (!marketCache) {
     marketCache = await getTradeBucketed(interval,length)
   }
   handleInstrument(ws._data.instrument.XBTUSD)
   return marketCache
-  // else {
-    // var now = new Date().getTime()
-    // var candles = marketCache.candles
-    // // candles[candles.length-1] = candles[candles.length-2]
-    // var opens = marketCache.opens
-    // var highs = marketCache.highs
-    // var lows = marketCache.lows
-    // var closes = marketCache.closes
-    // var lastCandle = candles[candles.length-1]
-    // var lastCandleTime = new Date(lastCandle.time).getTime()
-    // var missingLength = Math.floor((((now-lastCandleTime)/60000)+binSize)/interval)
-    // // includes last candle
-    // var missing = await getTradeBucketed(interval,missingLength)
-    
-    // var firstMissingCandle = missing.candles[0]
-    // if (firstMissingCandle.time !== lastCandle.time || 
-    //   firstMissingCandle.open !== lastCandle.open || 
-    //   firstMissingCandle.high !== lastCandle.high || 
-    //   firstMissingCandle.low !== lastCandle.low || 
-    //   firstMissingCandle.close !== lastCandle.close) {
-    //   console.log('last candle data mismatched')
-    // }
-    // else {
-    //   console.log('last candle data matched')
-    // }
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-    // candles.splice(0,missingLength-1)
-    // opens.splice(0,missingLength-1)
-    // highs.splice(0,missingLength-1)
-    // lows.splice(0,missingLength-1)
-    // closes.splice(0,missingLength-1)
-    // candles.splice(-1,1)
-    // opens.splice(-1,1)
-    // highs.splice(-1,1)
-    // lows.splice(-1,1)
-    // closes.splice(-1,1)
-    // marketCache = {
-    //   candles: candles.concat(missing.candles),
-    //   opens: opens.concat(missing.opens),
-    //   highs: highs.concat(missing.highs),
-    //   lows: lows.concat(missing.lows),
-    //   closes: lows.concat(missing.closes)
-    // }
-  // }
-  // return marketCache
-}
-
-// async function getPosition() {
-//   var response = await client.Position.Position_get()  
-//   .catch(function(e) {
-//     console.log('Error:', e.statusText)
-//     debugger
-//   })
-//   var positions = JSON.parse(response.data.toString())
-//   return positions[0] || {currentQty:0}
-// }
-
-async function getMargin() {
-  var response = await client.User.User_getMargin()  
-  .catch(function(e) {
-    console.log('Error:', e.statusText)
-    debugger
-  })
+async function getMargin() { try {
+  var response = await client.User.User_getMargin() 
   var margin = JSON.parse(response.data.toString())
   return margin
-}
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function cancelAllOrders() {
+async function cancelAllOrders() { try {
+  console.log('Cancelling All Orders')
   let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
-  .catch(function(e) {
-    console.log(e.statusText)
-    debugger
+  console.log('Cancelled All Orders')
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function updateLeverage(leverage) { try {
+  console.log('Updating Leverage')
+  let response = await client.Position.Position_updateLeverage({symbol:'XBTUSD',leverage:leverage})
+  console.log('Updated Leverage ')
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function getTradeHistory(startTime) { try {
+  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
+  startTime: new Date(startTime).toISOString(),
+  columns:'commissionnn,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
   })
-  console.log('Cancelled - All Orders')
+  let data = JSON.parse(response.data)
+  data.forEach(d => {
+    console.log(d.timestamp,d.execType,d.price,d.orderQty)
+  })
+  debugger
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function getFundingHistory(startTime) { try {
+  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  let response = await client.Funding.Funding_get({symbol: 'XBTUSD',
+  startTime: new Date(startTime).toISOString()
+  })
+  let data = JSON.parse(response.data)
+  // data.forEach(d => {
+  //   console.log(d.timestamp,d.fundingRate)
+  // })
+  // debugger
+  return data
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function getOrders(startTime) { try {
+  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
+    startTime: new Date(startTime).toISOString(),
+    // filter: '{"ordType":"Limit"}',
+    columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
+  })
+  let orders = JSON.parse(response.data)
+  orders = orders.filter(order => {
+    return (order.ordStatus != 'Canceled' && order.ordType != 'Funding')
+  })
+  return orders
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function getOpenOrders(startTime) { try {
+  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
+    startTime: new Date(startTime).toISOString(),
+    filter: '{"ordStatus":"New","ordType":"Limit"}',
+    columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
+  })
+  let orders = JSON.parse(response.data)
+  orders.forEach(order => {
+    openOrders[order.ordType] = order
+  })
+  return openOrders
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function getCurrentCandle() {
+  return currentCandle
 }
 
-async function enterStops(order) {
-  let candelAllOrdersResponse = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
-  .catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Cancelled - All Orders')
-  
-  let stopLossOrderResponse = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly,ParticipateDoNotInitiate',
-    orderQty:-order.positionSizeUSD,
-    price:order.stopLoss,
-    stopPx:order.stopLossTrigger
-  }).catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Submitted - StopLimit Order ')
-
-  let takeProfitOrderResponse = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly,ParticipateDoNotInitiate',
-    orderQty:-order.positionSizeUSD,
-    price:order.takeProfit,
-    stopPx:order.takeProfitTrigger
-  }).catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Submitted - TakeProfitLimit Order ')
-
-  let stopMarketOrderResponse = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
-    orderQty:-order.positionSizeUSD,
-    stopPx:order.stopMarketTrigger
-  }).catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Submitted - StopMarket Order ')
-}
-
-async function enter(order,margin) {
-  console.log('ENTER ', JSON.stringify(order))
-
-  console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
+async function enter(order,margin) { try {
+  console.log('Margin','available',margin.availableMargin/100000000,'balance',margin.marginBalance/100000000,'wallet',margin.walletBalance/100000000)
 
   let position = getPosition()
   if (position.currentQty != 0) {
-    console.log('position.currentQty',position.currentQty)
+    console.log('Existing position',position.currentQty)
     return
   }
 
@@ -654,33 +610,27 @@ async function enter(order,margin) {
   if (isFundingWindow(instrument)) {
     var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,instrument.fundingRate)
     if (fundingStopLoss) {
-      console.log('FUNDING STOP ENTER',JSON.stringify(fundingStopLoss))
+      console.log('Funding ' + order.type + ' has to pay. Do not enter.',JSON.stringify(fundingStopLoss))
       return
     }
   }
 
   cancelAllOrders()
+  updateLeverage(order.leverage)
 
-  let updateLeverageResponse = await client.Position.Position_updateLeverage({symbol:'XBTUSD',leverage:order.leverage})
-  .catch(function(e) {
-    console.log(e.statusText)
-    debugger
-  })
-  console.log('Updated - Leverage ')
+  console.log('ENTER ', JSON.stringify(order))
 
-  entryOrder = order
-  pendingStopLossOrder = null
-  var responseData = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD,'',RETRYON_CANCELED)
-  console.log('ENTER response status', responseData.ordStatus)
-  if (responseData.ordStatus === 'Canceled') {
+  var entryOrder = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD,'',RETRYON_CANCELED)
+  if (entryOrder.ordStatus === 'Canceled' || entryOrder.ordStatus === 'Overloaded') {
     return false
   }
 
+  entryOrder = order
   orderStopMarket(order.stopMarketTrigger,-order.positionSizeUSD)
-
   log.writeEntryOrder(order)
+
   return true
-}
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function wait(ms) {
   return new Promise((resolve,reject) => {
@@ -688,7 +638,8 @@ async function wait(ms) {
   })
 }
 
-async function orderLimitRetry(cid,price,size,execInst,retryOn) {
+async function orderLimitRetry(cid,price,size,execInst,retryOn) { try {
+  console.log('Ordering limit retry')
   retryOn += 'Overloaded'
   let responseData, 
       count = 0,
@@ -700,11 +651,12 @@ async function orderLimitRetry(cid,price,size,execInst,retryOn) {
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
   } while((retryOn.indexOf(responseData.ordStatus) >= 0) && count < 10 && await wait(waitTime))
+  console.log('Ordered limit retry status', responseData.ordStatus)
   return responseData
-}
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function orderLimit(cid,price,size,execInst) {
-  return new Promise(async (resolve,reject) => {
+async function orderLimit(cid,price,size,execInst) { 
+  return new Promise(async (resolve,reject) => { try {
     if (size > 0) {
       if (price > lastQuote.bidPrice) {
         price = lastQuote.bidPrice
@@ -739,89 +691,25 @@ async function orderLimit(cid,price,size,execInst) {
     }
 
     resolve({})
-  })
+  } catch(e) {console.error(e.stack||e);debugger} })
 }
 
-async function getTradeHistory(startTime) {
-  let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
-  startTime: new Date(startTime).toISOString(),
-  columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
+async function orderStopMarket(price,size) { try {
+  console.log('Ordering stop market')
+  let response = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+    orderQty:size,
+    stopPx:price 
   })
-  .catch(error => {
-    console.log(error)
-    debugger
-  })
-  let data = JSON.parse(response.data)
-  data.forEach(d => {
-    console.log(d.timestamp,d.execType,d.price,d.orderQty)
-  })
-  debugger
-}
+  let responseData = JSON.parse(response.data)
+  console.log('Ordered stop market',responseData.ordStatus)
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function getFundingHistory(startTime) {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
-  let response = await client.Funding.Funding_get({symbol: 'XBTUSD',
-  startTime: new Date(startTime).toISOString()
-  })
-  .catch(error => {
-    console.log(error)
-    debugger
-  })
-  let data = JSON.parse(response.data)
-  // data.forEach(d => {
-  //   console.log(d.timestamp,d.fundingRate)
-  // })
-  // debugger
-  return data
-}
-
-async function getOrders(startTime) {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
-  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
-    startTime: new Date(startTime).toISOString(),
-    // filter: '{"ordType":"Limit"}',
-    columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
-  })
-  .catch(error => {
-    console.log(error)
-    debugger
-  })
-  let orders = JSON.parse(response.data)
-  orders = orders.filter(order => {
-    return (order.ordStatus != 'Canceled' && order.ordType != 'Funding')
-  })
-  return orders
-}
-
-async function getOpenOrders(startTime) {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
-  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
-    startTime: new Date(startTime).toISOString(),
-    filter: '{"ordStatus":"New","ordType":"Limit"}',
-    columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
-  })
-  .catch(error => {
-    console.log(error)
-    debugger
-  })
-  let orders = JSON.parse(response.data)
-  orders.forEach(order => {
-    openOrders[order.ordType] = order
-  })
-  return openOrders
-}
-
-async function getCurrentCandle() {
-  return currentCandle
-}
-
-async function init(exitTradeCb) {
+async function init(exitTradeCb) { try {
   exitTradeCallback = exitTradeCb
-  client = await authorize().catch(e => {
-    console.error(e)
-    debugger
-  })
+  client = await authorize()
   // inspect(client.apis)
+  // await getTradeHistory()
+
   let currentTradeBucketed = await getCurrentTradeBucketed()
   currentCandle = currentTradeBucketed.candle
   currentCandleTimeOffset = currentTradeBucketed.candleTimeOffset
@@ -835,8 +723,6 @@ async function init(exitTradeCb) {
   // var openOrder = getOpenOrder()
   // debugger
 
-  // var yesterday = new Date().getTime() - (48*60*60000)
-  // await getTradeHistory(yesterday)
   // await getFundingHistory(yesterday)
   // await getInstrument()
   // await getOrders(yesterday)
@@ -844,7 +730,7 @@ async function init(exitTradeCb) {
   // await orderLimitRetry('',3888,1000,'',RETRYON_CANCELED)
   // debugger
   // testCheckPosition()
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 module.exports = {
   init: init,
