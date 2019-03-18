@@ -86,7 +86,7 @@ async function getOrder(signal,market,bankroll,margin) {
   let profitFactor = bankroll.profitFactor
   let stopMarketFactor = bankroll.stopMarketFactor
   let stopLossLookBack = bankroll.stopLossLookBack
-  let leverageMargin = availableMargin*0.000000009
+  let leverageMargin = availableMargin*0.000000008
   let entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger, stopMarketTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
@@ -130,7 +130,7 @@ async function getOrder(signal,market,bankroll,margin) {
   riskAmountUSD = Math.round(riskAmountBTC * entryPrice)
   positionSizeBTC = riskAmountBTC / -lossDistancePercent
   positionSizeUSD = Math.round(positionSizeBTC * entryPrice)
-  leverage = Math.ceil(Math.abs(positionSizeBTC / leverageMargin))
+  leverage = Math.ceil(Math.abs(positionSizeBTC / leverageMargin)*100)/100
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
