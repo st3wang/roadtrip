@@ -131,7 +131,7 @@ function addTradeToCandle(time,price) {
   else {
     let lastIndex = marketCache.candles.length - 1
     let lastCandle = marketCache.candles[lastIndex]
-    console.log('add trade to lastCandle', new Date().toISOString(), new Date(time).toISOString(), price, JSON.stringify(lastCandle))
+    // console.log('add trade to lastCandle', new Date().toISOString(), new Date(time).toISOString(), price, JSON.stringify(lastCandle))
     if (time >= lastCandle.startTimeMs && time <= lastCandle.endTimeMs) {
       if (price > lastCandle.high) {
         lastCandle.high = price
