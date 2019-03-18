@@ -72,6 +72,7 @@ function handleOrder(data) {
 
 function handlePosition(data) {
   if (data[0].leverage !== entryOrder.leverage) {
+    console.log('handlePosition existing leverage',data[0].leverage,'entryOrder leverage',entryOrder.leverage)
     updateLeverage(entryOrder.leverage)
   }
 }
