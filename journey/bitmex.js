@@ -474,7 +474,10 @@ async function getCurrentTradeBucketed(interval) { try {
     startTime:startTime
   })
   var buckets = JSON.parse(response.data.toString());
-  let candle = toCandle(buckets)
+  var candle = {}
+  if (buckets) {
+    candle = toCandle(buckets)
+  }
   let timeMs = now-candleTimeOffset
   candle.time = new Date(timeMs).toISOString()
   candle.startTimeMs = timeMs
@@ -514,10 +517,13 @@ async function getTradeBucketed(interval,length) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getMarket(interval,length) { try {
-  if (!marketCache) {
+  if (marketCache) {
+    // update current candle
+    handleInstrument(ws._data.instrument.XBTUSD)
+  }
+  else {
     marketCache = await getTradeBucketed(interval,length)
   }
-  handleInstrument(ws._data.instrument.XBTUSD)
   return marketCache
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
@@ -704,15 +710,26 @@ async function orderStopMarket(price,size) { try {
   console.log('Ordered stop market',responseData.ordStatus)
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function initMarket() { try {
+  await getMarket(15,96)
+  let currentTradeBucketed = await getCurrentTradeBucketed()
+  currentCandleTimeOffset = currentTradeBucketed.candleTimeOffset
+  if (currentTradeBucketed.candle.open) {
+    currentCandle = currentTradeBucketed.candle
+  }
+  else {
+    var open = marketCache.closes[marketCache.closes.length-1]
+    currentCandle.open = currentCandle.high = currentCandle.low = currentCandle.close = open
+  }
+} catch(e) {console.error(e.stack||e);debugger} }
+
 async function init(exitTradeCb) { try {
   exitTradeCallback = exitTradeCb
   client = await authorize()
+  await initMarket()
+
   // inspect(client.apis)
   // await getTradeHistory()
-
-  let currentTradeBucketed = await getCurrentTradeBucketed()
-  currentCandle = currentTradeBucketed.candle
-  currentCandleTimeOffset = currentTradeBucketed.candleTimeOffset
 
   entryOrder = log.readEntryOrder()
   await getOpenOrders()

@@ -1,4 +1,4 @@
-const sheets = require('./sheets')
+// const sheets = require('./sheets')
 const fs = require('fs')
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
@@ -57,15 +57,15 @@ function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent
         console.log(e)
       }
     })
-    sheets.enterTrade(entryData).catch(e => {
-      console.log(e)
-    })
+    // sheets.enterTrade(entryData).catch(e => {
+    //   console.log(e)
+    // })
   }
 }
 function writeExit(exitData) {
-  sheets.exitTrade(exitData).catch(e => {
-    console.log(e)
-  })
+  // sheets.exitTrade(exitData).catch(e => {
+  //   console.log(e)
+  // })
 }
 
 function writeEntryOrder(order) {
@@ -113,7 +113,7 @@ function findEntryOrder(price,sizeUSD) {
 }
 
 async function init() {
-  await sheets.init()
+  // await sheets.init()
 }
 
 module.exports = {
