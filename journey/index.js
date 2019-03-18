@@ -12,7 +12,6 @@ global.log = log
 console.log('setup', JSON.stringify(setup))
 
 async function next() {
-  // TODO: move position logic from strategy.js to bitmex.js
   let position = bitmex.getPosition()
   let margin = await bitmex.getMargin()
   let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles
@@ -23,7 +22,7 @@ async function next() {
   //   position.currentQty = 0
   // }
   
-  var order = await strategy.getOrder(rsiSignal,market,setup.bankroll,position,margin)
+  var order = await strategy.getOrder(rsiSignal,market,setup.bankroll,margin)
   var orderSent = false
 
   // if (shoes.test) {

@@ -73,14 +73,9 @@ function highestBody(market,start,length) {
   return Math.max(highestOpen,highestClose)
 }
 
-async function getOrder(signal,market,bankroll,position,margin) {
+async function getOrder(signal,market,bankroll,margin) {
   var created = new Date().toISOString()
   let signalCondition = signal.condition
-  let positionSize = position.currentQty
-
-  if (positionSize != 0 || signalCondition.length < 2) {
-    return {created:created,type:'-'}
-  }
   
   let lastIndex = market.closes.length - 1
   let close = market.closes[lastIndex]

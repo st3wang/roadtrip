@@ -644,6 +644,11 @@ async function enter(order,margin) {
 
   console.log('Margin', margin.availableMargin/100000000, margin.marginBalance/100000000, margin.walletBalance/100000000)
 
+  let position = getPosition()
+  if (position.currentQty != 0) {
+    return
+  }
+
   var instrument = getInstrument()
   if (isFundingWindow(instrument)) {
     var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,instrument.fundingRate)
