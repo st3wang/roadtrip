@@ -646,6 +646,7 @@ async function enter(order,margin) {
 
   let position = getPosition()
   if (position.currentQty != 0) {
+    console.log('position.currentQty',position.currentQty)
     return
   }
 
