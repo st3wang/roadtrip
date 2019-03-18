@@ -533,18 +533,6 @@ async function getMargin() { try {
   return margin
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function cancelAllOrders() { try {
-  console.log('Cancelling All Orders')
-  let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
-  console.log('Cancelled All Orders')
-} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
-
-async function updateLeverage(leverage) { try {
-  console.log('Updating Leverage')
-  let response = await client.Position.Position_updateLeverage({symbol:'XBTUSD',leverage:leverage})
-  console.log('Updated Leverage ')
-} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
-
 async function getTradeHistory(startTime) { try {
   startTime = startTime || (new Date().getTime() - (24*60*60000))
   let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
@@ -602,6 +590,18 @@ async function getOpenOrders(startTime) { try {
 async function getCurrentCandle() {
   return currentCandle
 }
+
+async function cancelAllOrders() { try {
+  console.log('Cancelling All Orders')
+  let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
+  console.log('Cancelled All Orders')
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function updateLeverage(leverage) { try {
+  console.log('Updating Leverage',leverage)
+  let response = await client.Position.Position_updateLeverage({symbol:'XBTUSD',leverage:leverage})
+  console.log('Updated Leverage ')
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function enter(order,margin) { try {
   console.log('Margin','available',margin.availableMargin/100000000,'balance',margin.marginBalance/100000000,'wallet',margin.walletBalance/100000000)
@@ -663,6 +663,7 @@ async function orderLimitRetry(cid,price,size,execInst,retryOn) { try {
 
 async function orderLimit(cid,price,size,execInst) { 
   return new Promise(async (resolve,reject) => { try {
+    console.log('Ordering limit',price,size,execInst)
     if (size > 0) {
       if (price > lastQuote.bidPrice) {
         price = lastQuote.bidPrice
@@ -692,10 +693,11 @@ async function orderLimit(cid,price,size,execInst) {
 
     if (response && response.data) {
       var data = JSON.parse(response.data)
-      console.log('Limit Order', response.data, JSON.stringify(lastQuote))
+      console.log('Ordered Limit', response.data, JSON.stringify(lastQuote))
       resolve(data)
     }
 
+    console.log('Failed order limit')
     resolve({})
   } catch(e) {console.error(e.stack||e);debugger} })
 }
