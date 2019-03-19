@@ -130,7 +130,7 @@ async function getOrder(signal,market,bankroll,margin) {
   riskAmountUSD = Math.round(riskAmountBTC * entryPrice)
   positionSizeBTC = riskAmountBTC / -lossDistancePercent
   positionSizeUSD = Math.round(positionSizeBTC * entryPrice)
-  leverage = Math.ceil(Math.abs(positionSizeBTC / leverageMargin)*100)/100
+  leverage = Math.max(Math.ceil(Math.abs(positionSizeBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss

@@ -71,10 +71,10 @@ function handleOrder(data) {
 }
 
 function handlePosition(data) {
-  if (data[0].leverage !== entryOrder.leverage) {
-    console.log('handlePosition existing leverage',data[0].leverage,'entryOrder leverage',entryOrder.leverage)
-    updateLeverage(entryOrder.leverage)
-  }
+  // if (data[0].leverage !== entryOrder.leverage) {
+  //   console.log('handlePosition existing leverage',data[0].leverage,'entryOrder leverage',entryOrder.leverage)
+  //   updateLeverage(entryOrder.leverage)
+  // }
 }
 
 function isFundingWindow(instrument) {
@@ -623,12 +623,11 @@ async function enter(order,margin) { try {
   }
 
   cancelAllOrders()
-  updateLeverage(order.leverage)
 
   console.log('ENTER ', JSON.stringify(order))
 
-  var entryOrder = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD,'',RETRYON_CANCELED)
-  if (entryOrder.ordStatus === 'Canceled' || entryOrder.ordStatus === 'Overloaded') {
+  let responseData = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD,'',RETRYON_CANCELED)
+  if (responseData.ordStatus === 'Canceled' || responseData.ordStatus === 'Overloaded') {
     return false
   }
 
@@ -692,14 +691,16 @@ async function orderLimit(cid,price,size,execInst) {
       }
     })
 
+    let data = {}
     if (response && response.data) {
       var data = JSON.parse(response.data)
       console.log('Ordered Limit', response.data, JSON.stringify(lastQuote))
-      resolve(data)
+    }
+    else {
+      console.log('Failed order limit')
     }
 
-    console.log('Failed order limit')
-    resolve({})
+    resolve(data)
   } catch(e) {console.error(e.stack||e);debugger} })
 }
 
@@ -730,6 +731,7 @@ async function init(exitTradeCb) { try {
   exitTradeCallback = exitTradeCb
   client = await authorize()
   await initMarket()
+  await updateLeverage(0) // cross margin
 
   // inspect(client.apis)
   // await getTradeHistory()
