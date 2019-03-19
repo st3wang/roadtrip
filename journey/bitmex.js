@@ -617,7 +617,7 @@ async function enter(order,margin) { try {
     }
   }
 
-  cancelAllOrders()
+  await cancelAllOrders()
 
   console.log('ENTER ', JSON.stringify(order))
 
@@ -627,7 +627,7 @@ async function enter(order,margin) { try {
   }
 
   entryOrder = order
-  orderStopMarket(order.stopMarketTrigger,-order.positionSizeUSD)
+  await orderStopMarket(order.stopMarketTrigger,-order.positionSizeUSD)
   log.writeEntryOrder(order)
 
   return true
