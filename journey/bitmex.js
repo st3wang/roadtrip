@@ -693,7 +693,7 @@ async function orderLimit(cid,price,size,execInst) {
 
     let data = {}
     if (response && response.data) {
-      var data = JSON.parse(response.data)
+      data = JSON.parse(response.data)
       console.log('Ordered Limit', response.data, JSON.stringify(lastQuote))
     }
     else {
