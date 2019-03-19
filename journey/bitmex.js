@@ -716,6 +716,7 @@ async function initMarket() { try {
     currentCandle = currentTradeBucketed.candle
   }
   else {
+    currentCandle = {}
     var open = marketCache.closes[marketCache.closes.length-1]
     currentCandle.open = currentCandle.high = currentCandle.low = currentCandle.close = open
   }
