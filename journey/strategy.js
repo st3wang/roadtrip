@@ -15,7 +15,7 @@ async function getRsi(data,length) {
   return Array(length).fill(0).concat(result.result.outReal)
 }
 
-async function getSignal(closes,rsiLength,rsiOverbought,rsiOversold) {
+async function getSignal(closes,rsiLength,rsiOverbought,rsiOversold) { try {
   var rsis = await getRsi(closes,rsiLength)
   var len = closes.length
   var last0 = len - 1
@@ -47,7 +47,7 @@ async function getSignal(closes,rsiLength,rsiOverbought,rsiOversold) {
     signal.condition = 'L'
   }
   return signal
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 function lowest(values,start,length) {
   start++
@@ -73,7 +73,7 @@ function highestBody(market,start,length) {
   return Math.max(highestOpen,highestClose)
 }
 
-async function getOrder(signal,market,bankroll,margin) {
+async function getOrder(signal,market,bankroll,margin) { try {
   var created = new Date().toISOString()
   let signalCondition = signal.condition
   
@@ -155,7 +155,7 @@ async function getOrder(signal,market,bankroll,margin) {
     positionSizeUSD: positionSizeUSD,
     leverage: leverage
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 module.exports = {
   getSignal: getSignal,

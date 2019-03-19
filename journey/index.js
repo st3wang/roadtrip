@@ -109,6 +109,7 @@ async function getTradeCsv() {
 async function getFundingCsv() {
   var csv = 'Date,Rate\n'
   var fundings = await bitmex.getFundingHistory()
+  fundings.push(bitmex.getNextFunding())
   fundings.forEach(funding => {
     csv += funding.timestamp+','+funding.fundingRate+'\n'
   })

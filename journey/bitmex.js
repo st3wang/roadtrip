@@ -12,8 +12,8 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
-var entryOrder, openOrders = {}
-var lastQuote = {}
+var entryOrder, openOrders, lastInstrument, lastPosition
+
 var currentCandle, currentCandleTimeOffset
 
 function heartbeat() {
@@ -71,6 +71,7 @@ function handleOrder(data) {
 }
 
 function handlePosition(data) {
+  lastPosition = data[0]
   // if (data[0].leverage !== entryOrder.leverage) {
   //   console.log('handlePosition existing leverage',data[0].leverage,'entryOrder leverage',entryOrder.leverage)
   //   updateLeverage(entryOrder.leverage)
@@ -151,46 +152,37 @@ function addTradeToCandle(time,price) {
 }
 
 async function handleInstrument(data) { try {
-  var instrument = data[0]
-  var bid = instrument.bidPrice
-  var ask = instrument.askPrice
-  var price = instrument.lastPrice
+  lastInstrument = data[0]
+  var bid = lastInstrument.bidPrice
+  var ask = lastInstrument.askPrice
+  var price = lastInstrument.lastPrice
 
   var now = new Date().getTime()
   var candleTimeOffset = now % 900000
   if (candleTimeOffset >= currentCandleTimeOffset) {
-    addTradeToCandle(new Date(instrument.timestamp).getTime(),price)
+    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),price)
   }
   else {
     startNextCandle()
   }
   currentCandleTimeOffset = candleTimeOffset
   
-  if (bid !== lastQuote.bidPrice || ask !== lastQuote.askPrice) {
-    checkPosition(ws._data.position.XBTUSD[0].currentQty, bid, ask, entryOrder)
-  }
-  lastQuote = {
-    bidPrice: bid,
-    askPrice: ask
+  if (bid !== lastInstrument.bidPrice || ask !== lastInstrument.askPrice) {
+    checkPosition(lastPosition.currentQty, bid, ask, entryOrder)
   }
 
-  if (isFundingWindow(instrument)) {
-    var position = ws._data.position.XBTUSD[0]
-    var fundingStopLoss = await checkFundingPosition(position.currentQty, instrument.fundingRate, bid, ask, entryOrder)
+  if (isFundingWindow(lastInstrument)) {
+    var fundingStopLoss = await checkFundingPosition(lastPosition.currentQty, lastInstrument.fundingRate, bid, ask, entryOrder)
     if (fundingStopLoss) {
       await orderStopLoss('',fundingStopLoss.price,fundingStopLoss.size)
     }
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
-function getQuote() {
-  return lastQuote
-}
-
-function getFunding(instrument) {
+function getNextFunding() {
   return {
-    fundingRate: instrument.fundingRate,
-    fundingTimestamp: instrument.fundingTimestamp
+    fundingRate: lastInstrument.fundingRate,
+    timestamp: lastInstrument.fundingTimestamp
   }
 }
 
@@ -199,11 +191,18 @@ function getInstrument() {
 }
 
 function getPosition() {
-  return ws._data.position.XBTUSD[0]
+  return lastPosition
 }
 
 function getOpenOrder(type) {
   return openOrders[type]
+}
+
+function getQuote() {
+  return {
+    bidPrice: lastInstrument.bidPrice,
+    askPrice: lastInstrument.askPrice
+  }
 }
 
 function getOpenLimitOrderMatching(price,size) {
@@ -602,15 +601,13 @@ async function updateLeverage(leverage) { try {
 async function enter(order,margin) { try {
   console.log('Margin','available',margin.availableMargin/100000000,'balance',margin.marginBalance/100000000,'wallet',margin.walletBalance/100000000)
 
-  let position = getPosition()
-  if (position.currentQty != 0) {
-    console.log('Existing position',position.currentQty)
+  if (lastPosition.currentQty != 0) {
+    console.log('Already in a position',lastPosition.currentQty)
     return
   }
 
-  var instrument = getInstrument()
-  if (isFundingWindow(instrument)) {
-    var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,instrument.fundingRate)
+  if (isFundingWindow(lastInstrument)) {
+    var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,lastInstrument.fundingRate)
     if (fundingStopLoss) {
       console.log('Funding ' + order.type + ' has to pay. Do not enter.',JSON.stringify(fundingStopLoss))
       return
@@ -660,13 +657,15 @@ async function orderLimit(cid,price,size,execInst) {
   return new Promise(async (resolve,reject) => { try {
     console.log('Ordering limit',price,size,execInst)
     if (size > 0) {
-      if (price > lastQuote.bidPrice) {
-        price = lastQuote.bidPrice
+      if (price > lastInstrument.bidPrice) {
+        console.log('orderLimit price',price,'is more than last bidPrice',lastInstrument.bidPrice)
+        price = lastInstrument.bidPrice
       }
     }
     else {
-      if (price < lastQuote.askPrice) {
-        price = lastQuote.askPrice
+      if (price < lastInstrument.askPrice) {
+        console.log('orderLimit price',price,'is less than last askPrice',lastInstrument.askPrice)
+        price = lastInstrument.askPrice
       }
     }
   
@@ -724,6 +723,7 @@ async function initMarket() { try {
 
 async function initOrders() { try {
   entryOrder = log.readEntryOrder()
+  openOrders = {}
   let orders = await getOpenOrders()
   orders.forEach(order => {
     openOrders[order.ordType] = order
@@ -767,5 +767,6 @@ module.exports = {
   getFundingHistory: getFundingHistory,
   getOpenOrder: getOpenOrder,
   openOrders: openOrders,
-  getCurrentCandle: getCurrentCandle
+  getCurrentCandle: getCurrentCandle,
+  getNextFunding: getNextFunding
 }
