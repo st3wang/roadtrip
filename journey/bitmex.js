@@ -12,7 +12,7 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
-var entryOrder, openOrders, lastInstrument, lastPosition
+var entryOrder, openOrders, lastInstrument = {}, lastPosition = {}
 
 var currentCandle, currentCandleTimeOffset
 
@@ -152,15 +152,15 @@ function addTradeToCandle(time,price) {
 }
 
 async function handleInstrument(data) { try {
-  lastInstrument = data[0]
-  var bid = lastInstrument.bidPrice
-  var ask = lastInstrument.askPrice
-  var price = lastInstrument.lastPrice
+  var instrument = data[0]
+  var bid = instrument.bidPrice
+  var ask = instrument.askPrice
+  var price = instrument.lastPrice
 
   var now = new Date().getTime()
   var candleTimeOffset = now % 900000
   if (candleTimeOffset >= currentCandleTimeOffset) {
-    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),price)
+    addTradeToCandle(new Date(instrument.timestamp).getTime(),price)
   }
   else {
     startNextCandle()
@@ -171,12 +171,13 @@ async function handleInstrument(data) { try {
     checkPosition(lastPosition.currentQty, bid, ask, entryOrder)
   }
 
-  if (isFundingWindow(lastInstrument)) {
-    var fundingStopLoss = await checkFundingPosition(lastPosition.currentQty, lastInstrument.fundingRate, bid, ask, entryOrder)
+  if (isFundingWindow(instrument)) {
+    var fundingStopLoss = await checkFundingPosition(lastPosition.currentQty, instrument.fundingRate, bid, ask, entryOrder)
     if (fundingStopLoss) {
       await orderStopLoss('',fundingStopLoss.price,fundingStopLoss.size)
     }
   }
+  lastInstrument = instrument
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function getNextFunding() {
