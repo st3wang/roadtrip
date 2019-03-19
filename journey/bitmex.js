@@ -473,7 +473,7 @@ async function getCurrentTradeBucketed(interval) { try {
   })
   var buckets = JSON.parse(response.data.toString());
   var candle = {}
-  if (buckets) {
+  if (buckets && buckets[0]) {
     candle = toCandle(buckets)
   }
   let timeMs = now-candleTimeOffset
@@ -688,7 +688,7 @@ async function orderLimit(cid,price,size,execInst) {
     let data = {}
     if (response && response.data) {
       data = JSON.parse(response.data)
-      console.log('Ordered Limit', response.data, JSON.stringify(lastQuote))
+      console.log('Ordered Limit', response.data)
     }
     else {
       console.log('Failed order limit')
