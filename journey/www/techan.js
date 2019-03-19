@@ -3531,9 +3531,8 @@ module.exports = function(d3_behavior_drag, d3_event, d3_select, d3_dispatch, ac
         var text = trendlineGroup.append('text').attr('class','start')
         var textData = text.data()
         text._groups[0].forEach((tg,i) => {
-          tg.textContent = textData[i].start.value
+          tg.textContent = textData[i].end.text || textData[i].end.value
           tg.style.fill = pathBody[i][0].style.stroke = textData[i].color
-
         })
       }
 //       trendlineGroup.append('circle').attr('class', 'start').attr('r', 1);

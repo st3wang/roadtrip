@@ -196,10 +196,12 @@
 
     var candles,trades,fundings, drawRsi
     var trendlines = []
+    var marketHigh = 0
 
     d3.csv("market.csv", function(error, data) {
         var accessor = candlestick.accessor();
         candles = data.map(function(d) {
+          marketHigh = Math.max(marketHigh,+d.High)
             return {
                 date: parseDate(d.Date),
                 open: +d.Open,
@@ -261,8 +263,8 @@
         fundings.forEach(funding => {
             trendlines.push({ 
                 color: funding.rate < 0 ? '#CC47ED' : '#008fff', 
-                start: { date: funding.date, value: 2000 }, 
-                end: { date: funding.date, value: 7000 } }
+                start: { date: funding.date, value: 3000 }, 
+                end: { date: funding.date, value: marketHigh, text: funding.rate } },
             )
         })
         if (trades) {
