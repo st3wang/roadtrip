@@ -66,7 +66,7 @@ async function wsConnect() { try {
 function handleOrder(data) {
   data.forEach((order,i) => {
     console.log('ORDER',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
-    openOrders[order.ordType] = order
+    openOrders[order.ordType] = order.ordStatus == 'New' ? order : null
   })
 }
 
@@ -329,7 +329,6 @@ async function checkPosition(positionSize,bid,ask,order) { try {
         // LONG
         if (ask >= order.takeProfit) {
           console.log('Missed LONG trade', bid, ask, JSON.stringify(openEntryOrder), order)
-          debugger
           await cancelAllOrders()
         }
       }
@@ -337,7 +336,6 @@ async function checkPosition(positionSize,bid,ask,order) { try {
         // SHORT
         if (bid <= order.takeProfit) {
           console.log('Missed SHORT trade', bid, ask, JSON.stringify(openEntryOrder), order)
-          debugger
           await cancelAllOrders()
         }
       }
@@ -582,10 +580,7 @@ async function getOpenOrders(startTime) { try {
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
   })
   let orders = JSON.parse(response.data)
-  orders.forEach(order => {
-    openOrders[order.ordType] = order
-  })
-  return openOrders
+  return orders
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getCurrentCandle() {
@@ -727,6 +722,14 @@ async function initMarket() { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function initOrders() { try {
+  entryOrder = log.readEntryOrder()
+  let orders = await getOpenOrders()
+  orders.forEach(order => {
+    openOrders[order.ordType] = order
+  })
+} catch(e) {console.error(e.stack||e);debugger} }
+
 async function init(exitTradeCb) { try {
   exitTradeCallback = exitTradeCb
   client = await authorize()
@@ -735,9 +738,7 @@ async function init(exitTradeCb) { try {
 
   // inspect(client.apis)
   // await getTradeHistory()
-
-  entryOrder = log.readEntryOrder()
-  await getOpenOrders()
+  await initOrders()
   await wsConnect()
 
   // await getOrderBook()
