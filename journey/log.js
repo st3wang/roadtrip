@@ -1,4 +1,3 @@
-// const sheets = require('./sheets')
 const fs = require('fs')
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
