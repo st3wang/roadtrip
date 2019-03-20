@@ -46,7 +46,7 @@ async function wsConnect() { try {
     testnet: shoes.bitmex.test,
     apiKeyID: shoes.bitmex.key,
     apiKeySecret: shoes.bitmex.secret,
-    maxTableLen:10
+    maxTableLen:100
   })
   ws.on('error', console.error);
   ws.on('open', () => console.log('Connection opened.'));
