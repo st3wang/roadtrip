@@ -5,7 +5,7 @@ const ymdHelper = require('./ymdHelper')
 const readFile = util.promisify(fs.readFile)
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 
-async function getMarket(exchange,interval,startYmd,endYmd) {
+async function getMarket(exchange,interval,startYmd,endYmd) { try {
   console.log('getMarket',startYmd,endYmd,interval)
   var opens = [], highs = [], lows = [], closes = []
   for (var ymd = startYmd; ymd <= endYmd; ymd = ymdHelper.nextDay(ymd)) {
@@ -23,9 +23,9 @@ async function getMarket(exchange,interval,startYmd,endYmd) {
   }
   fillMarketNull(market)
   return market
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-function fillMarketNull(market) {
+function fillMarketNull(market) { try {
   var closes = market.closes
   var len = closes.length
   for (var i = 0; i < len; i++) {
@@ -33,7 +33,7 @@ function fillMarketNull(market) {
       closes[i] = closes[i-1]
     }
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 module.exports = {
   getMarket: getMarket

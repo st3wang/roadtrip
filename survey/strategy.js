@@ -119,7 +119,8 @@ async function getRsiCase(startTime,interval,market,setup) {
     drawdowns[i] = 0
   }
 
-  var feeRate = 0.0001
+  var feeRate = -0.000225, stopFeeRate = 0.000675,
+      skipCount = 0, skip = 0
 
   for (var i = startBar; i < rsis.length; i++) {
     time += timeIncrement
@@ -128,7 +129,7 @@ async function getRsiCase(startTime,interval,market,setup) {
       high = highs[i]
       low = lows[i]
       if (stopLoss >= low && stopLoss <= high) {
-        fee = positionSize * feeRate
+        fee = positionSize * stopFeeRate
         capital -= fee
 
         let profit = -positionSize * (lossDistance/close)
@@ -171,58 +172,66 @@ async function getRsiCase(startTime,interval,market,setup) {
       // shortLossDistance = Math.abs(highest(highs,i,stopLossLookBack) - close)
       shortCondition = prsi > rsiOverboughtExecute && rsi <= rsiOverboughtExecute //&& overbought
       if (shortCondition) {
-        overbought = oversold = false
-        entryPrice = close * (1 - (getRandomInt(5)*0.0001))
-        stopLoss = highestBody(market,i,stopLossLookBack)
-        lossDistance = Math.abs(stopLoss - close)
-        lossDistancePercent = lossDistance/close
-        if (lossDistancePercent >= minStopLoss && lossDistancePercent <= maxStopLoss) {
-          profitDistance = lossDistance * profitFactor
-          // stopLoss = entryPrice + lossDistance // optimize
-          takeProfit = entryPrice - profitDistance
-
-          // positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistance
-          // positionSize = (compound ? capital : startCapital) * entryPrice * riskPerTradePercent / lossDistance
-          positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistancePercent 
-
-          fee = positionSize * feeRate
-          capital -= fee
-
-          barsNotInTrade += i - exitBar
-          enterBar = i
-          // db.enterTrade(query,
-            // rsiOverbought,rsiOversold,stopLossLookBack,setup.profitFactor,
-            // 'S',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
-          pushEnter(trades,'SHORT',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
+        skipCount++
+        if (skipCount > skip) {
+          skipCount = 0
+          overbought = oversold = false
+          entryPrice = close //* (1 - (getRandomInt(5)*0.0001))
+          stopLoss = highestBody(market,i,stopLossLookBack)
+          lossDistance = Math.abs(stopLoss - close)
+          lossDistancePercent = lossDistance/close
+          if (lossDistancePercent >= minStopLoss && lossDistancePercent <= maxStopLoss) {
+            profitDistance = lossDistance * profitFactor
+            // stopLoss = entryPrice + lossDistance // optimize
+            takeProfit = entryPrice - profitDistance
+  
+            // positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistance
+            // positionSize = (compound ? capital : startCapital) * entryPrice * riskPerTradePercent / lossDistance
+            positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistancePercent 
+  
+            fee = positionSize * feeRate
+            capital -= fee
+  
+            barsNotInTrade += i - exitBar
+            enterBar = i
+            // db.enterTrade(query,
+              // rsiOverbought,rsiOversold,stopLossLookBack,setup.profitFactor,
+              // 'S',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
+            pushEnter(trades,'SHORT',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
+          }
         }
       }
       else {
         // longLossDistance = Math.abs(close - lowest(lows,i,stopLossLookBack))
         longCondition = prsi < rsiOversoldExecute && rsi >= rsiOversoldExecute //&& oversold
         if (longCondition) {
-          overbought = oversold = false
-          entryPrice = close * (1 + (getRandomInt(5)*0.0001))
-          stopLoss = lowestBody(market,i,stopLossLookBack)
-          lossDistance = Math.abs(close - stopLoss)
-          lossDistancePercent = lossDistance/close
-          if (lossDistancePercent >= minStopLoss && lossDistancePercent <= maxStopLoss) {
-            profitDistance = lossDistance * profitFactor
-            stopLoss = entryPrice - lossDistance
-            takeProfit = entryPrice + profitDistance
+          skipCount++
+          if (skipCount > skip) {
+            skipCount = 0
+            overbought = oversold = false
+            entryPrice = close //* (1 + (getRandomInt(5)*0.0001))
+            stopLoss = lowestBody(market,i,stopLossLookBack)
+            lossDistance = Math.abs(close - stopLoss)
+            lossDistancePercent = lossDistance/close
+            if (lossDistancePercent >= minStopLoss && lossDistancePercent <= maxStopLoss) {
+              profitDistance = lossDistance * profitFactor
+              stopLoss = entryPrice - lossDistance
+              takeProfit = entryPrice + profitDistance
 
-            // positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistance
-            // positionSize = (compound ? capital : startCapital) * entryPrice * riskPerTradePercent / lossDistance
-            positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistancePercent 
+              // positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistance
+              // positionSize = (compound ? capital : startCapital) * entryPrice * riskPerTradePercent / lossDistance
+              positionSize = (compound ? capital : startCapital) * riskPerTradePercent / lossDistancePercent 
 
-            fee = positionSize * feeRate
-            capital -= fee
+              fee = positionSize * feeRate
+              capital -= fee
 
-            barsNotInTrade += i - exitBar
-            enterBar = i
-            // db.enterTrade(query,
-              // rsiOverbought,rsiOversold,stopLossLookBack,setup.profitFactor,
-              // 'L',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
-            pushEnter(trades,'LONG',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
+              barsNotInTrade += i - exitBar
+              enterBar = i
+              // db.enterTrade(query,
+                // rsiOverbought,rsiOversold,stopLossLookBack,setup.profitFactor,
+                // 'L',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
+              pushEnter(trades,'LONG',capital,time,positionSize,entryPrice,stopLoss,takeProfit)
+            }
           }
         }
       }

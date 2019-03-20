@@ -1,5 +1,8 @@
 const util = require('util')
 const fs = require('fs')
+const http 	= require('http')
+const gunzip = require('gunzip-file')
+
 const ymdHelper = require('./ymdHelper')
 
 const readFile = util.promisify(fs.readFile)
@@ -128,17 +131,17 @@ function getCandles(groups,startTime,interval) {
   })
 }
 
-async function getCandleDay(ymd,interval) {
+async function getCandleDay(ymd,interval) { try {
   console.log('getCandleDay',ymd,interval)
   var trades = await readAndParseForCandle(ymd)
-  var startTimeGMT = new Date(YYYY_MM_DD(ymd))
+  var startTimeGMT = new Date(ymdHelper.YYYY_MM_DD(ymd))
   var startTimeGMTMS = startTimeGMT.getTime()
   var groups = await getGroups(trades,startTimeGMTMS,interval)
   var candles = await getCandles(groups,startTimeGMTMS,interval)
   return candles
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-function downloadTradeDay(ymd) {
+function downloadTradeDay(ymd) { try {
   return new Promise((resolve, reject) => {
     const request = http.get(roadmap.url + ymd + '.csv.gz', function(response) {
       const csvFilename = filePath.replace('YYYYMMDD',ymd) //'data/trade/' + ymd + '.csv'
@@ -154,9 +157,9 @@ function downloadTradeDay(ymd) {
       })
     })
   })
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function downloadTradeData(startYmd,endYmd) {
+async function downloadTradeData(startYmd,endYmd) { try {
   var ymd = startYmd
   while (ymd <= endYmd) {
     const cleanedTradeFile = getCleanedTradeFile(ymd)
@@ -171,9 +174,9 @@ async function downloadTradeData(startYmd,endYmd) {
     }
     ymd = ymdHelper.nextDay(ymd)
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function generateCandleDayFiles(startYmd,endYmd,interval) {
+async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
   var ymd = startYmd
   while (ymd <= endYmd) {
     var writePath = 'data/bitmex/candle/' + interval + '/' + ymd + '.json'
@@ -191,21 +194,21 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) {
     }
     ymd = ymdHelper.nextDay(ymd)
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function updateCandleFiles() {
+async function updateCandleFiles() { try {
   var interval = 15
   var startYmd = historyStartYmd
-  var endYmd = 20190307
+  var endYmd = 20190319
   await downloadTradeData(startYmd,endYmd)
   await generateCandleDayFiles(startYmd,endYmd,interval)
   // var market = await getMarket(startYmd,endYmd,interval)
   // var marketString = JSON.stringify(market)
   // var path = 'data/market/'+interval+'/market.json'
   // await writeFile(path,marketString,writeFileOptions)
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function getMarket(startYmd,endYmd,interval) {
+async function getMarket(startYmd,endYmd,interval) { try {
   console.log('getMarket',startYmd,endYmd,interval)
   var opens = [], highs = [], lows = [], closes = []
   for (var ymd = startYmd; ymd <= endYmd; ymd = ymdHelper.nextDay(ymd)) {
@@ -223,7 +226,7 @@ async function getMarket(startYmd,endYmd,interval) {
   }
   fillMarketNull(market)
   return market
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 function fillMarketNull(market) {
   var closes = market.closes

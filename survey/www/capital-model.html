@@ -81,7 +81,7 @@
   </div>
   <script>
   var market, plotCloses
-  var startDateISO = '2017-08-18T00:00:00.000Z'
+  var startDateISO = '2017-01-01T00:00:00.000Z'
   var startDate = new Date(startDateISO)
   var startYMD = startDateISO.substring(0,10).replace(/-/g,'')
   var layout = {
@@ -183,7 +183,7 @@
 
     Plotly.newPlot('plotDiv', data, layout);
 
-    profitSpan.textContent = (capitals[capitals.length-1] / capitals[0] * 100).toFixed(2) + '%'
+    profitSpan.textContent = ((capitals[capitals.length-1]-capitals[0]) / capitals[0] * 100).toFixed(2) + '%'
     totalTradesSpan.textContent = overview.totalTrades
     winRateSpan.textContent = (overview.winRate * 100).toFixed(2) + '%'
     maxDrawdownSpan.textContent = (overview.maxDrawdown * 100).toFixed(0) + '%'

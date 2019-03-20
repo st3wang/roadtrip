@@ -539,7 +539,7 @@ async function getTradeHistory(startTime) { try {
   startTime = startTime || (new Date().getTime() - (24*60*60000))
   let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
   startTime: new Date(startTime).toISOString(),
-  columns:'commissionnn,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
+  columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
   })
   let data = JSON.parse(response.data)
   data.forEach(d => {
