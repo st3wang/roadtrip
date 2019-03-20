@@ -12,7 +12,7 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
-var entryOrder, openOrders, lastInstrument = {}, lastPosition = {}
+var entryOrder, lastInstrument = {}, lastPosition = {}, lastOrders = []
 
 var currentCandle, currentCandleTimeOffset
 
@@ -46,7 +46,7 @@ async function wsConnect() { try {
     testnet: shoes.bitmex.test,
     apiKeyID: shoes.bitmex.key,
     apiKeySecret: shoes.bitmex.secret,
-    maxTableLen:100
+    maxTableLen:10
   })
   ws.on('error', console.error);
   ws.on('open', () => console.log('Connection opened.'));
@@ -64,9 +64,9 @@ async function wsConnect() { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function handleOrder(data) {
-  data.forEach((order,i) => {
+  lastOrders = data
+  lastOrders.forEach((order,i) => {
     console.log('ORDER',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
-    openOrders[order.ordType] = order.ordStatus == 'New' ? order : null
   })
 }
 
@@ -195,10 +195,6 @@ function getPosition() {
   return lastPosition
 }
 
-function getOpenOrder(type) {
-  return openOrders[type]
-}
-
 function getQuote() {
   return {
     bidPrice: lastInstrument.bidPrice,
@@ -207,16 +203,11 @@ function getQuote() {
 }
 
 function getOpenLimitOrderMatching(price,size) {
-  var openOrder = getOpenOrder('Limit')
-  if (openOrder && openOrder.price == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
-    return openOrder
-  }
-}
-
-function getOpenStopOrderMatching(price,size) {
-  var openOrder = getOpenOrder('Stop')
-  if (openOrder && openOrder.stopPx == price && Math.abs(openOrder.orderQty) == Math.abs(size)) {
-    return openOrder
+  var openLimitOrder = lastOrders.find(order => {
+    return (order.ordStatus == 'New' && order.ordType == 'Limit')
+  })
+  if (openLimitOrder && openLimitOrder.price == price && Math.abs(openLimitOrder.orderQty) == Math.abs(size)) {
+    return openLimitOrder
   }
 }
 
@@ -322,10 +313,7 @@ async function checkPosition(positionSize,bid,ask,order) { try {
     }
   }
   else {
-    var openEntryOrder
-    if (order) {
-      getOpenLimitOrderMatching(order.entryPrice,order.positionSizeUSD)
-    }
+    var openEntryOrder = order ? getOpenLimitOrderMatching(order.entryPrice,order.positionSizeUSD) : null
     if (openEntryOrder) {
       // Check our order in the orderbook. Cancel the order if it has reached the target.
       if (order.positionSizeUSD > 0) {
@@ -575,17 +563,6 @@ async function getOrders(startTime) { try {
   return orders
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function getOpenOrders(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
-  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
-    startTime: new Date(startTime).toISOString(),
-    filter: '{"ordStatus":"New","ordType":"Limit"}',
-    columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
-  })
-  let orders = JSON.parse(response.data)
-  return orders
-} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
-
 async function getCurrentCandle() {
   return currentCandle
 }
@@ -728,11 +705,6 @@ async function initMarket() { try {
 
 async function initOrders() { try {
   entryOrder = log.readEntryOrder()
-  openOrders = {}
-  let orders = await getOpenOrders()
-  orders.forEach(order => {
-    openOrders[order.ordType] = order
-  })
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function init(exitTradeCb) { try {
@@ -747,9 +719,6 @@ async function init(exitTradeCb) { try {
   await wsConnect()
 
   // await getOrderBook()
-
-  // var openOrder = getOpenOrder()
-  // debugger
 
   // await getFundingHistory(yesterday)
   // await getInstrument()
@@ -770,8 +739,6 @@ module.exports = {
   getOrders: getOrders,
   getTradeHistory: getTradeHistory,
   getFundingHistory: getFundingHistory,
-  getOpenOrder: getOpenOrder,
-  openOrders: openOrders,
   getCurrentCandle: getCurrentCandle,
   getNextFunding: getNextFunding
 }
