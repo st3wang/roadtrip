@@ -34,7 +34,7 @@ function getRsiCaseFileDir(startYmd,length,interval,rsiOverbought,rsiOversold) {
   return 'data/case/rsi/'+startYmd+'_'+length+'_'+interval+'/'+rsiOverbought+'_'+rsiOversold+'/'
 }
 
-async function generateRsiCaseFiles(startYmd,endYmd,interval,config) {
+async function generateRsiCaseFiles(startYmd,endYmd,interval,config) { try {
   var startTime = new Date(ymdHelper.YYYY_MM_DD(startYmd)).getTime()
   var market = await bitmex.getMarket(startYmd,endYmd,interval)
   market.rsis = []
@@ -56,9 +56,9 @@ async function generateRsiCaseFiles(startYmd,endYmd,interval,config) {
   })
 
   console.log('done generateRsiCaseFiles')
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function getRsiCaseTrades(startYmd, endYmd, interval, rsiLength, rsiOverbought, rsiOversold, stopLossLookBack, profitFactor) {
+async function getRsiCaseTrades(startYmd, endYmd, interval, rsiLength, rsiOverbought, rsiOversold, stopLossLookBack, profitFactor) { try {
   var readPath = getRsiCaseFilePath(bitmex.historyStartYmd, endYmd, interval, rsiLength, rsiOverbought, rsiOversold, stopLossLookBack, profitFactor)
   var jsonString = fs.readFileSync(readPath,readFileOptions)
   if (jsonString.length == 0) {
@@ -74,9 +74,9 @@ async function getRsiCaseTrades(startYmd, endYmd, interval, rsiLength, rsiOverbo
     return t[EXIT_TIME] > endTime
   }) - 1
   return trades.slice(startIndex,endIndex)
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function loopRsiCase(config, callback) {
+async function loopRsiCase(config, callback) { try {
   var minRsiLength = config.minRsiLength, maxRsiLength = config.maxRsiLength
   var minRsiOverbought = config.minRsiOverbought, maxRsiOverbought = config.maxRsiOverbought
   var minRsiOversold = config.minRsiOversold, maxRsiOversold = config.maxRsiOversold
@@ -110,7 +110,7 @@ async function loopRsiCase(config, callback) {
       console.log('done',rsiOverbought,rsiOversold,'time remaining',(timeRemaining/60000).toFixed(2), timeFinish.toString())
     }
   }
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 async function generateRsiOverviewFile(startYmd,endYmd,interval,config) {
   var overviews = {}
@@ -251,7 +251,7 @@ async function studyRsiProfit(startYmd,endYmd,interval,config) {
   }
 }
 
-async function updateRsiCaseFiles() {
+async function updateRsiCaseFiles() { try {
   var config = {
     minRsiLength: 2, maxRsiLength: 2,
     minRsiOverbought: 55, maxRsiOverbought: 55,
@@ -265,9 +265,9 @@ async function updateRsiCaseFiles() {
   debugger
   // await generateRsiOverviewFile(20190219,20190222,15,config)
   console.log('done updateRsiCaseFiles')
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function test() {
+async function test() { try {
   var config = {
     minRsiLength: 11, maxRsiLength: 11,
     minRsiOverbought: 51, maxRsiOverbought: 51,
@@ -287,9 +287,9 @@ async function test() {
   //   }
   // }
   debugger
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function initMarketServer() {
+async function initMarketServer() { try {
   let markets = {}
 
   // var setup = {
@@ -302,7 +302,7 @@ async function initMarketServer() {
   let getMarketData = async function(setup) {
     let startYMD = setup.startYMD
     if (!markets[startYMD]) {
-      markets[startYMD] = await marketHelper.getMarket('bitmex',15,startYMD,20190307)
+      markets[startYMD] = await marketHelper.getMarket('bitmex',15,startYMD,20190319)
       markets[startYMD].rsis = []
     }
     return markets[startYMD]
@@ -336,14 +336,14 @@ async function initMarketServer() {
     return overviewJson
   }
   await server.init(getMarketJson,getOverviewJson)
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function start() {
+async function start() { try {
   // await bitmex.updateCandleFiles()
   // await binance.updateCandleFiles()
 
   await initMarketServer()
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 start()
 

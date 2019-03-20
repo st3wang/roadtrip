@@ -27,7 +27,7 @@ function responseWithData(response,contentType,data) {
   response.end()
 }
 
-async function init(getMarketJson,getOverviewJson) {
+async function init(getMarketJson,getOverviewJson) { try {
   http.createServer(async (request, response) => {
     let path = url.parse(request.url).pathname
     switch(path) {
@@ -55,7 +55,7 @@ async function init(getMarketJson,getOverviewJson) {
   }).listen(port)
   
   console.log("Listening on port " + port)
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 module.exports = {
   init: init
