@@ -322,7 +322,10 @@ async function checkPosition(positionSize,bid,ask,order) { try {
     }
   }
   else {
-    var openEntryOrder = getOpenLimitOrderMatching(order.entryPrice,order.positionSizeUSD)
+    var openEntryOrder
+    if (order) {
+      getOpenLimitOrderMatching(order.entryPrice,order.positionSizeUSD)
+    }
     if (openEntryOrder) {
       // Check our order in the orderbook. Cancel the order if it has reached the target.
       if (order.positionSizeUSD > 0) {

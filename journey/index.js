@@ -1,4 +1,3 @@
-const sheets = require('./sheets')
 const log = require('./log')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
