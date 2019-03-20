@@ -95,8 +95,9 @@ async function getOrder(signal,market,bankroll,margin) { try {
 
   switch(signalCondition) {
     case 'SHORT':
-      entryPrice = Math.max(quote.askPrice,close)
       stopLoss = highestBody(market,lastIndex,stopLossLookBack)
+      entryPrice = Math.max(quote.askPrice,close) // use askPrice or close
+      entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
       lossDistance = Math.abs(stopLoss - entryPrice)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2 // round to 0.5
       profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
@@ -108,8 +109,9 @@ async function getOrder(signal,market,bankroll,margin) { try {
       // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
-      entryPrice = Math.min(quote.bidPrice,close)
       stopLoss = lowestBody(market,lastIndex,stopLossLookBack)
+      entryPrice = Math.min(quote.bidPrice,close)
+      entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       lossDistance = -Math.abs(entryPrice - stopLoss)
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
       profitDistance = -lossDistance * profitFactor
