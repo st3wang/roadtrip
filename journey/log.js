@@ -93,11 +93,14 @@ function readEntryOrders() {
   return entryOrdersCache
 }
 
-function findEntryOrder(price,sizeUSD) {
+function findEntryOrder(timestamp,price,sizeUSD) {
+  var time = new Date(timestamp).getTime()
   var orders = readEntryOrders()
   var found
   orders.forEach(order => {
-    if (order[5] == ''+price && order[15] == ''+sizeUSD) {
+    let orderTime = new Date(order[0]).getTime()
+    let orderPrice = parseFloat(order[5])
+    if (time >= orderTime && time <= (orderTime+2*60*60000) && orderPrice <= price+2 && orderPrice >= price-2 && order[15] == ''+sizeUSD) {
       found = {
         timestamp: order[0],
         price: price,

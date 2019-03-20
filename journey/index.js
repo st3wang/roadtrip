@@ -84,7 +84,7 @@ async function getTradeCsv() {
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
   for (var i = 0; i < orders.length; i++) {
     var entryOrder = orders[i]
-    var entryOrderRecord = log.findEntryOrder(entryOrder.price,entryOrder.orderQty*(entryOrder.side=='Buy'?1:-1))
+    var entryOrderRecord = log.findEntryOrder(entryOrder.timestamp,entryOrder.price,entryOrder.orderQty*(entryOrder.side=='Buy'?1:-1))
     var stopLoss = 0
     var takeProfit = 0 
     var stopMarket = 0 
