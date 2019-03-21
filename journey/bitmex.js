@@ -8,11 +8,11 @@ const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 const EXECINST_REDUCEONLY = ',ReduceOnly'
 const RETRYON_CANCELED = 'Canceled'
 
-var client, exitTradeCallback, marketCache
+var client, checkPositionCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
-var entrySignal, lastInstrument = {}, lastPosition = {}, lastOrders = []
+var lastInstrument = {}, lastPosition = {}, lastOrders = []
 
 var currentCandle, currentCandleTimeOffset
 
@@ -72,17 +72,6 @@ function handleOrder(data) {
 
 function handlePosition(data) {
   lastPosition = data[0]
-  // if (data[0].leverage !== entrySignal.leverage) {
-  //   console.log('handlePosition existing leverage',data[0].leverage,'entrySignal leverage',entrySignal.leverage)
-  //   updateLeverage(entrySignal.leverage)
-  // }
-}
-
-function isFundingWindow(instrument) {
-  var fundingTime = new Date(instrument.fundingTimestamp).getTime()
-  var checkFundingPositionTime = fundingTime - 1800000
-  var now = new Date().getTime()
-  return (now > checkFundingPositionTime)
 }
 
 function startNextCandle() {
@@ -166,15 +155,10 @@ async function handleInstrument(data) { try {
   currentCandleTimeOffset = candleTimeOffset
   
   if (bid !== lastInstrument.bidPrice || ask !== lastInstrument.askPrice) {
-    checkPosition(candleTimeOffset,lastPosition.currentQty, bid, ask, entrySignal)
+    checkPositionCallback(instrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
+      bid, ask, instrument.fundingTimestamp, instrument.fundingRate)
   }
 
-  if (isFundingWindow(instrument)) {
-    var fundingStopLoss = await checkFundingPosition(lastPosition.currentQty, instrument.fundingRate, bid, ask, entrySignal)
-    if (fundingStopLoss) {
-      await orderTakeProfit('',fundingStopLoss.price,fundingStopLoss.size)
-    }
-  }
   lastInstrument = instrument
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -186,7 +170,7 @@ function getNextFunding() {
 }
 
 function getInstrument() {
-  return ws._data.instrument.XBTUSD[0]
+  return lastInstrument
 }
 
 function getPosition() {
@@ -200,7 +184,7 @@ function getQuote() {
   }
 }
 
-function getNewLimitOrderMatching(price,size) {
+function findNewLimitOrder(price,size) {
   size = Math.abs(size)
   return lastOrders.find(order => {
     return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
@@ -208,7 +192,7 @@ function getNewLimitOrderMatching(price,size) {
   })
 }
 
-var stopLossOrderRequesting, takeProfitOrderRequesting
+var exitRequesting
 
 // async function orderStopLoss(created,price,size) { try {
 //   // FIXME: need to check price and size. if different request new order
@@ -248,138 +232,6 @@ var stopLossOrderRequesting, takeProfitOrderRequesting
 //   // }
 //   return responseData
 // } catch(e) {console.error(e.stack||e);debugger} }
-
-async function orderTakeProfit(created,price,size) { try {
-  if (takeProfitOrderRequesting) {
-    //console.log('takeProfitOrderRequesting')
-    return
-  }
-
-  var newTakeProfitOrder = getNewLimitOrderMatching(price,size)
-  if (newTakeProfitOrder) {
-    //console.log('Order already submitted')
-    return
-  }
-
-  // var cid = created + 'EXIT+'
-  var cid = ''
-  console.log('New orderTakeProfit',cid,price,size)
-
-  takeProfitOrderRequesting = true
-  var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
-  takeProfitOrderRequesting = false
-  console.log('orderTakeProfit response status', responseData.ordStatus)
-  return responseData
-} catch(e) {console.error(e.stack||e);debugger} }
-
-async function checkPosition(candleTimeOffset,positionSize,bid,ask,signal) { try {
-  if (positionSize > 0) {  
-    if (!signal) {
-      throw new Error('Error: No signal in the memory. Need to load one up.')
-      // load existing signal
-      return
-    }
-
-    // LONG
-    if (ask >= signal.takeProfitTrigger) {
-      // console.log('LONG TAKE PROFIT')
-      var responseData = await orderTakeProfit(signal.created,signal.takeProfit,-positionSize)
-    }
-    // else if (ask <= signal.stopLoss) {
-    //   // console.log('LONG STOP LOSS')
-    //   // use ask for chasing stop loss
-    //   // var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
-    // }
-    // else {
-    //   // console.log('LONG IN POSITION')
-    // }
-  } 
-  else if (positionSize < 0) {
-    // SHORT 
-    if (bid <= signal.takeProfitTrigger) {
-      // console.log('SHORT TAKE PROFIT')
-      var responseData = await orderTakeProfit(signal.created,signal.takeProfit,-positionSize)
-    }
-    else if (bid >= signal.stopLoss) {
-      // console.log('SHORT STOP LOSS')
-      // use bid for chasing stop loss
-      // var responseData = await orderStopLoss(signal.created,signal.stopLoss,-positionSize)
-    }
-    else {
-      // console.log('SHORT IN POSITION')
-    }
-  }
-  else {
-    var newEntryOrder = signal ? getNewLimitOrderMatching(signal.entryPrice,signal.positionSizeUSD) : null
-    if (newEntryOrder) {
-      // Check our ourder in the orderbook. Cancel the order if it has reached the target.
-      if (signal.positionSizeUSD > 0) {
-        // LONG
-        if (ask >= signal.takeProfit) {
-          console.log('Missed LONG trade', bid, ask, JSON.stringify(newEntryOrder), signal)
-          await cancelAllOrders()
-        }
-      }
-      else {
-        // SHORT
-        if (bid <= signal.takeProfit) {
-          console.log('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
-          await cancelAllOrders()
-        }
-      }
-    }
-  }
-} catch(e) {console.error(e.stack||e);debugger} }
-
-async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,signal) { try {
-  if (positionSizeUSD > 0) {  
-    if (fundingRate > 0) {
-      return {price:ask,size:-positionSizeUSD,fundingRate:fundingRate}
-    }
-  } 
-  else if (positionSizeUSD < 0) {
-    if (fundingRate < 0) {
-      return {price:bid,size:-positionSizeUSD,fundingRate:fundingRate}
-    }
-  }
-  else {
-    // Check if there is an entry order that has to pay funding
-    var newEntryOrder = signal ? getNewLimitOrderMatching(signal.entryPrice,signal.positionSizeUSD) : null
-    if (newEntryOrder && 
-      // to avoid stakeoverflow
-      newEntryOrder.orderQty !== 0) {
-      var fundingStopLoss = await checkFundingPosition(signal.positionSizeUSD,fundingRate,bid,ask,signal)
-      if (fundingStopLoss) {
-        await cancelAllOrders()
-      }
-    }
-  }
-} catch(e) {console.error(e.stack||e);debugger} }
-
-function testCheckPosition() {
-  var interval = 500
-  var order = {
-    entryPrice: 3900,
-    positionSizeUSD: 1000,
-    stopLossTrigger: 3860.5,
-    stopLoss: 3860,
-    takeProfitTrigger: 4000.5,
-    takeProfit: 40001
-  }
-  var testArgs1 = [
-    [order.positionSizeUSD,order.entryPrice,order.entryPrice+0.5,order],
-    [order.positionSizeUSD,order.entryPrice+1,order.entryPrice+1.5,order],
-    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
-    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
-    [order.positionSizeUSD,order.stopLoss+1,order.stopLoss+1.5,order],
-    // [order.positionSizeUSD,order.stopLoss-2,order.stopLoss-1.5,order]
-  ]
-  testArgs1.forEach((args,i) => {
-    setTimeout(() => {
-      checkPosition.apply(this, args);
-    }, interval*(i+1))
-  })
-}
 
 async function authorize() { try {
   let swaggerClient = await new SwaggerClient({
@@ -564,7 +416,7 @@ async function getCurrentCandle() {
   return currentCandle
 }
 
-async function cancelAllOrders() { try {
+async function cancelAll() { try {
   console.log('Cancelling All Orders')
   let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
   console.log('Cancelled All Orders')
@@ -579,20 +431,7 @@ async function updateLeverage(leverage) { try {
 async function enter(signal,margin) { try {
   console.log('Margin','available',margin.availableMargin/100000000,'balance',margin.marginBalance/100000000,'wallet',margin.walletBalance/100000000)
 
-  if (lastPosition.currentQty != 0) {
-    console.log('Already in a position',lastPosition.currentQty)
-    return
-  }
-
-  if (isFundingWindow(lastInstrument)) {
-    var fundingStopLoss = await checkFundingPosition(signal.positionSizeUSD,lastInstrument.fundingRate)
-    if (fundingStopLoss) {
-      console.log('Funding ' + signal.type + ' has to pay. Do not enter.',JSON.stringify(fundingStopLoss))
-      return
-    }
-  }
-
-  await cancelAllOrders()
+  await cancelAll()
 
   console.log('ENTER ', JSON.stringify(signal))
 
@@ -601,12 +440,33 @@ async function enter(signal,margin) { try {
     return false
   }
 
-  entrySignal = signal
   await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
-  log.writeEntryOrder(signal)
 
   return true
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function exit(created,price,size) { try {
+  if (exitRequesting) {
+    //console.log('exitRequesting')
+    return
+  }
+
+  var newExitOrder = findNewLimitOrder(price,size)
+  if (newExitOrder) {
+    //console.log('Order already submitted')
+    return
+  }
+
+  // var cid = created + 'EXIT+'
+  var cid = ''
+  console.log('New exit',cid,price,size)
+
+  exitRequesting = true
+  var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
+  exitRequesting = false
+  console.log('EXIT response status', responseData.ordStatus)
+  return responseData
+} catch(e) {console.error(e.stack||e);debugger} }
 
 async function wait(ms) {
   return new Promise((resolve,reject) => {
@@ -700,19 +560,14 @@ async function initMarket() { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function initOrders() { try {
-  entrySignal = log.readEntrySignal()
-} catch(e) {console.error(e.stack||e);debugger} }
-
-async function init(exitTradeCb) { try {
-  exitTradeCallback = exitTradeCb
+async function init(checkPositionCb) { try {
+  checkPositionCallback = checkPositionCb
   client = await authorize()
   await initMarket()
   await updateLeverage(0) // cross margin
 
   // inspect(client.apis)
   // await getTradeHistory()
-  await initOrders()
   await wsConnect()
 
   // await getOrderBook()
@@ -720,22 +575,25 @@ async function init(exitTradeCb) { try {
   // await getFundingHistory(yesterday)
   // await getInstrument()
   // await getOrders(yesterday)
-
-  // await orderLimitRetry('',3888,1000,'',RETRYON_CANCELED)
-  // debugger
-  // testCheckPosition()
 } catch(e) {console.error(e.stack||e);debugger} }
 
 module.exports = {
   init: init,
   getMarket: getMarket,
   getPosition: getPosition,
+  getInstrument: getInstrument,
   getMargin: getMargin,
   getQuote: getQuote,
-  enter: enter,
+
   getOrders: getOrders,
   getTradeHistory: getTradeHistory,
   getFundingHistory: getFundingHistory,
   getCurrentCandle: getCurrentCandle,
-  getNextFunding: getNextFunding
+  getNextFunding: getNextFunding,
+
+  findNewLimitOrder: findNewLimitOrder,
+
+  enter: enter,
+  exit: exit,
+  cancelAll: cancelAll
 }
