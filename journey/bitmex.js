@@ -136,16 +136,14 @@ function addTradeToCandle(time,price) {
     // console.log('add trade to lastCandle', new Date().toISOString(), new Date(time).toISOString(), price, JSON.stringify(lastCandle))
     if (time >= lastCandle.startTimeMs && time <= lastCandle.endTimeMs) {
       if (price > lastCandle.high) {
-        lastCandle.high = price
-        marketCache.highs = price
+        marketCache.highs[lastIndex] = lastCandle.high = price
       }
       else if (price < lastCandle.low) {
-        lastCandle.low = price
-        lastCandle.lows = price
+        lastCandle.lows[lastIndex] = lastCandle.low = price
       }
       if (time > lastCandle.lastTradeTimeMs) {
         lastCandle.lastTradeTimeMs = time
-        lastCandle.close = price
+        lastCandle.closes[lastIndex] = lastCandle.close = price
       }
     }
   }
