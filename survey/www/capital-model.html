@@ -4,7 +4,7 @@
   <style>
     body {
       font-family: Helvetica;
-      font-size: 14px;
+      font-size: 12px;
     }
     input {
       width: 40px;
@@ -71,9 +71,21 @@
   </div>
   <div>
     <button onclick="decrease(profitFactorInput)">-</button>
-    <input id="profitFactorInput" type="text" value="150"></input>
+    <input id="profitFactorInput" type="text" value="160"></input>
     <button onclick="increase(profitFactorInput)">+</button>
     <label>ProfitFactor</label>
+  </div>
+  <div>
+    <button onclick="decrease(minStopLoss)">-</button>
+    <input id="minStopLoss" type="text" value="6"></input>
+    <button onclick="increase(minStopLoss)">+</button>
+    <label>MinStopLoss</label>
+  </div>
+  <div>
+    <button onclick="decrease(maxStopLoss)">-</button>
+    <input id="maxStopLoss" type="text" value="120"></input>
+    <button onclick="increase(maxStopLoss)">+</button>
+    <label>MaxStopLoss</label>
   </div>
   <div>
     <input type="checkbox" id="compoundInput" onclick="changeCompound(compoundInput)">
@@ -81,7 +93,7 @@
   </div>
   <script>
   var market, plotCloses
-  var startDateISO = '2017-01-01T00:00:00.000Z'
+  var startDateISO = '2019-01-01T00:00:00.000Z'
   var startDate = new Date(startDateISO)
   var startYMD = startDateISO.substring(0,10).replace(/-/g,'')
   var layout = {
@@ -148,6 +160,8 @@
       rsiOversoldExecute: parseInt(rsiOversoldExecuteInput.value),
       stopLossLookBack: parseInt(stopLossLookBackInput.value),
       profitFactor: parseInt(profitFactorInput.value),
+      minStopLoss: parseInt(minStopLoss.value),
+      maxStopLoss: parseInt(maxStopLoss.value),
       compound: (compoundInput.checked)
     }
 
