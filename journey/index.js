@@ -43,13 +43,13 @@ function isFundingWindow(fundingTimestamp) {
   return (now > checkFundingPositionTime)
 }
 
-function isInPositionTooLong(timestamp,signal) {
+function isInPositionForTooLong(signal) {
   if (Math.abs(signal.lossDistancePercent) > 0.002) {
-    var time = new Date(timestamp).getTime()
+    var time = new Date().getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
     var tooLong = delta > (3000000)
-    // console.log('isInPositionTooLong',tooLong,timestamp,signal.timestamp)
+    // console.log('isInPositionForTooLong',tooLong,signal.timestamp)
     return tooLong
   }
 }
@@ -63,7 +63,7 @@ async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fun
   var action = {}
   if (positionSize > 0) {
     // LONG
-    if (isInPositionTooLong(timestamp,signal) || (isFundingWindow(fundingTimestamp) && fundingRate > 0)) {
+    if (isInPositionForTooLong(signal) || (isFundingWindow(fundingTimestamp) && fundingRate > 0)) {
       action.exit = {price:ask}
     }
     else if (ask >= signal.takeProfitTrigger) {
@@ -72,7 +72,7 @@ async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fun
   } 
   else if (positionSize < 0) {
     // SHORT 
-    if (isInPositionTooLong(timestamp,signal) || (isFundingWindow(fundingTimestamp) && fundingRate < 0)) {
+    if (isInPositionForTooLong(signal) || (isFundingWindow(fundingTimestamp) && fundingRate < 0)) {
       action.exit = {price:bid}
     }
     else if (bid <= signal.takeProfitTrigger) {
