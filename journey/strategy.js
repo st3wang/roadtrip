@@ -74,7 +74,7 @@ function highestBody(market,start,length) {
 }
 
 async function getOrderSignal(signal,market,bankroll,margin) { try {
-  var created = new Date().toISOString()
+  var timestamp = new Date().toISOString()
   let signalCondition = signal.condition
   
   let lastIndex = market.closes.length - 1
@@ -138,7 +138,7 @@ async function getOrderSignal(signal,market,bankroll,margin) { try {
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
 
   return {
-    created: created,
+    timestamp: timestamp,
     capitalBTC: capitalBTC,
     capitalUSD: capitalUSD,
     type: (goodStopDistance ? signalCondition : '-'),

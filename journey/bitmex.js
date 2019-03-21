@@ -435,7 +435,7 @@ async function enter(signal,margin) { try {
 
   console.log('ENTER ', JSON.stringify(signal))
 
-  let responseData = await orderLimitRetry(signal.created+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
+  let responseData = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
   if (responseData.ordStatus === 'Canceled' || responseData.ordStatus === 'Overloaded') {
     return false
   }
@@ -445,7 +445,7 @@ async function enter(signal,margin) { try {
   return true
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function exit(created,price,size) { try {
+async function exit(timestamp,price,size) { try {
   if (exitRequesting) {
     //console.log('exitRequesting')
     return
@@ -457,7 +457,7 @@ async function exit(created,price,size) { try {
     return
   }
 
-  // var cid = created + 'EXIT+'
+  // var cid = timestamp + 'EXIT+'
   var cid = ''
   console.log('New exit',cid,price,size)
 

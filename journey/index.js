@@ -43,6 +43,15 @@ function isFundingWindow(fundingTimestamp) {
   return (now > checkFundingPositionTime)
 }
 
+function isInPositionTooLong(timestamp,signal) {
+  if (signal.lossDistancePercent > 0.002) {
+    var time = new Date(timestamp).getTime()
+    var entryTime = new Date(signal.timestamp).getTime()
+    var delta = time-entryTime
+    return delta > (3000000)
+  }
+}
+
 async function checkPositionCallback(timestamp,candleTimeOffset,positionSize,bid,ask,fundingTimestamp,fundingRate) { try {
   return await checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fundingTimestamp,fundingRate,entrySignal)
 } catch(e) {console.error(e.stack||e);debugger} }
@@ -51,21 +60,19 @@ async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fun
   var action = {}
   if (positionSize > 0) {
     // LONG
-    if (isFundingWindow(fundingTimestamp) && fundingRate > 0) {
+    if (isInPositionTooLong(timestamp,signal) || (isFundingWindow(fundingTimestamp) && fundingRate > 0)) {
       action.exit = {price:ask}
     }
     else if (ask >= signal.takeProfitTrigger) {
-      // console.log('LONG TAKE PROFIT')
       action.exit = {price:signal.takeProfit}
     }
   } 
   else if (positionSize < 0) {
     // SHORT 
-    if (isFundingWindow(fundingTimestamp) && fundingRate < 0) {
+    if (isInPositionTooLong(timestamp,signal) || (isFundingWindow(fundingTimestamp) && fundingRate < 0)) {
       action.exit = {price:bid}
     }
     else if (bid <= signal.takeProfitTrigger) {
-      // console.log('SHORT TAKE PROFIT')
       action.exit = {price:signal.takeProfit}
     }
   }
@@ -107,7 +114,7 @@ async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fun
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function next() {
+async function next() { try {
   let position = bitmex.getPosition()
   let margin = await bitmex.getMargin()
   let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles
@@ -147,7 +154,7 @@ async function next() {
     let instrument = bitmex.getInstrument()
 
     if (position.currentQty != 0) {
-      console.log('Already in a position',lastPosition.currentQty)
+      console.log('Already in a position',position.currentQty)
     }
     else if (isFundingWindow(instrument.fundingTimestamp) &&
       ((signal.positionSizeUSD > 0 && instrument.fundingRate > 0) || 
@@ -164,9 +171,9 @@ async function next() {
     log.writeEntrySignal(signal)
   }
   log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,signal,orderSent)
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function getMarketCsv() {
+async function getMarketCsv() { try {
   var market = await bitmex.getMarket(15,96)
   var currentCandle = await bitmex.getCurrentCandle()
   var candles = market.candles.slice(1)
@@ -181,7 +188,7 @@ async function getMarketCsv() {
     candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+','+rsis[i]+'\n'
   })
   return csv
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
   var status = order.ordStatus.toUpperCase()
@@ -192,7 +199,7 @@ function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
     (order.price||order.stopPx)+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
 }
 
-async function getTradeCsv() {
+async function getTradeCsv() { try {
   var yesterday = new Date().getTime() - (24*60*60000)
   var orders = await bitmex.getOrders(yesterday)
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
@@ -217,9 +224,9 @@ async function getTradeCsv() {
     }
   }
   return csv
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function getFundingCsv() {
+async function getFundingCsv() { try {
   var csv = 'Date,Rate\n'
   var fundings = await bitmex.getFundingHistory()
   fundings.push(bitmex.getNextFunding())
@@ -227,9 +234,9 @@ async function getFundingCsv() {
     csv += funding.timestamp+','+funding.fundingRate+'\n'
   })
   return csv
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
-async function start() {
+async function start() { try {
   await log.init()
   entrySignal = log.readEntrySignal()
   await bitmex.init(checkPositionCallback)
@@ -247,6 +254,6 @@ async function start() {
     next()
     setInterval(next,interval)
   },startIn)
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 start()

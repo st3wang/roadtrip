@@ -25,7 +25,7 @@ function csvToArray(csv) {
 }
 
 function writeInterval(rsiSignal,market,bankroll,position,margin,signal,orderSent) {
-  var isoString = signal.created
+  var isoString = signal.timestamp
   var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + market.closes[market.closes.length-1].toFixed(1) + ',' +
     rsiSignal.condition + ',' + signal.type + ',' + position.currentQty + ',' + (margin.marginBalance/100000000).toFixed(4) + '\n'
   console.log(signalCSV.replace('\n',''))
