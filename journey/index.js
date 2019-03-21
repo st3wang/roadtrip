@@ -44,7 +44,7 @@ function isFundingWindow(fundingTimestamp) {
 }
 
 function isInPositionTooLong(timestamp,signal) {
-  if (signal.lossDistancePercent > 0.002) {
+  if (Math.abs(signal.lossDistancePercent) > 0.002) {
     var time = new Date(timestamp).getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime

@@ -63,12 +63,18 @@ async function wsConnect() { try {
   })
 } catch(e) {console.error(e.stack||e);debugger} }
 
-function handleOrder(data) {
+async function handleOrder(data) { try {
   lastOrders = data
   lastOrders.forEach((order,i) => {
     console.log('ORDER',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
   })
-}
+  if (lastInstrument && lastPosition) {
+    var now = new Date().getTime()
+    var candleTimeOffset = now % 900000
+    checkPositionCallback(lastInstrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
+      lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
+  }
+} catch(e) {console.error(e.stack||e);debugger} }
 
 function handlePosition(data) {
   lastPosition = data[0]
