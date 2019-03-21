@@ -49,7 +49,7 @@ function isInPositionTooLong(timestamp,signal) {
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
     var tooLong = delta > (3000000)
-    console.log('isInPositionTooLong',tooLong)
+    console.log('isInPositionTooLong',tooLong,timestamp,signal.timestamp)
     return tooLong
   }
 }
