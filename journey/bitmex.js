@@ -201,12 +201,11 @@ function getQuote() {
 }
 
 function getOpenLimitOrderMatching(price,size) {
-  var openLimitOrder = lastOrders.find(order => {
-    return (order.ordStatus == 'New' && order.ordType == 'Limit')
+  size = Math.abs(size)
+  return lastOrders.find(order => {
+    return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
+      order.price == price && openLimitOrder.orderQty == size)
   })
-  if (openLimitOrder && openLimitOrder.price == price && Math.abs(openLimitOrder.orderQty) == Math.abs(size)) {
-    return openLimitOrder
-  }
 }
 
 var stopLossOrderRequesting, takeProfitOrderRequesting
