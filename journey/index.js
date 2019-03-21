@@ -48,24 +48,25 @@ async function checkPositionCallback(timestamp,candleTimeOffset,positionSize,bid
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fundingTimestamp,fundingRate,signal) { try {
+  var action = {}
   if (positionSize > 0) {
     // LONG
     if (isFundingWindow(fundingTimestamp) && fundingRate > 0) {
-      await bitmex.exit('',ask,-positionSizeUSD)
+      action.exit = {price:ask}
     }
     else if (ask >= signal.takeProfitTrigger) {
       // console.log('LONG TAKE PROFIT')
-      await bitmex.exit(signal.created,signal.takeProfit,-positionSize)
+      action.exit = {price:signal.takeProfit}
     }
   } 
   else if (positionSize < 0) {
     // SHORT 
     if (isFundingWindow(fundingTimestamp) && fundingRate < 0) {
-      await bitmex.exit('',bid,-positionSizeUSD)
+      action.exit = {price:bid}
     }
     else if (bid <= signal.takeProfitTrigger) {
       // console.log('SHORT TAKE PROFIT')
-      await bitmex.exit(signal.created,signal.takeProfit,-positionSize)
+      action.exit = {price:signal.takeProfit}
     }
   }
   else {
@@ -76,18 +77,18 @@ async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fun
         // LONG
         if (isFundingWindow(fundingTimestamp) && fundingRate > 0) {
           console.log('New LONG will have to pay. Cancel trade.')
-          await bitmex.cancelAll()
+          action.cancel = {}
         }
         else if (ask >= signal.takeProfit) {
           console.log('Missed LONG trade. Cancel trade.', bid, ask, JSON.stringify(newEntryOrder), signal)
-          await bitmex.cancelAll()
+          action.cancel = {}
         }
       }
       else {
         // SHORT
         if (isFundingWindow(fundingTimestamp) && fundingRate < 0) {
           console.log('New SHORT will have to pay. Cancel trade.')
-          await bitmex.cancelAll()
+          action.cancel = {}
         }
         else if (bid <= signal.takeProfit) {
           console.log('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
@@ -95,6 +96,14 @@ async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fun
         }
       }
     }
+  }
+
+  var response
+  if (action.exit) {
+    response = await bitmex.exit('',action.exit.price,-positionSize)
+  }
+  else if (action.cancel) {
+    response = await bitmex.cancelAll()
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
