@@ -73,7 +73,7 @@ function highestBody(market,start,length) {
   return Math.max(highestOpen,highestClose)
 }
 
-async function getOrder(signal,market,bankroll,margin) { try {
+async function getOrderSignal(signal,market,bankroll,margin) { try {
   var created = new Date().toISOString()
   let signalCondition = signal.condition
   
@@ -161,6 +161,6 @@ async function getOrder(signal,market,bankroll,margin) { try {
 
 module.exports = {
   getSignal: getSignal,
-  getOrder: getOrder,
+  getOrderSignal: getOrderSignal,
   getRsi: getRsi
 }

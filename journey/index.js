@@ -21,35 +21,35 @@ async function next() {
   //   position.currentQty = 0
   // }
   
-  var order = await strategy.getOrder(rsiSignal,market,setup.bankroll,margin)
+  var signal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,margin)
   var orderSent = false
 
   // if (shoes.test) {
   //   debugger
   //   var distance = 0.5
-  //   order.type = 'SHORT'
-  //   order.entryPrice = 3718.5
-  //   order.leverage = 1
-  //   if (order.type == 'LONG') {
-  //     order.stopLoss = order.entryPrice - distance
-  //     order.stopMarketTrigger = order.entryPrice - distance*4
-  //     order.takeProfit = order.entryPrice + distance
-  //     order.positionSizeUSD = 1
+  //   signal.type = 'SHORT'
+  //   signal.entryPrice = 3718.5
+  //   signal.leverage = 1
+  //   if (signal.type == 'LONG') {
+  //     signal.stopLoss = signal.entryPrice - distance
+  //     signal.stopMarketTrigger = signal.entryPrice - distance*4
+  //     signal.takeProfit = signal.entryPrice + distance
+  //     signal.positionSizeUSD = 1
   //   }
   //   else {
-  //     order.stopLoss = order.entryPrice + distance
-  //     order.stopMarketTrigger = order.entryPrice + distance*4
-  //     order.takeProfit = order.entryPrice - distance
-  //     order.positionSizeUSD = -1
+  //     signal.stopLoss = signal.entryPrice + distance
+  //     signal.stopMarketTrigger = signal.entryPrice + distance*4
+  //     signal.takeProfit = signal.entryPrice - distance
+  //     signal.positionSizeUSD = -1
   //   }
-  //   order.stopLossTrigger = order.stopLoss
-  //   order.takeProfitTrigger = order.takeProfit
+  //   signal.stopLossTrigger = signal.stopLoss
+  //   signal.takeProfitTrigger = signal.takeProfit
   // }
 
-  if (order.type == 'SHORT' || order.type == 'LONG') {
-    orderSent = await bitmex.enter(order,margin)
+  if (signal.type == 'SHORT' || signal.type == 'LONG') {
+    orderSent = await bitmex.enter(signal,margin)
   }
-  log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,order,orderSent)
+  log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,signal,orderSent)
 }
 
 async function getMarketCsv() {
@@ -84,14 +84,14 @@ async function getTradeCsv() {
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
   for (var i = 0; i < orders.length; i++) {
     var entryOrder = orders[i]
-    var entryOrderRecord = log.findEntryOrder(entryOrder.timestamp,entryOrder.price,entryOrder.orderQty*(entryOrder.side=='Buy'?1:-1))
+    var entrySignal = log.findEntrySignal(entryOrder.timestamp,entryOrder.price,entryOrder.orderQty*(entryOrder.side=='Buy'?1:-1))
     var stopLoss = 0
     var takeProfit = 0 
     var stopMarket = 0 
-    if (entryOrderRecord) {
-      stopLoss = entryOrderRecord.stopLoss
-      takeProfit = entryOrderRecord.takeProfit
-      stopMarket = entryOrderRecord.stopMarket
+    if (entrySignal) {
+      stopLoss = entrySignal.stopLoss
+      takeProfit = entrySignal.takeProfit
+      stopMarket = entrySignal.stopMarket
     }
     csv += getOrderCsv(entryOrder,'ENTER',stopLoss,takeProfit,stopMarket)
 

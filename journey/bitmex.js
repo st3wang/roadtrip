@@ -12,7 +12,7 @@ var client, exitTradeCallback, marketCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
-var entryOrder, lastInstrument = {}, lastPosition = {}, lastOrders = []
+var entrySignal, lastInstrument = {}, lastPosition = {}, lastOrders = []
 
 var currentCandle, currentCandleTimeOffset
 
@@ -72,9 +72,9 @@ function handleOrder(data) {
 
 function handlePosition(data) {
   lastPosition = data[0]
-  // if (data[0].leverage !== entryOrder.leverage) {
-  //   console.log('handlePosition existing leverage',data[0].leverage,'entryOrder leverage',entryOrder.leverage)
-  //   updateLeverage(entryOrder.leverage)
+  // if (data[0].leverage !== entrySignal.leverage) {
+  //   console.log('handlePosition existing leverage',data[0].leverage,'entrySignal leverage',entrySignal.leverage)
+  //   updateLeverage(entrySignal.leverage)
   // }
 }
 
@@ -166,13 +166,13 @@ async function handleInstrument(data) { try {
   currentCandleTimeOffset = candleTimeOffset
   
   if (bid !== lastInstrument.bidPrice || ask !== lastInstrument.askPrice) {
-    checkPosition(lastPosition.currentQty, bid, ask, entryOrder)
+    checkPosition(candleTimeOffset,lastPosition.currentQty, bid, ask, entrySignal)
   }
 
   if (isFundingWindow(instrument)) {
-    var fundingStopLoss = await checkFundingPosition(lastPosition.currentQty, instrument.fundingRate, bid, ask, entryOrder)
+    var fundingStopLoss = await checkFundingPosition(lastPosition.currentQty, instrument.fundingRate, bid, ask, entrySignal)
     if (fundingStopLoss) {
-      await orderStopLoss('',fundingStopLoss.price,fundingStopLoss.size)
+      await orderTakeProfit('',fundingStopLoss.price,fundingStopLoss.size)
     }
   }
   lastInstrument = instrument
@@ -200,7 +200,7 @@ function getQuote() {
   }
 }
 
-function getOpenLimitOrderMatching(price,size) {
+function getNewLimitOrderMatching(price,size) {
   size = Math.abs(size)
   return lastOrders.find(order => {
     return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
@@ -210,44 +210,44 @@ function getOpenLimitOrderMatching(price,size) {
 
 var stopLossOrderRequesting, takeProfitOrderRequesting
 
-async function orderStopLoss(created,price,size) { try {
-  // FIXME: need to check price and size. if different request new order
-  // TODO: implement order queue and only send the latest request
-  if (stopLossOrderRequesting) {
-    // console.log('stopLossOrderRequesting')
-    return
-  }
+// async function orderStopLoss(created,price,size) { try {
+//   // FIXME: need to check price and size. if different request new order
+//   // TODO: implement order queue and only send the latest request
+//   if (stopLossOrderRequesting) {
+//     // console.log('stopLossOrderRequesting')
+//     return
+//   }
 
-  // var cid = created + 'EXIT-'  
-  var cid = ''
-  var responseData
-  var openStopLossOrder = getOpenLimitOrderMatching(price,size)
+//   // var cid = created + 'EXIT-'  
+//   var cid = ''
+//   var responseData
+//   var openStopLossOrder = getNewLimitOrderMatching(price,size)
 
-  if (openStopLossOrder) {
-    //console.log('Order with the same price and size is already opened')
-    return
+//   if (openStopLossOrder) {
+//     //console.log('Order with the same price and size is already opened')
+//     return
 
-    // Different price or size with the same id
-    // if (openOrder.clOrdID == cid) {
-    //   console.log('Amend orderStopLoss',cid,price,size)
-    //   stopLossOrderRequesting = true
-    //   responseData = await amendLimit(cid,price,size) 
-    //   stopLossOrderRequesting = false
-    //   console.log('orderStopLoss response status', responseData.ordStatus)
-    //   return responseData
-    // }
-  }
+//     // Different price or size with the same id
+//     // if (openOrder.clOrdID == cid) {
+//     //   console.log('Amend orderStopLoss',cid,price,size)
+//     //   stopLossOrderRequesting = true
+//     //   responseData = await amendLimit(cid,price,size) 
+//     //   stopLossOrderRequesting = false
+//     //   console.log('orderStopLoss response status', responseData.ordStatus)
+//     //   return responseData
+//     // }
+//   }
 
-  console.log('New orderStopLoss',cid,price,size)
-  stopLossOrderRequesting = true
-  var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
-  stopLossOrderRequesting = false
-  console.log('orderStopLoss response status', responseData.ordStatus)
-  // if (responseData.ordStatus == 'Canceled') {
-  //   console.log('Orderbook jumped right back. No need to stop.')
-  // }
-  return responseData
-} catch(e) {console.error(e.stack||e);debugger} }
+//   console.log('New orderStopLoss',cid,price,size)
+//   stopLossOrderRequesting = true
+//   var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
+//   stopLossOrderRequesting = false
+//   console.log('orderStopLoss response status', responseData.ordStatus)
+//   // if (responseData.ordStatus == 'Canceled') {
+//   //   console.log('Orderbook jumped right back. No need to stop.')
+//   // }
+//   return responseData
+// } catch(e) {console.error(e.stack||e);debugger} }
 
 async function orderTakeProfit(created,price,size) { try {
   if (takeProfitOrderRequesting) {
@@ -255,9 +255,9 @@ async function orderTakeProfit(created,price,size) { try {
     return
   }
 
-  var openTakeProfitOrder = getOpenLimitOrderMatching(price,size)
-  if (openTakeProfitOrder) {
-    //console.log('Order already opened')
+  var newTakeProfitOrder = getNewLimitOrderMatching(price,size)
+  if (newTakeProfitOrder) {
+    //console.log('Order already submitted')
     return
   }
 
@@ -272,58 +272,58 @@ async function orderTakeProfit(created,price,size) { try {
   return responseData
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function checkPosition(positionSize,bid,ask,order) { try {
+async function checkPosition(candleTimeOffset,positionSize,bid,ask,signal) { try {
   if (positionSize > 0) {  
-    if (!order) {
-      throw new Error('Error: No order in the memory. Need to load one up.')
-      // load existing order
+    if (!signal) {
+      throw new Error('Error: No signal in the memory. Need to load one up.')
+      // load existing signal
       return
     }
 
     // LONG
-    if (ask <= order.stopLoss) {
-      // console.log('LONG STOP LOSS')
-      // use ask for chasing stop loss
-      var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
-    }
-    else if (ask >= order.takeProfitTrigger) {
+    if (ask >= signal.takeProfitTrigger) {
       // console.log('LONG TAKE PROFIT')
-      var responseData = await orderTakeProfit(order.created,order.takeProfit,-positionSize)
+      var responseData = await orderTakeProfit(signal.created,signal.takeProfit,-positionSize)
     }
-    else {
-      // console.log('LONG IN POSITION')
-    }
+    // else if (ask <= signal.stopLoss) {
+    //   // console.log('LONG STOP LOSS')
+    //   // use ask for chasing stop loss
+    //   // var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
+    // }
+    // else {
+    //   // console.log('LONG IN POSITION')
+    // }
   } 
   else if (positionSize < 0) {
     // SHORT 
-    if (bid >= order.stopLoss) {
+    if (bid <= signal.takeProfitTrigger) {
+      // console.log('SHORT TAKE PROFIT')
+      var responseData = await orderTakeProfit(signal.created,signal.takeProfit,-positionSize)
+    }
+    else if (bid >= signal.stopLoss) {
       // console.log('SHORT STOP LOSS')
       // use bid for chasing stop loss
-      var responseData = await orderStopLoss(order.created,order.stopLoss,-positionSize)
-    }
-    else if (bid <= order.takeProfitTrigger) {
-      // console.log('SHORT TAKE PROFIT')
-      var responseData = await orderTakeProfit(order.created,order.takeProfit,-positionSize)
+      // var responseData = await orderStopLoss(signal.created,signal.stopLoss,-positionSize)
     }
     else {
       // console.log('SHORT IN POSITION')
     }
   }
   else {
-    var openEntryOrder = order ? getOpenLimitOrderMatching(order.entryPrice,order.positionSizeUSD) : null
-    if (openEntryOrder) {
-      // Check our order in the orderbook. Cancel the order if it has reached the target.
-      if (order.positionSizeUSD > 0) {
+    var newEntryOrder = signal ? getNewLimitOrderMatching(signal.entryPrice,signal.positionSizeUSD) : null
+    if (newEntryOrder) {
+      // Check our ourder in the orderbook. Cancel the order if it has reached the target.
+      if (signal.positionSizeUSD > 0) {
         // LONG
-        if (ask >= order.takeProfit) {
-          console.log('Missed LONG trade', bid, ask, JSON.stringify(openEntryOrder), order)
+        if (ask >= signal.takeProfit) {
+          console.log('Missed LONG trade', bid, ask, JSON.stringify(newEntryOrder), signal)
           await cancelAllOrders()
         }
       }
       else {
         // SHORT
-        if (bid <= order.takeProfit) {
-          console.log('Missed SHORT trade', bid, ask, JSON.stringify(openEntryOrder), order)
+        if (bid <= signal.takeProfit) {
+          console.log('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
           await cancelAllOrders()
         }
       }
@@ -331,7 +331,7 @@ async function checkPosition(positionSize,bid,ask,order) { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,order) { try {
+async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,signal) { try {
   if (positionSizeUSD > 0) {  
     if (fundingRate > 0) {
       return {price:ask,size:-positionSizeUSD,fundingRate:fundingRate}
@@ -343,12 +343,12 @@ async function checkFundingPosition(positionSizeUSD,fundingRate,bid,ask,order) {
     }
   }
   else {
-    // Check if there is an open entry order that has to pay funding
-    var openEntryOrder = getOpenLimitOrderMatching(order.entryPrice,order.positionSizeUSD)
-    if (openEntryOrder && 
+    // Check if there is an entry order that has to pay funding
+    var newEntryOrder = signal ? getNewLimitOrderMatching(signal.entryPrice,signal.positionSizeUSD) : null
+    if (newEntryOrder && 
       // to avoid stakeoverflow
-      openEntryOrder.orderQty !== 0) {
-      var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,fundingRate,bid,ask,order)
+      newEntryOrder.orderQty !== 0) {
+      var fundingStopLoss = await checkFundingPosition(signal.positionSizeUSD,fundingRate,bid,ask,signal)
       if (fundingStopLoss) {
         await cancelAllOrders()
       }
@@ -576,7 +576,7 @@ async function updateLeverage(leverage) { try {
   console.log('Updated Leverage ')
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function enter(order,margin) { try {
+async function enter(signal,margin) { try {
   console.log('Margin','available',margin.availableMargin/100000000,'balance',margin.marginBalance/100000000,'wallet',margin.walletBalance/100000000)
 
   if (lastPosition.currentQty != 0) {
@@ -585,25 +585,25 @@ async function enter(order,margin) { try {
   }
 
   if (isFundingWindow(lastInstrument)) {
-    var fundingStopLoss = await checkFundingPosition(order.positionSizeUSD,lastInstrument.fundingRate)
+    var fundingStopLoss = await checkFundingPosition(signal.positionSizeUSD,lastInstrument.fundingRate)
     if (fundingStopLoss) {
-      console.log('Funding ' + order.type + ' has to pay. Do not enter.',JSON.stringify(fundingStopLoss))
+      console.log('Funding ' + signal.type + ' has to pay. Do not enter.',JSON.stringify(fundingStopLoss))
       return
     }
   }
 
   await cancelAllOrders()
 
-  console.log('ENTER ', JSON.stringify(order))
+  console.log('ENTER ', JSON.stringify(signal))
 
-  let responseData = await orderLimitRetry(order.created+'ENTER',order.entryPrice,order.positionSizeUSD,'',RETRYON_CANCELED)
+  let responseData = await orderLimitRetry(signal.created+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
   if (responseData.ordStatus === 'Canceled' || responseData.ordStatus === 'Overloaded') {
     return false
   }
 
-  entryOrder = order
-  await orderStopMarket(order.stopMarketTrigger,-order.positionSizeUSD)
-  log.writeEntryOrder(order)
+  entrySignal = signal
+  await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
+  log.writeEntryOrder(signal)
 
   return true
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
@@ -701,7 +701,7 @@ async function initMarket() { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function initOrders() { try {
-  entryOrder = log.readEntryOrder()
+  entrySignal = log.readEntrySignal()
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function init(exitTradeCb) { try {

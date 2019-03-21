@@ -5,8 +5,8 @@ const path = require('path')
 
 const logDir = path.resolve(__dirname, 'log')
 const conditionFile = logDir + '/condition.csv'
-const entryFile = logDir + '/entry.csv'
-const entryOrderFile = logDir + '/entry_order.json'
+const signalsfile = logDir + '/signals.csv'
+const entrySignalFile = logDir + '/entry_signal.json'
 
 if (!fs.existsSync(logDir)) {
   fs.mkdirSync(logDir)
@@ -14,8 +14,8 @@ if (!fs.existsSync(logDir)) {
 if (!fs.existsSync(conditionFile)) {
   fs.writeFileSync(conditionFile,'time,prsi,rsi,close,signalCondition,orderType,position,balance\n',writeFileOptions)
 }
-if (!fs.existsSync(entryFile)) {
-  fs.writeFileSync(entryFile,'Time,Capital,Risk,R/R,Type,Entry,Stop,Target,StopMarket,StopPercent,StopDistance,TargetDistance,RiskBTC,RiskUSD,SizeBTC,SizeUSD,Leverage\n',writeFileOptions)
+if (!fs.existsSync(signalsfile)) {
+  fs.writeFileSync(signalsfile,'Time,Capital,Risk,R/R,Type,Entry,Stop,Target,StopMarket,StopPercent,StopDistance,TargetDistance,RiskBTC,RiskUSD,SizeBTC,SizeUSD,Leverage\n',writeFileOptions)
 }
 
 function csvToArray(csv) {
@@ -24,10 +24,10 @@ function csvToArray(csv) {
   })
 }
 
-function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent) {
-  var isoString = order.created
+function writeInterval(rsiSignal,market,bankroll,position,margin,signal,orderSent) {
+  var isoString = signal.created
   var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + market.closes[market.closes.length-1].toFixed(1) + ',' +
-    rsiSignal.condition + ',' + order.type + ',' + position.currentQty + ',' + (margin.marginBalance/100000000).toFixed(4) + '\n'
+    rsiSignal.condition + ',' + signal.type + ',' + position.currentQty + ',' + (margin.marginBalance/100000000).toFixed(4) + '\n'
   console.log(signalCSV.replace('\n',''))
   fs.appendFile(conditionFile, signalCSV, e => {
     if (e) {
@@ -35,7 +35,7 @@ function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent
     }
   })
   var dataFile = logDir+'/'+isoString.replace(/\:/g,',')+'.json'
-  var content = JSON.stringify({rsiSignal:rsiSignal,market:market,bankroll:bankroll,position:position,margin:margin,order:order})
+  var content = JSON.stringify({rsiSignal:rsiSignal,market:market,bankroll:bankroll,position:position,margin:margin,signal:signal})
   fs.writeFile(dataFile,content,writeFileOptions, e => {
     if (e) {
       console.log(e)
@@ -45,13 +45,13 @@ function writeInterval(rsiSignal,market,bankroll,position,margin,order,orderSent
     // Time,Capital,Risk,R/R,
     // Type,Entry,Stop,Target,StopMarket,StopPercent,StopDistance,TargetDistance,
     // RiskBTC,RiskUSD,SizeBTC,SizeUSD,Leverage
-    entryOrdersCache = null
+    entrySignalsCache = null
     var entryData = [isoString,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
-      order.type,order.entryPrice,order.stopLoss,order.takeProfit,order.stopMarketTrigger,order.lossDistancePercent,order.lossDistance,order.profitDistance,
-      order.riskAmountBTC,order.riskAmountUSD,order.positionSizeBTC,order.positionSizeUSD,order.leverage]
+      signal.type,signal.entryPrice,signal.stopLoss,signal.takeProfit,signal.stopMarketTrigger,signal.lossDistancePercent,signal.lossDistance,signal.profitDistance,
+      signal.riskAmountBTC,signal.riskAmountUSD,signal.positionSizeBTC,signal.positionSizeUSD,signal.leverage]
     var entryCSV = entryData.toString()
     console.log(entryCSV)
-    fs.appendFile(entryFile, entryCSV+'\n', e => {
+    fs.appendFile(signalsfile, entryCSV+'\n', e => {
       if (e) {
         console.log(e)
       }
@@ -67,47 +67,47 @@ function writeExit(exitData) {
   // })
 }
 
-function writeEntryOrder(order) {
-  fs.writeFileSync(entryOrderFile,JSON.stringify(order),writeFileOptions)
+function writeEntrySignal(signal) {
+  fs.writeFileSync(entrySignalFile,JSON.stringify(signal),writeFileOptions)
 }
 
-function readEntryOrder() {
-  if (!fs.existsSync(entryOrderFile)) {
+function readEntrySignal() {
+  if (!fs.existsSync(entrySignalFile)) {
     return
   }
-  var str = fs.readFileSync(entryOrderFile,readFileOptions)
+  var str = fs.readFileSync(entrySignalFile,readFileOptions)
   return JSON.parse(str)
 }
 
-var entryOrdersCache
+var entrySignalsCache
 
-function readEntryOrders() {
-  if (!entryOrdersCache) {
-    if (!fs.existsSync(entryFile)) {
+function readEntrySignals() {
+  if (!entrySignalsCache) {
+    if (!fs.existsSync(signalsfile)) {
       return
     }
-    var csv = fs.readFileSync(entryFile,readFileOptions)
-    entryOrdersCache = csvToArray(csv)
+    var csv = fs.readFileSync(signalsfile,readFileOptions)
+    entrySignalsCache = csvToArray(csv)
   }
   
-  return entryOrdersCache
+  return entrySignalsCache
 }
 
-function findEntryOrder(timestamp,price,sizeUSD) {
+function findEntrySignal(timestamp,price,sizeUSD) {
   var time = new Date(timestamp).getTime()
-  var orders = readEntryOrders()
+  var signals = readEntrySignals()
   var found
-  orders.forEach(order => {
-    let orderTime = new Date(order[0]).getTime()
-    let orderPrice = parseFloat(order[5])
-    if (time >= orderTime && time <= (orderTime+2*60*60000) && orderPrice <= price+2 && orderPrice >= price-2 && order[15] == ''+sizeUSD) {
+  signals.forEach(signal => {
+    let signalTime = new Date(signal[0]).getTime()
+    let signalPrice = parseFloat(signal[5])
+    if (time >= signalTime && time <= (signalTime+2*60*60000) && signalPrice <= price+2 && signalPrice >= price-2 && signal[15] == ''+sizeUSD) {
       found = {
-        timestamp: order[0],
+        timestamp: signal[0],
         price: price,
         size: sizeUSD,
-        stopLoss: order[6],
-        takeProfit: order[7],
-        stopMarket: order[8]
+        stopLoss: signal[6],
+        takeProfit: signal[7],
+        stopMarket: signal[8]
       }
     }
   })
@@ -122,8 +122,8 @@ module.exports = {
   init: init,
   writeInterval: writeInterval,
   writeExit: writeExit,
-  writeEntryOrder: writeEntryOrder,
-  readEntryOrder: readEntryOrder,
-  readEntryOrders: readEntryOrders,
-  findEntryOrder: findEntryOrder
+  writeEntrySignal: writeEntrySignal,
+  readEntrySignal: readEntrySignal,
+  readEntrySignals: readEntrySignals,
+  findEntrySignal: findEntrySignal
 }
