@@ -49,7 +49,7 @@ function isInPositionTooLong(timestamp,signal) {
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
     var tooLong = delta > (3000000)
-    console.log('isInPositionTooLong',tooLong,timestamp,signal.timestamp)
+    // console.log('isInPositionTooLong',tooLong,timestamp,signal.timestamp)
     return tooLong
   }
 }
@@ -59,7 +59,7 @@ async function checkPositionCallback(timestamp,candleTimeOffset,positionSize,bid
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fundingTimestamp,fundingRate,signal) { try {
-  console.log('checkPosition')
+  // console.log('checkPosition')
   var action = {}
   if (positionSize > 0) {
     // LONG
