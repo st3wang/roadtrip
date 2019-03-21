@@ -204,7 +204,7 @@ function getOpenLimitOrderMatching(price,size) {
   size = Math.abs(size)
   return lastOrders.find(order => {
     return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
-      order.price == price && openLimitOrder.orderQty == size)
+      order.price == price && order.orderQty == size)
   })
 }
 
