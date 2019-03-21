@@ -139,11 +139,11 @@ function addTradeToCandle(time,price) {
         marketCache.highs[lastIndex] = lastCandle.high = price
       }
       else if (price < lastCandle.low) {
-        lastCandle.lows[lastIndex] = lastCandle.low = price
+        marketCache.lows[lastIndex] = lastCandle.low = price
       }
       if (time > lastCandle.lastTradeTimeMs) {
         lastCandle.lastTradeTimeMs = time
-        lastCandle.closes[lastIndex] = lastCandle.close = price
+        marketCache.closes[lastIndex] = lastCandle.close = price
       }
     }
   }
