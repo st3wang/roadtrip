@@ -133,10 +133,10 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
     let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
     
     let orderSignal
-    if (candleTimeOffset >= 895000) {
+    if (candleTimeOffset >= 894000) {
       orderSignal = await getOrderSignalWithCurrentCandle(margin)
     }
-    else if (candleTimeOffset <= 5000) {
+    else if (candleTimeOffset <= 6000) {
       orderSignal = await getOrderSignal(margin)
     }
 
