@@ -41,7 +41,7 @@ async function wsAddStream(table, handler) { try {
   })
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function wsConnect() { try {
+async function connect() { try {
   ws = new BitMEXRealtimeAPI({
     testnet: shoes.bitmex.test,
     apiKeyID: shoes.bitmex.key,
@@ -83,7 +83,7 @@ async function handleOrder(data) { try {
 
 function handlePosition(data) {
   lastPosition = data[0]
-  
+
   var qty = lastPosition.currentQty
   if (qty != lastQty) {
     checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
@@ -260,14 +260,13 @@ var exitRequesting
 // } catch(e) {console.error(e.stack||e);debugger} }
 
 async function authorize() { try {
+  console.log('Authorizing')
   let swaggerClient = await new SwaggerClient({
-    // Switch this to `www.bitmex.com` when you're ready to try it out for real.
-    // Don't forget the `www`!
     url: shoes.bitmex.swagger,
     usePromise: true
   })
-  // Comment out if you're not requesting any user data.
   swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(shoes.bitmex.key, shoes.bitmex.secret));
+  console.log('Authorized')
   return swaggerClient
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -600,6 +599,7 @@ async function orderStopMarket(price,size) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function initMarket() { try {
+  console.log('Initializing market')
   await getMarket(15,96)
   let currentTradeBucketed = await getCurrentTradeBucketed()
   currentCandleTimeOffset = currentTradeBucketed.candleTimeOffset
@@ -611,6 +611,7 @@ async function initMarket() { try {
     var open = marketCache.closes[marketCache.closes.length-1]
     currentCandle.open = currentCandle.high = currentCandle.low = currentCandle.close = open
   }
+  console.log('Initialized market')
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function init(checkPositionCb) { try {
@@ -621,7 +622,7 @@ async function init(checkPositionCb) { try {
 
   // inspect(client.apis)
   // await getTradeHistory()
-  await wsConnect()
+  await connect()
 
   // await getOrderBook()
 
