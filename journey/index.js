@@ -48,7 +48,7 @@ function isInPositionForTooLong(signal) {
     var time = new Date().getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
-    var tooLong = delta > (3000000)
+    var tooLong = delta > (3600000) // 1hr
     // console.log('isInPositionForTooLong',tooLong,signal.timestamp)
     return tooLong
   }
@@ -100,7 +100,7 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
       action.exit = {price:ask}
     }
     else if (ask >= signal.takeProfitTrigger) {
-      action.exit = {price:signal.takeProfit}
+      action.exit = {price:Math.max(signal.takeProfit,ask)}
     }
   } 
   else if (positionSize < 0) {
@@ -109,7 +109,7 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
       action.exit = {price:bid}
     }
     else if (bid <= signal.takeProfitTrigger) {
-      action.exit = {price:signal.takeProfit}
+      action.exit = {price:Math.min(signal.takeProfit,bid)}
     }
   }
   else {
