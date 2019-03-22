@@ -90,6 +90,31 @@ function handlePosition(data) {
   lastPosition = data[0]
 }
 
+async function handleInstrument(data) { try {
+  var lastBid = lastInstrument.bidPrice
+  var lastAsk = lastInstrument.askPrice
+  
+  Object.assign(lastInstrument, data[0])
+  var bid = lastInstrument.bidPrice
+  var ask = lastInstrument.askPrice
+  var price = lastInstrument.lastPrice
+
+  var now = new Date().getTime()
+  var candleTimeOffset = now % 900000
+  if (candleTimeOffset >= currentCandleTimeOffset) {
+    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),price)
+  }
+  else {
+    startNextCandle()
+  }
+  currentCandleTimeOffset = candleTimeOffset
+  
+  if (bid !== lastBid || ask !== lastAsk) {
+    checkPositionCallback(lastInstrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
+      bid, ask, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
+  }
+} catch(e) {console.error(e.stack||e);debugger} }
+
 function startNextCandle() {
   var now = new Date().getTime()
   var candleTimeOffset = now % 900000
@@ -155,31 +180,6 @@ function addTradeToCandle(time,price) {
     }
   }
 }
-
-async function handleInstrument(data) { try {
-  var lastBid = lastInstrument.bidPrice
-  var lastAsk = lastInstrument.askPrice
-
-  lastInstrument = data[0]
-  var bid = lastInstrument.bidPrice
-  var ask = lastInstrument.askPrice
-  var price = lastInstrument.lastPrice
-
-  var now = new Date().getTime()
-  var candleTimeOffset = now % 900000
-  if (candleTimeOffset >= currentCandleTimeOffset) {
-    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),price)
-  }
-  else {
-    startNextCandle()
-  }
-  currentCandleTimeOffset = candleTimeOffset
-  
-  if (bid !== lastBid || ask !== lastAsk) {
-    checkPositionCallback(lastInstrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
-      bid, ask, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
-  }
-} catch(e) {console.error(e.stack||e);debugger} }
 
 function getNextFunding() {
   return {
