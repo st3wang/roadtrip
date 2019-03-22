@@ -177,16 +177,10 @@ async function next() { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getMarketCsv() { try {
-  var market = await bitmex.getMarket(15,96)
-  var currentCandle = await bitmex.getCurrentCandle()
-  var candles = market.candles.slice(1)
-  var closes = market.closes.slice(1)
-  candles.push(currentCandle)
-  closes.push(currentCandle.close)
-
-  var rsis = await strategy.getRsi(closes,setup.rsi.length)
+  var market = await bitmex.getMarketWithCurrentCandle(15,96)
+  var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
   var csv = 'Date,Open,High,Low,Close,Rsi\n'
-  candles.forEach((candle,i) => {
+  market.candles.forEach((candle,i) => {
     csv += //new Date(candle.time).toUTCString()
     candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+','+rsis[i]+'\n'
   })

@@ -8,7 +8,7 @@ const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 const EXECINST_REDUCEONLY = ',ReduceOnly'
 const RETRYON_CANCELED = 'Canceled'
 
-var client, checkPositionCallback, marketCache
+var client, checkPositionCallback, marketCache, marketWithCurrentCandleCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
@@ -100,6 +100,8 @@ function startNextCandle() {
     return
   }
 
+  marketWithCurrentCandleCache = null
+
   marketCache.opens.shift()
   marketCache.highs.shift()
   marketCache.lows.shift()
@@ -155,27 +157,28 @@ function addTradeToCandle(time,price) {
 }
 
 async function handleInstrument(data) { try {
-  var instrument = data[0]
-  var bid = instrument.bidPrice
-  var ask = instrument.askPrice
-  var price = instrument.lastPrice
+  var lastBid = lastInstrument.bidPrice
+  var lastAsk = lastInstrument.askPrice
+
+  lastInstrument = data[0]
+  var bid = lastInstrument.bidPrice
+  var ask = lastInstrument.askPrice
+  var price = lastInstrument.lastPrice
 
   var now = new Date().getTime()
   var candleTimeOffset = now % 900000
   if (candleTimeOffset >= currentCandleTimeOffset) {
-    addTradeToCandle(new Date(instrument.timestamp).getTime(),price)
+    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),price)
   }
   else {
     startNextCandle()
   }
   currentCandleTimeOffset = candleTimeOffset
   
-  if (bid !== lastInstrument.bidPrice || ask !== lastInstrument.askPrice) {
-    checkPositionCallback(instrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
-      bid, ask, instrument.fundingTimestamp, instrument.fundingRate)
+  if (bid !== lastBid || ask !== lastAsk) {
+    checkPositionCallback(lastInstrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
+      bid, ask, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
   }
-
-  lastInstrument = instrument
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function getNextFunding() {
@@ -380,7 +383,34 @@ async function getMarket(interval,length) { try {
     marketCache = await getTradeBucketed(interval,length)
   }
   return marketCache
-} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function getMarketWithCurrentCandle(interval,length) { try {
+  if (marketWithCurrentCandleCache) {
+    let lastIndex = marketWithCurrentCandleCache.candles.length - 1
+    marketWithCurrentCandleCache.candles[lastIndex] = currentCandle
+    marketWithCurrentCandleCache.opens[lastIndex] = currentCandle.open
+    marketWithCurrentCandleCache.highs[lastIndex] = currentCandle.high
+    marketWithCurrentCandleCache.lows[lastIndex] = currentCandle.low
+    marketWithCurrentCandleCache.closes[lastIndex] = currentCandle.close
+  }
+  else {
+    var market = await getMarket(15,96)
+    var candles = market.candles.slice(1)
+    var opens = market.opens.slice(1)
+    var highs = market.highs.slice(1)
+    var lows = market.lows.slice(1)
+    var closes = market.closes.slice(1)
+  
+    candles.push(currentCandle)
+    opens.push(currentCandle.open)
+    highs.push(currentCandle.high)
+    lows.push(currentCandle.low)
+    closes.push(currentCandle.close)
+    marketWithCurrentCandleCache = {candles: candles, opens: opens, highs: highs, lows: lows, closes: closes}
+  }
+  return marketWithCurrentCandleCache
+} catch(e) {console.error(e.stack||e);debugger} }
 
 async function getMargin() { try {
   var response = await client.User.User_getMargin() 
@@ -596,6 +626,7 @@ async function init(checkPositionCb) { try {
 module.exports = {
   init: init,
   getMarket: getMarket,
+  getMarketWithCurrentCandle: getMarketWithCurrentCandle,
   getPosition: getPosition,
   getInstrument: getInstrument,
   getMargin: getMargin,
