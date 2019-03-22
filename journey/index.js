@@ -67,7 +67,7 @@ async function getOrderSignalWithCurrentCandle(margin) {
   var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
   var conservativeCloses, conservativeRsiSignal
   
-  console.log('getOrderSignalWithCurrentCandle rsiSignal', rsiSignal.prsi.toFixed(1),rsiSignal.rsi.toFixed(1),rsiSignal.condition)
+  console.log('timestamp, getOrderSignalWithCurrentCandle rsiSignal', rsiSignal.prsi.toFixed(1),rsiSignal.rsi.toFixed(1),rsiSignal.condition)
 
   if (rsiSignal.condition == 'LONG') { 
     conservativeCloses = market.closes.slice(1)
@@ -130,7 +130,7 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
   }
   else {
     let candleTimeOffset = bitmex.getCandleTimeOffset()
-    console.log('candleTimeOffset',candleTimeOffset)
+    console.log(new Date().toISOString(), 'candleTimeOffset',candleTimeOffset)
     let margin = await bitmex.getMargin()
     let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
     
