@@ -44,7 +44,7 @@ function isFundingWindow(fundingTimestamp) {
 }
 
 function isInPositionForTooLong(signal) {
-  if (Math.abs(signal.lossDistancePercent) > 0.002) {
+  if (signal && Math.abs(signal.lossDistancePercent) > 0.002) {
     var time = new Date().getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
@@ -54,11 +54,44 @@ function isInPositionForTooLong(signal) {
   }
 }
 
-async function checkPositionCallback(timestamp,candleTimeOffset,positionSize,bid,ask,fundingTimestamp,fundingRate) { try {
-  return await checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fundingTimestamp,fundingRate,entrySignal)
+async function checkPositionCallback(timestamp,positionSize,bid,ask,fundingTimestamp,fundingRate) { try {
+  return await checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fundingRate,entrySignal)
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fundingTimestamp,fundingRate,signal) { try {
+// async function checkSignal(bid,ask) {
+//   var market = await bitmex.getMarket(15,96)
+//   var closes = market.closes.slice(1)
+
+//   closes[closes.length] = bid
+//   var rsiBid = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+//   closes[closes.length] = ask
+//   var rsiAsk = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+
+//   if (rsiBid.type == rsiAsk.type) {
+//     let signal 
+//     if (rsiBid.type == 'SHORT') {
+
+//     } signal.type == 'LONG') {
+//     }
+//       let instrument = bitmex.getInstrument()
+  
+//       if (position.currentQty != 0) {
+//         console.log('Already in a position',position.currentQty)
+//       }
+//       else if (isFundingWindow(instrument.fundingTimestamp) &&
+//         ((signal.positionSizeUSD > 0 && instrument.fundingRate > 0) || 
+//         (signal.positionSizeUSD < 0 && instrument.fundingRate < 0))) {
+//           console.log('Funding ' + signal.type + ' will have to pay. Do not enter.',
+//             JSON.stringify(fundingStopLoss))
+//       }
+//       else {
+//         orderSent = await bitmex.enter(signal,margin)
+//       }
+//     }
+//   }
+// }
+
+async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fundingRate,signal) { try {
   // console.log('checkPosition')
   var action = {}
   if (positionSize > 0) {
@@ -80,6 +113,9 @@ async function checkPosition(timestamp,candleTimeOffset,positionSize,bid,ask,fun
     }
   }
   else {
+    // if (candleTimeOffset > 895000) {
+    //   await checkSignal(bid,ask)
+    // }
     var newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
     if (newEntryOrder) {
       // Check our ourder in the orderbook. Cancel the order if it has reached the target.

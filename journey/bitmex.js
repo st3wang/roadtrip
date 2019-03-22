@@ -13,6 +13,7 @@ var binSize = 5
 
 var ws, wsHeartbeatTimeout
 var lastInstrument = {}, lastPosition = {}, lastOrders = []
+var lastBid, lastAsk, lastQty
 
 var currentCandle, currentCandleTimeOffset
 
@@ -34,10 +35,9 @@ async function wsAddStream(table, handler) { try {
       }
     },200)
     var timeout = setTimeout(_ => {
-      console.log(table + ' timeout')
       clearInterval(checkValueInterval)
-      resolve()
-    }, 3000)
+      reject()
+    }, 5000)
   })
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -52,15 +52,12 @@ async function wsConnect() { try {
   ws.on('open', () => console.log('Connection opened.'));
   ws.on('close', () => console.log('Connection closed.'));
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
-  heartbeat()
 
   await wsAddStream('order',handleOrder)
   await wsAddStream('position',handlePosition)
   await wsAddStream('instrument',handleInstrument)
 
-  ws.addStream('.XBTUSDPI8H', 'quote', data => {
-    debugger
-  })
+  heartbeat()
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function pruneOrders(orders) {
@@ -77,30 +74,33 @@ async function handleOrder(data) { try {
   lastOrders.forEach((order,i) => {
     console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
   })
-  if (lastInstrument && lastPosition) {
-    var now = new Date().getTime()
-    var candleTimeOffset = now % 900000
-    checkPositionCallback(lastInstrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
-      lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
-  }
+
+  checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
+    lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
+
   pruneOrders(data)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function handlePosition(data) {
   lastPosition = data[0]
+  
+  var qty = lastPosition.currentQty
+  if (qty != lastQty) {
+    checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
+      lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
+  }
+
+  lastQty = lastPosition.currentQty
 }
 
 async function handleInstrument(data) { try {
-  var lastBid = lastInstrument.bidPrice
-  var lastAsk = lastInstrument.askPrice
+  lastInstrument = data[0]
   
-  Object.assign(lastInstrument, data[0])
   var bid = lastInstrument.bidPrice
   var ask = lastInstrument.askPrice
   var price = lastInstrument.lastPrice
 
-  var now = new Date().getTime()
-  var candleTimeOffset = now % 900000
+  var candleTimeOffset = getCandleTimeOffset()
   if (candleTimeOffset >= currentCandleTimeOffset) {
     addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),price)
   }
@@ -110,10 +110,17 @@ async function handleInstrument(data) { try {
   currentCandleTimeOffset = candleTimeOffset
   
   if (bid !== lastBid || ask !== lastAsk) {
-    checkPositionCallback(lastInstrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
+    checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
       bid, ask, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
   }
+
+  lastBid = bid
+  lastAsk = ask
 } catch(e) {console.error(e.stack||e);debugger} }
+
+function getCandleTimeOffset() {
+  return ((new Date().getTime()) % 900000)
+}
 
 function startNextCandle() {
   var now = new Date().getTime()
