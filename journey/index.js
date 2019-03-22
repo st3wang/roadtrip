@@ -59,6 +59,7 @@ async function checkPositionCallback(timestamp,positionSize,bid,ask,fundingTimes
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getOrderSignalWithCurrentCandle(margin) {
+  var timestamp = new Date().toISOString()
   var market = await bitmex.getMarketWithCurrentCandle(15,96)
   var closes = market.closes
   var lastPrice = closes[closes.length-1]
@@ -80,29 +81,30 @@ async function getOrderSignalWithCurrentCandle(margin) {
   }
 
   if (conservativeRsiSignal) {
-    console.log('getOrderSignalWithCurrentCandle conservativeRsiSignal', conservativeRsiSignal.prsi.toFixed(1),conservativeRsiSignal.rsi.toFixed(1),conservativeRsiSignal.condition)
+    console.log(timestamp, 'getOrderSignalWithCurrentCandle conservativeRsiSignal', conservativeRsiSignal.prsi.toFixed(1),conservativeRsiSignal.rsi.toFixed(1),conservativeRsiSignal.condition)
   }
   else {
-    console.log('getOrderSignalWithCurrentCandle conservativeRsiSignal null')
+    console.log(timestamp, 'getOrderSignalWithCurrentCandle conservativeRsiSignal null')
   }
 
   if (conservativeRsiSignal && conservativeRsiSignal.condition == rsiSignal.condition) {
     let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,margin)
-    console.log('getOrderSignalWithCurrentCandle orderSignal', orderSignal.type,orderSignal.entryPrice,orderSignal.positionSizeBTC,orderSignal.stopLoss,orderSignal.takeProfit)
+    console.log(timestamp, 'getOrderSignalWithCurrentCandle orderSignal', orderSignal.type,orderSignal.entryPrice,orderSignal.positionSizeBTC,orderSignal.stopLoss,orderSignal.takeProfit)
     return orderSignal
   }
 }
 
 async function getOrderSignal(margin) {
+  var timestamp = new Date().toISOString()
   var market = await bitmex.getMarket(15,96)
   var closes = market.closes
   // var lastPrice = closes[closes.length-1]
   var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
   
-  console.log('getOrderSignal rsiSignal',rsiSignal.prsi.toFixed(1),rsiSignal.rsi.toFixed(1),rsiSignal.condition)
+  console.log(timestamp, 'getOrderSignal rsiSignal',rsiSignal.prsi.toFixed(1),rsiSignal.rsi.toFixed(1),rsiSignal.condition)
 
   let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,margin)
-  console.log('getOrderSignal orderSignal', orderSignal.type,orderSignal.entryPrice,orderSignal.positionSizeBTC,orderSignal.stopLoss,orderSignal.takeProfit)
+  console.log(timestamp, 'getOrderSignal orderSignal', orderSignal.type,orderSignal.entryPrice,orderSignal.positionSizeBTC,orderSignal.stopLoss,orderSignal.takeProfit)
   return orderSignal
 }
 
