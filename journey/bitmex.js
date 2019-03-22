@@ -414,6 +414,7 @@ async function getMarket(interval,length) { try {
 
 async function getMarketWithCurrentCandle(interval,length) { try {
   if (marketWithCurrentCandleCache) {
+    appendCandleLastPrice()
     let lastIndex = marketWithCurrentCandleCache.candles.length - 1
     marketWithCurrentCandleCache.candles[lastIndex] = currentCandle
     marketWithCurrentCandleCache.opens[lastIndex] = currentCandle.open
