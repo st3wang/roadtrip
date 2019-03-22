@@ -63,10 +63,19 @@ async function wsConnect() { try {
   })
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function pruneOrders(orders) {
+  do {
+    found = orders.findIndex(order => {return order.ordStatus == 'Canceled'})
+    if (found >= 0) {
+      orders.splice(found,1)
+    }
+  } while(found >= 0)
+}
+
 async function handleOrder(data) { try {
   lastOrders = data
   lastOrders.forEach((order,i) => {
-    console.log('ORDER',i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
+    console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
   })
   if (lastInstrument && lastPosition) {
     var now = new Date().getTime()
@@ -74,6 +83,7 @@ async function handleOrder(data) { try {
     checkPositionCallback(lastInstrument.timestamp, candleTimeOffset, lastPosition.currentQty, 
       lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
   }
+  pruneOrders(data)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function handlePosition(data) {
