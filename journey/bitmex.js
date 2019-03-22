@@ -105,7 +105,7 @@ function handlePosition(data) {
 async function appendCandleLastPrice() {
   var candleTimeOffset = getCandleTimeOffset()
   if (candleTimeOffset >= currentCandleTimeOffset) {
-    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),lastInstrument.price)
+    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),lastInstrument.lastPrice)
   }
   else {
     startNextCandle()
