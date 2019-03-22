@@ -48,7 +48,7 @@ function isInPositionForTooLong(signal) {
     var time = new Date().getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
-    var tooLong = delta > (3600000) // 1hr
+    var tooLong = delta > (3500000) // 1hr
     // console.log('isInPositionForTooLong',tooLong,signal.timestamp)
     return tooLong
   }
@@ -58,41 +58,55 @@ async function checkPositionCallback(timestamp,positionSize,bid,ask,fundingTimes
   return await checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fundingRate,entrySignal)
 } catch(e) {console.error(e.stack||e);debugger} }
 
-// async function checkSignal(bid,ask) {
-//   var market = await bitmex.getMarket(15,96)
-//   var closes = market.closes.slice(1)
-
-//   closes[closes.length] = bid
-//   var rsiBid = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
-//   closes[closes.length] = ask
-//   var rsiAsk = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
-
-//   if (rsiBid.type == rsiAsk.type) {
-//     let signal 
-//     if (rsiBid.type == 'SHORT') {
-
-//     } signal.type == 'LONG') {
-//     }
-//       let instrument = bitmex.getInstrument()
+async function getOrderSignalWithCurrentCandle(margin) {
+  var market = await bitmex.getMarketWithCurrentCandle(15,96)
+  var closes = market.closes
+  var lastPrice = closes[closes.length-1]
+  if (!lastPrice) debugger
+  var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+  var conservativeCloses, conservativeRsiSignal
   
-//       if (position.currentQty != 0) {
-//         console.log('Already in a position',position.currentQty)
-//       }
-//       else if (isFundingWindow(instrument.fundingTimestamp) &&
-//         ((signal.positionSizeUSD > 0 && instrument.fundingRate > 0) || 
-//         (signal.positionSizeUSD < 0 && instrument.fundingRate < 0))) {
-//           console.log('Funding ' + signal.type + ' will have to pay. Do not enter.',
-//             JSON.stringify(fundingStopLoss))
-//       }
-//       else {
-//         orderSent = await bitmex.enter(signal,margin)
-//       }
-//     }
-//   }
-// }
+  console.log('getOrderSignalWithCurrentCandle rsiSignal', rsiSignal.prsi.toFixed(1),rsiSignal.rsi.toFixed(1),rsiSignal.condition)
+
+  if (rsiSignal.condition == 'LONG') { 
+    conservativeCloses = market.closes.slice(1)
+    conservativeCloses.push(lastPrice-0.5)
+    conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+  }
+  else if (rsiSignal.condition == 'SHORT') {
+    conservativeCloses = market.closes.slice(1)
+    conservativeCloses.push(lastPrice+0.5)
+    conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+  }
+
+  if (conservativeRsiSignal) {
+    console.log('getOrderSignalWithCurrentCandle conservativeRsiSignal', conservativeRsiSignal.prsi.toFixed(1),conservativeRsiSignal.rsi.toFixed(1),conservativeRsiSignal.condition)
+  }
+  else {
+    console.log('getOrderSignalWithCurrentCandle conservativeRsiSignal null')
+  }
+
+  if (conservativeRsiSignal && conservativeRsiSignal.condition == rsiSignal.condition) {
+    let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,margin)
+    console.log('getOrderSignalWithCurrentCandle orderSignal', orderSignal.type,orderSignal.entryPrice,orderSignal.positionSizeBTC,orderSignal.stopLoss,orderSignal.takeProfit)
+    return orderSignal
+  }
+}
+
+async function getOrderSignal(margin) {
+  var market = await bitmex.getMarket(15,96)
+  var closes = market.closes
+  // var lastPrice = closes[closes.length-1]
+  var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+  
+  console.log('getOrderSignal rsiSignal',rsiSignal.prsi.toFixed(1),rsiSignal.rsi.toFixed(1),rsiSignal.condition)
+
+  let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,margin)
+  console.log('getOrderSignal orderSignal', orderSignal.type,orderSignal.entryPrice,orderSignal.positionSizeBTC,orderSignal.stopLoss,orderSignal.takeProfit)
+  return orderSignal
+}
 
 async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fundingRate,signal) { try {
-  // console.log('checkPosition')
   var action = {}
   if (positionSize > 0) {
     // LONG
@@ -113,11 +127,32 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
     }
   }
   else {
-    // if (candleTimeOffset > 895000) {
-    //   await checkSignal(bid,ask)
-    // }
-    var newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
-    if (newEntryOrder) {
+    let candleTimeOffset = bitmex.getCandleTimeOffset()
+    console.log('candleTimeOffset',candleTimeOffset)
+    let margin = await bitmex.getMargin()
+    let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
+    
+    let orderSignal
+    if (candleTimeOffset >= 895000) {
+      orderSignal = await getOrderSignalWithCurrentCandle(margin)
+    }
+    else if (candleTimeOffset <= 5000) {
+      orderSignal = await getOrderSignal(margin)
+    }
+
+    if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG')) {
+      if (isFundingWindow(fundingTimestamp) &&
+        ((orderSignal.positionSizeUSD > 0 && fundingRate > 0) || 
+        (orderSignal.positionSizeUSD < 0 && fundingRate < 0))) {
+          console.log('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
+      }
+      else {
+        action.enter = {signal,orderSignal,margin}
+      }
+    }
+    // log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,orderSignal,orderSent)
+    
+    if (!action.enter && newEntryOrder) {
       // Check our ourder in the orderbook. Cancel the order if it has reached the target.
       if (signal.positionSizeUSD > 0) {
         // LONG
@@ -138,14 +173,21 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
         }
         else if (bid <= signal.takeProfit) {
           console.log('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
-          await bitmex.cancelAll()
+          action.cancel = {}
         }
       }
     }
   }
 
   var response
-  if (action.exit) {
+  if (action.enter) {
+    let orderSent = await bitmex.enter(orderSignal,margin)
+    if (orderSent) {
+      entrySignal = orderSignal
+      log.writeEntrySignal(orderSignal)
+    }
+  }
+  else if (action.exit) {
     response = await bitmex.exit('',action.exit.price,-positionSize)
   }
   else if (action.cancel) {
@@ -154,62 +196,10 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function next() { try {
-  let position = bitmex.getPosition()
-  let margin = await bitmex.getMargin()
-  let market = await bitmex.getMarket(15,96) // one day of 15 minutes candles
-  let rsiSignal = await strategy.getSignal(market.closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
-
-  // if (shoes.test) {
-  //   rsiSignal.condition = 'LONG'
-  //   position.currentQty = 0
-  // }
-  
-  var signal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,margin)
-  var orderSent = false
-
-  // if (shoes.test) {
-  //   debugger
-  //   var distance = 0.5
-  //   signal.type = 'SHORT'
-  //   signal.entryPrice = 3718.5
-  //   signal.leverage = 1
-  //   if (signal.type == 'LONG') {
-  //     signal.stopLoss = signal.entryPrice - distance
-  //     signal.stopMarketTrigger = signal.entryPrice - distance*4
-  //     signal.takeProfit = signal.entryPrice + distance
-  //     signal.positionSizeUSD = 1
-  //   }
-  //   else {
-  //     signal.stopLoss = signal.entryPrice + distance
-  //     signal.stopMarketTrigger = signal.entryPrice + distance*4
-  //     signal.takeProfit = signal.entryPrice - distance
-  //     signal.positionSizeUSD = -1
-  //   }
-  //   signal.stopLossTrigger = signal.stopLoss
-  //   signal.takeProfitTrigger = signal.takeProfit
-  // }
-
-  if (signal.type == 'SHORT' || signal.type == 'LONG') {
-    let instrument = bitmex.getInstrument()
-
-    if (position.currentQty != 0) {
-      console.log('Already in a position',position.currentQty)
-    }
-    else if (isFundingWindow(instrument.fundingTimestamp) &&
-      ((signal.positionSizeUSD > 0 && instrument.fundingRate > 0) || 
-      (signal.positionSizeUSD < 0 && instrument.fundingRate < 0))) {
-        console.log('Funding ' + signal.type + ' will have to pay. Do not enter.',
-          JSON.stringify(fundingStopLoss))
-    }
-    else {
-      orderSent = await bitmex.enter(signal,margin)
-    }
-  }
-  if (orderSent) {
-    entrySignal = signal
-    log.writeEntrySignal(signal)
-  }
-  log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,signal,orderSent)
+  var position = bitmex.getPosition()
+  var instrument = bitmex.getInstrument()
+  checkPosition(new Date().toISOString(), position.currentQty, 
+  instrument.bidPrice, instrument.askPrice, instrument.fundingTimestamp, instrument.fundingRate, entrySignal)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getMarketCsv() { try {
@@ -269,17 +259,10 @@ async function getFundingCsv() { try {
   return csv
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function start() { try {
-  await log.init()
-  entrySignal = log.readEntrySignal()
-  await bitmex.init(checkPositionCallback)
-  await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
-
-  next()
+function createInterval(candleDelay) {
   var now = new Date().getTime()
   var interval = 15*60000
-  var delay = 3000 // delay after candle close
-  var startIn = interval-now%(interval) + delay
+  var startIn = interval-now%(interval) + candleDelay
   var startInSec = startIn % 60000
   var startInMin = (startIn - startInSec) / 60000
   console.log('next one in ' + startInMin + ':' + Math.floor(startInSec/1000) + ' minutes')
@@ -287,6 +270,21 @@ async function start() { try {
     next()
     setInterval(next,interval)
   },startIn)
+}
+
+async function start() { try {
+  // var rsi1 = await strategy.getRsi([4000,4001,4002,4003,4004,4005,4006,4010,4011,4010],2)
+  // var rsi2 = await strategy.getRsi([4000,4001,4002,4003,4004,4005,4006,4010,4011,4009],2)
+  // debugger
+  await log.init()
+  entrySignal = log.readEntrySignal()
+  await bitmex.init(checkPositionCallback)
+  await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
+
+  next()
+  createInterval(-5000)
+  createInterval(0)
+  createInterval(5000)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 start()

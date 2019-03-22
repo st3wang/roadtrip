@@ -22,7 +22,7 @@ async function getSignal(closes,rsiLength,rsiOverbought,rsiOversold) { try {
   var last1 = len - 2
   var rsi = rsis[last0]
   var prsi = rsis[last1]
-  var close = closes[last0]
+  // var close = closes[last0]
   var shortCondition = prsi > rsiOverbought && rsi <= rsiOverbought 
   var longCondition = prsi < rsiOversold && rsi >= rsiOversold 
   var signal = {
