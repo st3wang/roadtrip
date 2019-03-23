@@ -24,6 +24,23 @@ function csvToArray(csv) {
   })
 }
 
+function writeOrderSignal(bankroll,signal) {
+  // Time,Capital,Risk,R/R,
+  // Type,Entry,Stop,Target,StopMarket,StopPercent,StopDistance,TargetDistance,
+  // RiskBTC,RiskUSD,SizeBTC,SizeUSD,Leverage
+  entrySignalsCache = null
+  var entryData = [signal.timestamp,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
+    signal.type,signal.entryPrice,signal.stopLoss,signal.takeProfit,signal.stopMarketTrigger,signal.lossDistancePercent,signal.lossDistance,signal.profitDistance,
+    signal.riskAmountBTC,signal.riskAmountUSD,signal.positionSizeBTC,signal.positionSizeUSD,signal.leverage]
+  var entryCSV = entryData.toString()
+  console.log(entryCSV)
+  fs.appendFile(signalsfile, entryCSV+'\n', e => {
+    if (e) {
+      console.log(e)
+    }
+  })
+}
+
 function writeInterval(rsiSignal,market,bankroll,position,margin,signal,orderSent) {
   var isoString = signal.timestamp
   var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + market.closes[market.closes.length-1].toFixed(1) + ',' +
@@ -125,5 +142,6 @@ module.exports = {
   writeEntrySignal: writeEntrySignal,
   readEntrySignal: readEntrySignal,
   readEntrySignals: readEntrySignals,
-  findEntrySignal: findEntrySignal
+  findEntrySignal: findEntrySignal,
+  writeOrderSignal: writeOrderSignal
 }

@@ -262,10 +262,10 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
       if (orderSent) {
         entrySignal = enter.signal
         log.writeEntrySignal(enter.signal)
+        log.writeOrderSignal(setup.bankroll,orderSignal)
       }
     }
   }
-
   // log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,orderSignal,orderSent)
 } catch(e) {console.error(e.stack||e);debugger} }
 
