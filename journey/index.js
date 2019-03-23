@@ -77,13 +77,16 @@ function isFundingWindow(fundingTimestamp) {
   return (now > checkFundingPositionTime)
 }
 
+var cutOffTimeForAll = 4*60*60000
+var cutOffTimeForLargeTrade = 59*60000
+
 function isInPositionForTooLong(signal) {
-  if (signal && Math.abs(signal.lossDistancePercent) > 0.002) {
+  if (signal) {
     var time = new Date().getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
-    var tooLong = delta > (3500000) // 1hr
-    return tooLong
+    return (delta > cutOffTimeForAll || 
+      (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) > 0.002))
   }
 }
 
