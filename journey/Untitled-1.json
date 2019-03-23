@@ -1,9 +1,0 @@
-{
-    "condition": "LONG",
-    "prsi": 20.13,
-    "rsi": 62.09,
-    "level": "verbose",
-    "message": "getOrderSignal rsiSignal",
-    "label": "index",
-    "timestamp": "2019-03-23T21:00:05.758Z"
-}
