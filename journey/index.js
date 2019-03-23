@@ -252,7 +252,7 @@ async function checkPosition(params) { try {
   var exit, cancel, enter
   if (exit = exitTooLong(params) || exitFunding(params) || exitTarget(params)) {
     logger.info('EXIT',exit)
-    response = await bitmex.exit('',exit.price,-positionSize)
+    response = await bitmex.exit('',exit.price,-params.positionSize)
   }
   else {
     if (cancel = cancelOrder(params)) {
