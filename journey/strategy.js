@@ -26,13 +26,13 @@ async function getSignal(closes,rsiLength,rsiOverbought,rsiOversold) { try {
   var shortCondition = prsi > rsiOverbought && rsi <= rsiOverbought 
   var longCondition = prsi < rsiOversold && rsi >= rsiOversold 
   var signal = {
-    rsis: rsis,
-    length: rsiLength,
-    overbought: rsiOverbought,
-    oversold: rsiOversold,
-    prsi: prsi,
-    rsi: rsi,
-    condition: '-'
+    condition: '-',
+    prsi: Math.round(prsi*100)/100,
+    rsi: Math.round(rsi*100)/100,
+    // rsis: rsis,
+    // length: rsiLength,
+    // overbought: rsiOverbought,
+    // oversold: rsiOversold,
   }
   if (shortCondition) {
     signal.condition = 'SHORT'

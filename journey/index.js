@@ -1,4 +1,5 @@
 const log = require('./log')
+const winston = require('winston')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
 const server = require('./server')
@@ -8,9 +9,42 @@ const setup = shoes.setup
 global.bitmex = bitmex
 global.log = log
 
+// const { createLogger, format, transports } = require('winston');
+// const { combine, timestamp, label, printf } = format;
+const colorizer = winston.format.colorize();
+
+const logger = winston.createLogger({
+  format: winston.format.label({label:'index'}),
+  transports: [
+    new winston.transports.Console({
+      level:'verbose',
+      format: winston.format.combine(
+        // winston.format.colorize(),
+        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+        winston.format.prettyPrint(),
+        winston.format.printf(info => {
+          if (info.level == 'debug') return
+          let splat = info[Symbol.for('splat')]
+          return `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message}` +
+           (splat ? `${JSON.stringify(splat)}` : '');
+        })
+      ),
+    }),
+    new winston.transports.File({filename:'combined.log',
+      level:'debug',
+      format: winston.format.combine(
+        winston.format.timestamp(),
+        winston.format.json()
+      ),
+    })
+  ]
+});
+
 var entrySignal
 
-console.log('setup', JSON.stringify(setup))
+
+logger.info('setup', setup)
+
 function testCheckPosition() {
   var interval = 500
   var order = {
@@ -59,7 +93,6 @@ async function checkPositionCallback(timestamp,positionSize,bid,ask,fundingTimes
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getOrderSignalWithCurrentCandle(margin) {
-  var timestamp = new Date().toISOString()
   var market = await bitmex.getMarketWithCurrentCandle(15,96)
   var closes = market.closes
   var lastPrice = closes[closes.length-1]
@@ -67,7 +100,7 @@ async function getOrderSignalWithCurrentCandle(margin) {
   var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
   var conservativeCloses, conservativeRsiSignal
   
-  console.log('timestamp, getOrderSignalWithCurrentCandle rsiSignal', rsiSignal.prsi.toFixed(1),rsiSignal.rsi.toFixed(1),rsiSignal.condition)
+  logger.verbose('getOrderSignalWithCurrentCandle rsiSignal', rsiSignal)
 
   if (rsiSignal.condition == 'LONG') { 
     conservativeCloses = market.closes.slice(1)
@@ -81,30 +114,29 @@ async function getOrderSignalWithCurrentCandle(margin) {
   }
 
   if (conservativeRsiSignal) {
-    console.log(timestamp, 'getOrderSignalWithCurrentCandle conservativeRsiSignal', conservativeRsiSignal.prsi.toFixed(1),conservativeRsiSignal.rsi.toFixed(1),conservativeRsiSignal.condition)
+    logger.verbose('getOrderSignalWithCurrentCandle conservativeRsiSignal', conservativeRsiSignal)
   }
   else {
-    console.log(timestamp, 'getOrderSignalWithCurrentCandle conservativeRsiSignal null')
+    logger.verbose('getOrderSignalWithCurrentCandle conservativeRsiSignal null')
   }
 
   if (conservativeRsiSignal && conservativeRsiSignal.condition == rsiSignal.condition) {
     let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,margin)
-    console.log(timestamp, 'getOrderSignalWithCurrentCandle orderSignal', orderSignal.type,orderSignal.entryPrice,orderSignal.positionSizeBTC,orderSignal.stopLoss,orderSignal.takeProfit)
+    logger.verbose('getOrderSignalWithCurrentCandle orderSignal', orderSignal)
     return orderSignal
   }
 }
 
 async function getOrderSignal(margin) {
-  var timestamp = new Date().toISOString()
   var market = await bitmex.getMarket(15,96)
   var closes = market.closes
   // var lastPrice = closes[closes.length-1]
   var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
   
-  console.log(timestamp, 'getOrderSignal rsiSignal',rsiSignal.prsi.toFixed(1),rsiSignal.rsi.toFixed(1),rsiSignal.condition)
+  logger.verbose('getOrderSignal rsiSignal',rsiSignal)
 
   let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,margin)
-  console.log(timestamp, 'getOrderSignal orderSignal', orderSignal.type,orderSignal.entryPrice,orderSignal.positionSizeBTC,orderSignal.stopLoss,orderSignal.takeProfit)
+  logger.verbose('getOrderSignal orderSignal',orderSignal)
   return orderSignal
 }
 
@@ -130,12 +162,12 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
   }
   else {
     let candleTimeOffset = bitmex.getCandleTimeOffset()
-    console.log(new Date().toISOString(), 'candleTimeOffset',candleTimeOffset)
+    logger.verbose('candleTimeOffset',candleTimeOffset)
     let margin = await bitmex.getMargin()
     let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
     
     let orderSignal
-    if (candleTimeOffset >= 894000) {
+    if (candleTimeOffset >= 0) { //894000) {
       orderSignal = await getOrderSignalWithCurrentCandle(margin)
     }
     else if (candleTimeOffset <= 6000) {
@@ -146,7 +178,7 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
       if (isFundingWindow(fundingTimestamp) &&
         ((orderSignal.positionSizeUSD > 0 && fundingRate > 0) || 
         (orderSignal.positionSizeUSD < 0 && fundingRate < 0))) {
-          console.log('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
+          logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
       }
       else {
         action.enter = {signal,orderSignal,margin}
@@ -159,42 +191,42 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
       if (signal.positionSizeUSD > 0) {
         // LONG
         if (isFundingWindow(fundingTimestamp) && fundingRate > 0) {
-          console.log('New LONG will have to pay. Cancel trade.')
+          logger.info('New LONG will have to pay. Cancel trade.')
           action.cancel = {}
         }
         else if (ask >= signal.takeProfit) {
-          console.log('Missed LONG trade. Cancel trade.', bid, ask, JSON.stringify(newEntryOrder), signal)
+          logger.info('Missed LONG trade. Cancel trade.', bid, ask, JSON.stringify(newEntryOrder), signal)
           action.cancel = {}
         }
       }
       else {
         // SHORT
         if (isFundingWindow(fundingTimestamp) && fundingRate < 0) {
-          console.log('New SHORT will have to pay. Cancel trade.')
+          logger.info('New SHORT will have to pay. Cancel trade.')
           action.cancel = {}
         }
         else if (bid <= signal.takeProfit) {
-          console.log('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
+          logger.info('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
           action.cancel = {}
         }
       }
     }
   }
 
-  var response
-  if (action.enter) {
-    let orderSent = await bitmex.enter(orderSignal,margin)
-    if (orderSent) {
-      entrySignal = orderSignal
-      log.writeEntrySignal(orderSignal)
-    }
-  }
-  else if (action.exit) {
-    response = await bitmex.exit('',action.exit.price,-positionSize)
-  }
-  else if (action.cancel) {
-    response = await bitmex.cancelAll()
-  }
+  // var response
+  // if (action.enter) {
+  //   let orderSent = await bitmex.enter(orderSignal,margin)
+  //   if (orderSent) {
+  //     entrySignal = orderSignal
+  //     log.writeEntrySignal(orderSignal)
+  //   }
+  // }
+  // else if (action.exit) {
+  //   response = await bitmex.exit('',action.exit.price,-positionSize)
+  // }
+  // else if (action.cancel) {
+  //   response = await bitmex.cancelAll()
+  // }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function next() { try {
@@ -267,7 +299,7 @@ function createInterval(candleDelay) {
   var startIn = interval-now%(interval) + candleDelay
   var startInSec = startIn % 60000
   var startInMin = (startIn - startInSec) / 60000
-  console.log('next one in ' + startInMin + ':' + Math.floor(startInSec/1000) + ' minutes')
+  logger.info('next one in ' + startInMin + ':' + Math.floor(startInSec/1000) + ' minutes')
   setTimeout(_ => {
     next()
     setInterval(next,interval)
@@ -285,7 +317,7 @@ async function start() { try {
 
   next()
   createInterval(-5000)
-  createInterval(0)
+  createInterval(500)
   createInterval(5000)
 } catch(e) {console.error(e.stack||e);debugger} }
 
