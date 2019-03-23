@@ -164,10 +164,10 @@ function exitTooLong({positionSize,bid,ask,signal}) {
 function exitTarget({positionSize,bid,ask,signal}) {
   var exit
   if (positionSize > 0) {
-    if (ask >= signal.takeProfitTrigger) action.exit = {price:Math.max(signal.takeProfit,ask),reason:'target'}
+    if (ask >= signal.takeProfitTrigger) exit = {price:Math.max(signal.takeProfit,ask),reason:'target'}
   } 
   else if (positionSize < 0) {
-    if (bid <= signal.takeProfitTrigger) action.exit = {price:Math.min(signal.takeProfit,bid),reason:'target'}
+    if (bid <= signal.takeProfitTrigger) exit = {price:Math.min(signal.takeProfit,bid),reason:'target'}
   }
   return exit
 }
