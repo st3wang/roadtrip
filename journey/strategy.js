@@ -73,13 +73,12 @@ function highestBody(market,start,length) {
   return Math.max(highestOpen,highestClose)
 }
 
-async function getOrderSignal(signal,market,bankroll,margin) { try {
+async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
   var timestamp = new Date().toISOString()
   let signalCondition = signal.condition
   
   let lastIndex = market.closes.length - 1
   let close = market.closes[lastIndex]
-  let availableMargin = margin.availableMargin
   let outsideCapitalBTC = bankroll.outsideCapitalBTC || 0
   let outsideCapitalUSD = bankroll.outsideCapitalUSD || 0
   let riskPerTradePercent = bankroll.riskPerTradePercent

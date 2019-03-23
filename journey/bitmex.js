@@ -8,7 +8,8 @@ const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 const EXECINST_REDUCEONLY = ',ReduceOnly'
 const RETRYON_CANCELED = 'Canceled'
 
-var client, checkPositionCallback, marketCache, marketWithCurrentCandleCache
+var client, checkPositionCallback, checkPositionParams = {}
+var marketCache, marketWithCurrentCandleCache
 var binSize = 5
 
 var ws, wsHeartbeatTimeout
@@ -61,6 +62,7 @@ async function connect() { try {
     console.log('Adding dummy stop market')
     await orderStopMarket(1,-1)
   }
+  await wsAddStream('margin',handleMargin)
   await wsAddStream('order',handleOrder)
   await wsAddStream('position',handlePosition)
   await wsAddStream('instrument',handleInstrument)
@@ -80,6 +82,11 @@ async function pruneCanceledOrders(orders) {
   return pruned
 }
 
+async function handleMargin(data) { try {
+  lastMargin = data[0]
+  checkPositionParams.availableMargin = lastMargin.availableMargin
+} catch(e) {console.error(e.stack||e);debugger} }
+
 async function handleOrder(data) { try {
   lastOrders = data
   lastOrders.forEach((order,i) => {
@@ -87,8 +94,7 @@ async function handleOrder(data) { try {
   })
 
   if (!pruneCanceledOrders(data)) {
-    checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
-      lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
+    checkPositionCallback(checkPositionParams)
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -98,8 +104,8 @@ function handlePosition(data) {
   var qty = lastPosition.currentQty
   if (qty != lastQty) {
     console.log('position',lastPosition.currentQty)
-    checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
-      lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
+    checkPositionParams.positionSize = qty
+    checkPositionCallback(checkPositionParams)
   }
 
   lastQty = lastPosition.currentQty
@@ -125,8 +131,11 @@ async function handleInstrument(data) { try {
   appendCandleLastPrice()
   
   if (bid !== lastBid || ask !== lastAsk) {
-    checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
-      bid, ask, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
+    checkPositionParams.bid = bid
+    checkPositionParams.ask = ask
+    checkPositionParams.fundingTimestamp = lastInstrument.fundingTimestamp
+    checkPositionParams.fundingRate = lastInstrument.fundingRate
+    checkPositionCallback(checkPositionParams)
   }
 
   lastBid = bid
@@ -232,6 +241,15 @@ function findNewLimitOrder(price,size) {
   return lastOrders.find(order => {
     return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
       order.price == price && order.orderQty == size)
+  })
+}
+
+function findNewLimitOrderWithSize(size) {
+  var side = size > 0 ? 'Buy' : 'Sell'
+  size = Math.abs(size)
+  return lastOrders.find(order => {
+    return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
+      order.side == side && order.orderQty == size)
   })
 }
 
@@ -444,9 +462,10 @@ async function getMarketWithCurrentCandle(interval,length) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getMargin() { try {
-  var response = await client.User.User_getMargin() 
-  var margin = JSON.parse(response.data.toString())
-  return margin
+  return lastMargin
+  // var response = await client.User.User_getMargin() 
+  // var margin = JSON.parse(response.data.toString())
+  // return margin
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getTradeHistory(startTime) { try {
@@ -681,6 +700,7 @@ module.exports = {
   getNextFunding: getNextFunding,
 
   findNewLimitOrder: findNewLimitOrder,
+  findNewLimitOrderWithSize: findNewLimitOrderWithSize,
   getCandleTimeOffset: getCandleTimeOffset,
 
   enter: enter,
