@@ -13,6 +13,11 @@ global.log = log
 // const { combine, timestamp, label, printf } = format;
 const colorizer = winston.format.colorize();
 
+const isoTimestamp = winston.format((info, opts) => {
+  info.timestamp = new Date().toISOString()
+  return info;
+});
+
 const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
@@ -20,7 +25,8 @@ const logger = winston.createLogger({
       level:'verbose',
       format: winston.format.combine(
         // winston.format.colorize(),
-        winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
+        isoTimestamp(),
+        // winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
         winston.format.prettyPrint(),
         winston.format.printf(info => {
           if (info.level == 'debug') return
@@ -33,7 +39,7 @@ const logger = winston.createLogger({
     new winston.transports.File({filename:'combined.log',
       level:'debug',
       format: winston.format.combine(
-        winston.format.timestamp(),
+        isoTimestamp(),
         winston.format.json()
       ),
     })
@@ -41,7 +47,6 @@ const logger = winston.createLogger({
 });
 
 var entrySignal
-
 
 logger.info('setup', setup)
 
