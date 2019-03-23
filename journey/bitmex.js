@@ -68,13 +68,16 @@ async function connect() { try {
   heartbeat()
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function pruneOrders(orders) {
+async function pruneCanceledOrders(orders) {
+  var found, pruned
   do {
     found = orders.findIndex(order => {return order.ordStatus == 'Canceled'})
     if (found >= 0) {
       orders.splice(found,1)
+      pruned = true
     }
   } while(found >= 0)
+  return pruned
 }
 
 async function handleOrder(data) { try {
@@ -83,10 +86,10 @@ async function handleOrder(data) { try {
     console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
   })
 
-  checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
-    lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
-
-  pruneOrders(data)
+  if (!pruneCanceledOrders(data)) {
+    checkPositionCallback(lastInstrument.timestamp, lastPosition.currentQty, 
+      lastInstrument.bidPrice, lastInstrument.askPrice, lastInstrument.fundingTimestamp, lastInstrument.fundingRate)
+  }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function handlePosition(data) {
