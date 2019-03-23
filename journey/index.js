@@ -181,7 +181,7 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
           logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
       }
       else {
-        action.enter = {signal,orderSignal,margin}
+        action.enter = {signal:orderSignal,margin:margin}
       }
     }
     // log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,orderSignal,orderSent)
@@ -213,20 +213,20 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
     }
   }
 
-  // var response
-  // if (action.enter) {
-  //   let orderSent = await bitmex.enter(orderSignal,margin)
-  //   if (orderSent) {
-  //     entrySignal = orderSignal
-  //     log.writeEntrySignal(orderSignal)
-  //   }
-  // }
-  // else if (action.exit) {
-  //   response = await bitmex.exit('',action.exit.price,-positionSize)
-  // }
-  // else if (action.cancel) {
-  //   response = await bitmex.cancelAll()
-  // }
+  var response
+  if (action.enter) {
+    let orderSent = await bitmex.enter(action.enter.signal,action.enter.margin)
+    if (orderSent) {
+      entrySignal = action.enter.signal
+      log.writeEntrySignal(action.enter.signal)
+    }
+  }
+  else if (action.exit) {
+    response = await bitmex.exit('',action.exit.price,-positionSize)
+  }
+  else if (action.cancel) {
+    response = await bitmex.cancelAll()
+  }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function next() { try {
