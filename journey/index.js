@@ -43,7 +43,7 @@ const logger = winston.createLogger({
 var entrySignal
 
 
-logger.info('setup', setup, new Error().stack)
+logger.info('setup', setup)
 
 function testCheckPosition() {
   var interval = 500
@@ -245,6 +245,7 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
     fundingRate:fundingRate,
     signal:signal
   }
+  logger.info('checkPosition',params)
 
   var exit, cancel, enter
   if (exit = exitTooLong(params) || exitFunding(params) || exitTarget(params)) {
