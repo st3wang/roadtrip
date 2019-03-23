@@ -532,7 +532,7 @@ async function enter(signal) { try {
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function exit(timestamp,price,size) { try {
-  if (exitRequesting) {
+  if (!price || !size || exitRequesting) {
     //console.log('exitRequesting')
     return
   }

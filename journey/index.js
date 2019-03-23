@@ -26,7 +26,7 @@ const logger = winston.createLogger({
           if (info.level == 'debug') return
           let splat = info[Symbol.for('splat')]
           return `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message}` +
-           (splat ? `${JSON.stringify(splat)}` : '');
+           (splat ? ` ${JSON.stringify(splat)}` : '');
         })
       ),
     }),
@@ -43,7 +43,7 @@ const logger = winston.createLogger({
 var entrySignal
 
 
-logger.info('setup', setup)
+logger.info('setup', setup, new Error().stack)
 
 function testCheckPosition() {
   var interval = 500
@@ -83,7 +83,6 @@ function isInPositionForTooLong(signal) {
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
     var tooLong = delta > (3500000) // 1hr
-    // console.log('isInPositionForTooLong',tooLong,signal.timestamp)
     return tooLong
   }
 }
@@ -140,93 +139,131 @@ async function getOrderSignal(margin) {
   return orderSignal
 }
 
-async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fundingRate,signal) { try {
-  var action = {}
+function exitFunding({positionSize,fundingTimestamp,fundingRate}) {
+  var exit 
+  if (positionSize > 0 && fundingRate > 0) {
+    if (isFundingWindow(fundingTimestamp)) exit = {price:ask,reason:'funding'}
+  } 
+  else if (positionSize < 0 && fundingRate < 0) {
+    if (isFundingWindow(fundingTimestamp)) exit = {price:bid,reason:'funding'}
+  }
+  return exit
+}
+
+function exitTooLong({positionSize,bid,ask,signal}) {
+  var exit
   if (positionSize > 0) {
-    // LONG
-    if (isInPositionForTooLong(signal) || (isFundingWindow(fundingTimestamp) && fundingRate > 0)) {
-      action.exit = {price:ask}
-    }
-    else if (ask >= signal.takeProfitTrigger) {
-      action.exit = {price:Math.max(signal.takeProfit,ask)}
-    }
+    if (isInPositionForTooLong(signal)) exit = {price:ask,reason:'toolong'}
+  }
+  else if (positionSize < 0) {
+    if (isInPositionForTooLong(signal)) exit = {price:bid,reason:'toolong'}
+  }
+  return exit
+}
+
+function exitTarget({positionSize,bid,ask,signal}) {
+  var exit
+  if (positionSize > 0) {
+    if (ask >= signal.takeProfitTrigger) action.exit = {price:Math.max(signal.takeProfit,ask),reason:'target'}
   } 
   else if (positionSize < 0) {
-    // SHORT 
-    if (isInPositionForTooLong(signal) || (isFundingWindow(fundingTimestamp) && fundingRate < 0)) {
-      action.exit = {price:bid}
+    if (bid <= signal.takeProfitTrigger) action.exit = {price:Math.min(signal.takeProfit,bid),reason:'target'}
+  }
+  return exit
+}
+
+function cancelOrder({positionSize,signal}) {
+  if (positionSize != 0) return
+
+  var cancel
+  let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
+  if (newEntryOrder) {
+    // Check our ourder in the orderbook. Cancel the order if it has reached the target.
+    if (signal.positionSizeUSD > 0) {
+      // LONG
+      if (isFundingWindow(fundingTimestamp) && fundingRate > 0) {
+        logger.info('New LONG will have to pay. Cancel trade.')
+        cancel = {reason:'funding'}
+      }
+      else if (ask >= signal.takeProfit) {
+        logger.info('Missed LONG trade. Cancel trade.', bid, ask, JSON.stringify(newEntryOrder), signal)
+        cancel = {reason:'target'}
+      }
     }
-    else if (bid <= signal.takeProfitTrigger) {
-      action.exit = {price:Math.min(signal.takeProfit,bid)}
+    else {
+      // SHORT
+      if (isFundingWindow(fundingTimestamp) && fundingRate < 0) {
+        logger.info('New SHORT will have to pay. Cancel trade.')
+        cancel = {reason:'funding'}
+      }
+      else if (bid <= signal.takeProfit) {
+        logger.info('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
+        cancel = {reason:'target'}
+      }
     }
+  }
+  return cancel
+}
+
+async function enterSignal({positionSize,fundingTimestamp,fundingRate}) { try {
+  if (positionSize != 0) return
+
+  var enter
+  let candleTimeOffset = bitmex.getCandleTimeOffset()
+  let margin = await bitmex.getMargin()
+  
+  let orderSignal
+  if (candleTimeOffset >= 894000) {
+    orderSignal = await getOrderSignalWithCurrentCandle(margin)
+  }
+  else if (candleTimeOffset <= 6000) {
+    orderSignal = await getOrderSignal(margin)
+  }
+
+  if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG')) {
+    if (isFundingWindow(fundingTimestamp) &&
+      ((orderSignal.positionSizeUSD > 0 && fundingRate > 0) || 
+      (orderSignal.positionSizeUSD < 0 && fundingRate < 0))) {
+        logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
+    }
+    else {
+      enter = {signal:orderSignal,margin:margin}
+    }
+  }
+  return enter
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fundingRate,signal) { try {
+  var params = {
+    positionSize:positionSize,
+    bid: bid,
+    ask: ask,
+    fundingTimestamp:fundingTimestamp,
+    fundingRate:fundingRate,
+    signal:signal
+  }
+
+  var exit, cancel, enter
+  if (exit = exitTooLong(params) || exitFunding(params) || exitTarget(params)) {
+    logger.info('EXIT',exit)
+    response = await bitmex.exit('',exit.price,-positionSize)
   }
   else {
-    let candleTimeOffset = bitmex.getCandleTimeOffset()
-    logger.verbose('candleTimeOffset',candleTimeOffset)
-    let margin = await bitmex.getMargin()
-    let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
-    
-    let orderSignal
-    if (candleTimeOffset >= 894000) {
-      orderSignal = await getOrderSignalWithCurrentCandle(margin)
+    if (cancel = cancelOrder(params)) {
+      logger.info('CANCEL',cancel)
+      // response = await bitmex.cancelAll()
     }
-    else if (candleTimeOffset <= 6000) {
-      orderSignal = await getOrderSignal(margin)
-    }
-
-    if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG')) {
-      if (isFundingWindow(fundingTimestamp) &&
-        ((orderSignal.positionSizeUSD > 0 && fundingRate > 0) || 
-        (orderSignal.positionSizeUSD < 0 && fundingRate < 0))) {
-          logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
-      }
-      else {
-        action.enter = {signal:orderSignal,margin:margin}
-      }
-    }
-    // log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,orderSignal,orderSent)
-    
-    if (!action.enter && newEntryOrder) {
-      // Check our ourder in the orderbook. Cancel the order if it has reached the target.
-      if (signal.positionSizeUSD > 0) {
-        // LONG
-        if (isFundingWindow(fundingTimestamp) && fundingRate > 0) {
-          logger.info('New LONG will have to pay. Cancel trade.')
-          action.cancel = {}
-        }
-        else if (ask >= signal.takeProfit) {
-          logger.info('Missed LONG trade. Cancel trade.', bid, ask, JSON.stringify(newEntryOrder), signal)
-          action.cancel = {}
-        }
-      }
-      else {
-        // SHORT
-        if (isFundingWindow(fundingTimestamp) && fundingRate < 0) {
-          logger.info('New SHORT will have to pay. Cancel trade.')
-          action.cancel = {}
-        }
-        else if (bid <= signal.takeProfit) {
-          logger.info('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
-          action.cancel = {}
-        }
-      }
+    if (enter = await enterSignal(params)) {
+      logger.info('ENTER',enter)
+      // let orderSent = await bitmex.enter(enter.signal,enter.margin)
+      // if (orderSent) {
+      //   entrySignal = enter.signal
+      //   log.writeEntrySignal(enter.signal)
+      // }
     }
   }
 
-  var response
-  if (action.enter) {
-    let orderSent = await bitmex.enter(action.enter.signal,action.enter.margin)
-    if (orderSent) {
-      entrySignal = action.enter.signal
-      log.writeEntrySignal(action.enter.signal)
-    }
-  }
-  else if (action.exit) {
-    response = await bitmex.exit('',action.exit.price,-positionSize)
-  }
-  else if (action.cancel) {
-    response = await bitmex.cancelAll()
-  }
+  // log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,orderSignal,orderSent)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function next() { try {
