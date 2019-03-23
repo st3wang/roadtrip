@@ -175,7 +175,7 @@ function exitTarget({positionSize,bid,ask,signal}) {
   return exit
 }
 
-function cancelOrder({positionSize,signal}) {
+function cancelOrder({positionSize,bid,ask,fundingTimestamp,fundingRate,signal}) {
   if (positionSize != 0) return
 
   var cancel
@@ -262,7 +262,7 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
       if (orderSent) {
         entrySignal = enter.signal
         log.writeEntrySignal(enter.signal)
-        log.writeOrderSignal(setup.bankroll,orderSignal)
+        log.writeOrderSignal(setup.bankroll,enter.signal)
       }
     }
   }
