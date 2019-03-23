@@ -183,7 +183,7 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
 
   var response
   if (action.enter) {
-    let orderSent = await bitmex.enter(action.enter.signal,margin,margin)
+    let orderSent = await bitmex.enter(action.enter.signal,action.enter.margin)
     if (orderSent) {
       entrySignal = action.enter.signal
       log.writeEntrySignal(action.enter.signal)
