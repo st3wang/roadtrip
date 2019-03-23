@@ -251,15 +251,15 @@ async function checkPosition(timestamp,positionSize,bid,ask,fundingTimestamp,fun
   else {
     if (cancel = cancelOrder(params)) {
       logger.info('CANCEL',cancel)
-      // response = await bitmex.cancelAll()
+      response = await bitmex.cancelAll()
     }
     if (enter = await enterSignal(params)) {
       logger.info('ENTER',enter)
-      // let orderSent = await bitmex.enter(enter.signal,enter.margin)
-      // if (orderSent) {
-      //   entrySignal = enter.signal
-      //   log.writeEntrySignal(enter.signal)
-      // }
+      let orderSent = await bitmex.enter(enter.signal,enter.margin)
+      if (orderSent) {
+        entrySignal = enter.signal
+        log.writeEntrySignal(enter.signal)
+      }
     }
   }
 
