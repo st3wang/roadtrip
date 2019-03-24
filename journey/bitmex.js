@@ -91,7 +91,7 @@ async function handleMargin(data) { try {
 async function handleOrder(data) { try {
   lastOrders = data
   lastOrders.forEach((order,i) => {
-    console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.orderQty)
+    console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.cumQty+'/'+order.orderQty)
   })
 
   if (!pruneCanceledOrders(data)) {
@@ -104,7 +104,6 @@ function handlePosition(data) {
 
   var qty = lastPosition.currentQty
   if (qty != lastQty) {
-    console.log('position',lastPosition.currentQty)
     checkPositionParams.positionSize = qty
     checkPositionCallback(checkPositionParams)
   }

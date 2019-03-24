@@ -31,8 +31,8 @@ const logger = winston.createLogger({
           let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
           switch(info.message) {
             case 'checkPosition':
-              let {walletBalance,lastPrice,positionSize,signal} = splat[0]
-              let {entryPrice,stopLoss,takeProfit} = signal
+              let {walletBalance,lastPrice,positionSize,fundingTimestamp,fundingRate,signal} = splat[0]
+              let {timestamp,entryPrice,stopLoss,takeProfit,lossDistancePercent} = signal
               if (positionSize > 0) {
                 positionSize = '\x1b[36;1m' + positionSize + '\x1b[39m'
                 lastPrice = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + (lastPrice?lastPrice.toFixed(1):lastPrice) + '\x1b[39m'
@@ -42,10 +42,14 @@ const logger = winston.createLogger({
                 lastPrice = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + (lastPrice?lastPrice.toFixed(1):lastPrice) + '\x1b[39m'
               }
               else {
-                lastPrice = (lastPrice?lastPrice.toFixed(1):lastPrice) 
+                lastPrice = (lastPrice?lastPrice.toFixed(1):lastPrice)
               }
-              log += 'W:'+(walletBalance?(walletBalance/100000000).toFixed(5):walletBalance)+' P:'+positionSize+' L:'+lastPrice+
-                ' E:'+(entryPrice?entryPrice.toFixed(1):entryPrice)+' S:'+(stopLoss?stopLoss.toFixed(1):stopLoss)+' T:'+(takeProfit?takeProfit.toFixed(1):takeProfit)
+              let now = new Date().getTime()
+              let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000).toFixed(1)
+              let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000).toFixed(1)
+              log += 'W:'+(walletBalance?(walletBalance/100000000).toFixed(4):walletBalance)+' P:'+positionSize+' L:'+lastPrice+
+                ' E:'+(entryPrice?entryPrice.toFixed(1):entryPrice)+' S:'+(stopLoss?stopLoss.toFixed(1):stopLoss)+' T:'+(takeProfit?takeProfit.toFixed(1):takeProfit)+
+                ' D:'+lossDistancePercent.toFixed(4)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+fundingRate
               break
             case 'enterSignal':
               let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
@@ -212,6 +216,19 @@ function exitTarget({positionSize,bid,ask,signal}) {
   return exit
 }
 
+function exitStop({positionSize,bid,ask,signal}) {
+  var {stopMarketTrigger} = signal
+  positionSize = 1
+  var exit
+  if (positionSize > 0) {
+    if (ask <= stopMarketTrigger) exit = {price:Math.min(stopMarketTrigger,ask),reason:'stop'}
+  } 
+  else if (positionSize < 0) {
+    if (bid >= stopMarketTrigger) exit = {price:Math.max(stopMarketTrigger,bid),reason:'stop'}
+  }
+  return exit
+}
+
 function cancelOrder(params) {
   var {positionSize,signal} = params
   
@@ -224,7 +241,7 @@ function cancelOrder(params) {
     params.signal = Object.assign({},signal)
     params.signal.takeProfitTrigger = params.signal.takeProfit
 
-    if (exit = (exitTooLong(params) || exitFunding(params) || exitTarget(params))) {
+    if (exit = (exitTooLong(params) || exitFunding(params) || exitTarget(params) || exitStop(params))) {
       cancel = {reason:exit.reason}
     }
   }
