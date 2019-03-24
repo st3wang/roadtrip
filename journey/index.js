@@ -34,14 +34,14 @@ const logger = winston.createLogger({
               let {walletBalance,entryPrice,lastPrice,positionSize,signal} = splat[0]
               if (positionSize > 0) {
                 positionSize = '\x1b[36;1m' + positionSize + '\x1b[39m'
-                lastPrice = (lastPrice >= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + lastPrice.toFixed(1) + '\x1b[39m'
+                lastPrice = (lastPrice >= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + lastPrice?lastPrice.toFixed(1):lastPrice + '\x1b[39m'
               }
               else if (positionSize < 0) {
                 positionSize = '\x1b[35;1m' + positionSize + '\x1b[39m'
-                lastPrice = (lastPrice <= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + lastPrice.toFixed(1) + '\x1b[39m'
+                lastPrice = (lastPrice <= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + lastPrice?lastPrice.toFixed(1):lastPrice + '\x1b[39m'
               }
               log += 'W:'+(walletBalance/100000000).toFixed(5)+' L:'+lastPrice+' P:'+positionSize+
-                ' E:'+signal.entryPrice.toFixed(1)+' S:'+signal.stopLoss.toFixed(1)+' T:'+signal.takeProfit.toFixed(1)
+                ' E:'+signal.entryPrice?signal.entryPrice.toFixed(1):signal.entryPrice+' S:'+signal.stopLoss?signal.stopLoss.toFixed(1):signal.stopLoss+' T:'+signal.takeProfit?signal.takeProfit.toFixed(1):signal.takeProfit
               break
             case 'enterSignal':
               let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
@@ -52,7 +52,7 @@ const logger = winston.createLogger({
                 log += ' '+conservativeRsiSignal.condition+' '+conservativeRsiSignal.prsi.toFixed(1)+' '+conservativeRsiSignal.rsi.toFixed(1)
               }
               if (orderSignal) {
-                log += ' '+orderSignal.type+' '+orderSignal.entryPrice.toFixed(1)+' '+orderSignal.positionSizeUSD+' '+orderSignal.lossDistance.toFixed(1)
+                log += ' '+orderSignal.type+' '+orderSignal.entryPrice?orderSignal.entryPrice.toFixed(1):orderSignal.entryPrice+' '+orderSignal.positionSizeUSD+' '+orderSignal.lossDistance?orderSignal.lossDistance.toFixed(1):orderSignal.lossDistance
               }
               break
             default:
