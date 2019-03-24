@@ -31,20 +31,21 @@ const logger = winston.createLogger({
           let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
           switch(info.message) {
             case 'checkPosition':
-              let {walletBalance,entryPrice,lastPrice,positionSize,signal} = splat[0]
+              let {walletBalance,lastPrice,positionSize,signal} = splat[0]
+              let {entryPrice,stopLoss,takeProfit} = signal
               if (positionSize > 0) {
                 positionSize = '\x1b[36;1m' + positionSize + '\x1b[39m'
-                lastPrice = (lastPrice >= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + (lastPrice?lastPrice.toFixed(1):lastPrice) + '\x1b[39m'
+                lastPrice = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + (lastPrice?lastPrice.toFixed(1):lastPrice) + '\x1b[39m'
               }
               else if (positionSize < 0) {
                 positionSize = '\x1b[35;1m' + positionSize + '\x1b[39m'
-                lastPrice = (lastPrice <= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + (lastPrice?lastPrice.toFixed(1):lastPrice) + '\x1b[39m'
+                lastPrice = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + (lastPrice?lastPrice.toFixed(1):lastPrice) + '\x1b[39m'
               }
               else {
                 lastPrice = (lastPrice?lastPrice.toFixed(1):lastPrice) 
               }
-              log += 'W:'+(walletBalance?(walletBalance/100000000).toFixed(5):walletBalance)+' L:'+lastPrice+' P:'+positionSize+
-                ' E:'+(signal.entryPrice?signal.entryPrice.toFixed(1):signal.entryPrice)+' S:'+(signal.stopLoss?signal.stopLoss.toFixed(1):signal.stopLoss)+' T:'+(signal.takeProfit?signal.takeProfit.toFixed(1):signal.takeProfit)
+              log += 'W:'+(walletBalance?(walletBalance/100000000).toFixed(5):walletBalance)+' P:'+positionSize+' L:'+lastPrice+
+                ' E:'+(entryPrice?entryPrice.toFixed(1):entryPrice)+' S:'+(stopLoss?stopLoss.toFixed(1):stopLoss)+' T:'+(takeProfit?takeProfit.toFixed(1):takeProfit)
               break
             case 'enterSignal':
               let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
