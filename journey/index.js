@@ -174,7 +174,7 @@ async function getOrderSignal(availableMargin) {
   return {rsiSignal:rsiSignal,orderSignal:orderSignal}
 }
 
-function exitFunding({positionSize,fundingTimestamp,fundingRate}) {
+function exitFunding({positionSize,bid,ask,fundingTimestamp,fundingRate}) {
   var exit 
   if (positionSize > 0 && fundingRate > 0) {
     if (isFundingWindow(fundingTimestamp)) exit = {price:ask,reason:'funding'}
