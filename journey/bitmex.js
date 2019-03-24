@@ -85,6 +85,7 @@ async function pruneCanceledOrders(orders) {
 async function handleMargin(data) { try {
   lastMargin = data[0]
   checkPositionParams.availableMargin = lastMargin.availableMargin
+  checkPositionParams.walletBalance = lastMargin.walletBalance
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function handleOrder(data) { try {

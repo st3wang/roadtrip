@@ -22,17 +22,22 @@ const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
     new winston.transports.Console({
-      level:'verbose',
+      level:shoes.log.level||'info',
       format: winston.format.combine(
-        // winston.format.colorize(),
         isoTimestamp(),
-        // winston.format.timestamp({ format: 'YYYY-MM-DD HH:mm:ss.SSS' }),
         winston.format.prettyPrint(),
         winston.format.printf(info => {
-          if (info.level == 'debug') return
           let splat = info[Symbol.for('splat')]
-          return `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message}` +
-           (splat ? ` ${JSON.stringify(splat)}` : '');
+          let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
+          switch(info.message) {
+            case 'checkPosition':
+              let p = splat[0], s = p.signal
+              log += 'W:'+(p.walletBalance/100000000).toFixed(4)+' B:'+p.bid+' A:'+p.ask+' P:'+p.positionSize+' E:'+s.entryPrice+' S:'+s.stopLoss+' T:'+s.takeProfit
+              break;
+            default:
+              log += (splat ? `${JSON.stringify(splat)}` : '')
+          }
+          return log
         })
       ),
     }),
