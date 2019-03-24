@@ -19,7 +19,7 @@ const isoTimestamp = winston.format((info, opts) => {
 });
 
 function conditionColor(condition) {
-  return (condition == 'LONG' ? '\x1b[36' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
+  return (condition == 'LONG' ? '\x1b[36m' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
 }
 
 const logger = winston.createLogger({
@@ -40,11 +40,11 @@ const logger = winston.createLogger({
               let positionSizeString, lastPriceString
               walletBalance /= 100000000
               if (positionSize > 0) {
-                positionSizeString = '\x1b[36;1m' + positionSize + '\x1b[39m'
+                positionSizeString = '\x1b[36m' + positionSize + '\x1b[39m'
                 lastPriceString = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
               }
               else if (positionSize < 0) {
-                positionSizeString = '\x1b[35;1m' + positionSize + '\x1b[39m'
+                positionSizeString = '\x1b[35m' + positionSize + '\x1b[39m'
                 lastPriceString = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
               }
               else {
@@ -55,7 +55,7 @@ const logger = winston.createLogger({
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000).toFixed(1)
               let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000).toFixed(1)
               let payFunding = fundingRate*positionSize/lastPrice/walletBalance
-              payFunding = (payFunding > 0 ? '\x1b[31m' : '\x1b[32m') + payFunding.toFixed(1) + '\x1b[39m'
+              payFunding = (payFunding > 0 ? '\x1b[31m' : '\x1b[32m') + payFunding.toFixed(5) + '\x1b[39m'
               log += 'W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercent.toFixed(4)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
@@ -150,7 +150,6 @@ async function getOrderSignalWithCurrentCandle(availableMargin) {
   var market = await bitmex.getMarketWithCurrentCandle(15,96)
   var closes = market.closes
   var lastPrice = closes[closes.length-1]
-  if (!lastPrice) debugger
   var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
   var conservativeCloses, conservativeRsiSignal, orderSignal
   
@@ -265,7 +264,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
 
   var enter
   let candleTimeOffset = bitmex.getCandleTimeOffset()
-  
+
   let signals, orderSignal
   if (candleTimeOffset >= 894000) {
     signals = await getOrderSignalWithCurrentCandle(availableMargin)
