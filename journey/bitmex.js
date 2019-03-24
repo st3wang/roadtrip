@@ -134,6 +134,7 @@ async function handleInstrument(data) { try {
   if (bid !== lastBid || ask !== lastAsk) {
     checkPositionParams.bid = bid
     checkPositionParams.ask = ask
+    checkPositionParams.lastPrice = lastInstrument.lastPrice
     checkPositionParams.fundingTimestamp = lastInstrument.fundingTimestamp
     checkPositionParams.fundingRate = lastInstrument.fundingRate
     checkPositionCallback(checkPositionParams)

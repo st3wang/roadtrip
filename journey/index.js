@@ -31,9 +31,30 @@ const logger = winston.createLogger({
           let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
           switch(info.message) {
             case 'checkPosition':
-              let p = splat[0], s = p.signal
-              log += 'W:'+(p.walletBalance/100000000).toFixed(4)+' B:'+p.bid+' A:'+p.ask+' P:'+p.positionSize+' E:'+s.entryPrice+' S:'+s.stopLoss+' T:'+s.takeProfit
-              break;
+              let {walletBalance,entryPrice,lastPrice,positionSize,signal} = splat[0]
+              if (positionSize > 0) {
+                positionSize = '\x1b[36;1m' + positionSize + '\x1b[39m'
+                lastPrice = (lastPrice >= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + lastPrice.toFixed(1) + '\x1b[39m'
+              }
+              else if (positionSize < 0) {
+                positionSize = '\x1b[35;1m' + positionSize + '\x1b[39m'
+                lastPrice = (lastPrice <= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + lastPrice.toFixed(1) + '\x1b[39m'
+              }
+              log += 'W:'+(walletBalance/100000000).toFixed(4)+' L:'+lastPrice+' P:'+positionSize+
+                ' E:'+signal.entryPrice.toFixed(1)+' S:'+signal.stopLoss.toFixed(1)+' T:'+signal.takeProfit.toFixed(1)
+              break
+            case 'enterSignal':
+              let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
+              if (rsiSignal) {
+                log += rsiSignal.condition+' '+rsiSignal.prsi.toFixed(1)+' '+rsiSignal.rsi.toFixed(1)
+              }
+              if (conservativeRsiSignal) {
+                log += ' '+conservativeRsiSignal.condition+' '+conservativeRsiSignal.prsi.toFixed(1)+' '+conservativeRsiSignal.rsi.toFixed(1)
+              }
+              if (orderSignal) {
+                log += ' '+orderSignal.type+' '+orderSignal.entryPrice.toFixed(1)+' '+orderSignal.positionSizeUSD+' '+orderSignal.lossDistance.toFixed(1)
+              }
+              break
             default:
               log += (splat ? `${JSON.stringify(splat)}` : '')
           }
@@ -111,9 +132,9 @@ async function getOrderSignalWithCurrentCandle(availableMargin) {
   var lastPrice = closes[closes.length-1]
   if (!lastPrice) debugger
   var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
-  var conservativeCloses, conservativeRsiSignal
+  var conservativeCloses, conservativeRsiSignal, orderSignal
   
-  logger.verbose('getOrderSignalWithCurrentCandle rsiSignal', rsiSignal)
+  // logger.verbose('getOrderSignalWithCurrentCandle rsiSignal', rsiSignal)
 
   if (rsiSignal.condition == 'LONG') { 
     conservativeCloses = market.closes.slice(1)
@@ -126,18 +147,18 @@ async function getOrderSignalWithCurrentCandle(availableMargin) {
     conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
   }
 
-  if (conservativeRsiSignal) {
-    logger.verbose('getOrderSignalWithCurrentCandle conservativeRsiSignal', conservativeRsiSignal)
-  }
-  else {
-    logger.verbose('getOrderSignalWithCurrentCandle conservativeRsiSignal null')
-  }
+  // if (conservativeRsiSignal) {
+  //   logger.verbose('getOrderSignalWithCurrentCandle conservativeRsiSignal', conservativeRsiSignal)
+  // }
+  // else {
+  //   logger.verbose('getOrderSignalWithCurrentCandle conservativeRsiSignal null')
+  // }
 
   if (conservativeRsiSignal && conservativeRsiSignal.condition == rsiSignal.condition) {
-    let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,availableMargin)
-    logger.verbose('getOrderSignalWithCurrentCandle orderSignal', orderSignal)
-    return orderSignal
+    orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,availableMargin)
+    // logger.verbose('getOrderSignalWithCurrentCandle orderSignal', orderSignal)
   }
+  return {rsiSignal:rsiSignal,conservativeRsiSignal:conservativeRsiSignal,orderSignal:orderSignal}
 }
 
 async function getOrderSignal(availableMargin) {
@@ -146,11 +167,11 @@ async function getOrderSignal(availableMargin) {
   // var lastPrice = closes[closes.length-1]
   var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
   
-  logger.verbose('getOrderSignal rsiSignal',rsiSignal)
+  // logger.verbose('getOrderSignal rsiSignal',rsiSignal)
 
   let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,availableMargin)
-  logger.verbose('getOrderSignal orderSignal',orderSignal)
-  return orderSignal
+  // logger.verbose('getOrderSignal orderSignal',orderSignal)
+  return {rsiSignal:rsiSignal,orderSignal:orderSignal}
 }
 
 function exitFunding({positionSize,fundingTimestamp,fundingRate}) {
@@ -212,12 +233,16 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
   var enter
   let candleTimeOffset = bitmex.getCandleTimeOffset()
   
-  let orderSignal
+  let signals, orderSignal
   if (candleTimeOffset >= 894000) {
-    orderSignal = await getOrderSignalWithCurrentCandle(availableMargin)
+    signals = await getOrderSignalWithCurrentCandle(availableMargin)
+    orderSignal = signals.orderSignal
+    logger.info('enterSignal',signals)
   }
   else if (candleTimeOffset <= 6000) {
-    orderSignal = await getOrderSignal(availableMargin)
+    signals = await getOrderSignal(availableMargin)
+    orderSignal = signals.orderSignal
+    logger.info('enterSignal',signals)
   }
 
   if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG')) {
