@@ -18,6 +18,10 @@ const isoTimestamp = winston.format((info, opts) => {
   return info;
 });
 
+function conditionColor(condition) {
+  return (condition == 'LONG' ? '\x1b[36' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
+}
+
 const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
@@ -60,15 +64,15 @@ const logger = winston.createLogger({
               let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
               if (rsiSignal) {
                 let {condition,prsi=NaN,rsi=NaN} = rsiSignal
-                log += condition+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
+                log += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (conservativeRsiSignal) {
                 let {condition,prsi=NaN,rsi=NaN} = conservativeRsiSignal
-                log += ' '+condition+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
+                log += ' '+conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (orderSignal) {
                 let {type,entryPrice=NaN,positionSizeUSD,lossDistance=NaN} = orderSignal
-                log += ' '+type+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)
+                log += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)
               }
               break
             default:
