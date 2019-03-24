@@ -40,7 +40,7 @@ const logger = winston.createLogger({
                 positionSize = '\x1b[35;1m' + positionSize + '\x1b[39m'
                 lastPrice = (lastPrice <= entryPrice ? '\x1b[32;1m' : '\x1b[31;1m') + lastPrice.toFixed(1) + '\x1b[39m'
               }
-              log += 'W:'+(walletBalance/100000000).toFixed(4)+' L:'+lastPrice+' P:'+positionSize+
+              log += 'W:'+(walletBalance/100000000).toFixed(5)+' L:'+lastPrice+' P:'+positionSize+
                 ' E:'+signal.entryPrice.toFixed(1)+' S:'+signal.stopLoss.toFixed(1)+' T:'+signal.takeProfit.toFixed(1)
               break
             case 'enterSignal':
