@@ -90,7 +90,7 @@ async function handleMargin(data) { try {
 async function handleOrder(data) { try {
   lastOrders = data
   lastOrders.forEach((order,i) => {
-    console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.orderQty)
+    console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.orderQty)
   })
 
   if (!pruneCanceledOrders(data)) {
@@ -546,6 +546,7 @@ async function enter(signal) { try {
   }
 
   await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
+  // await orderTakeProfit(signal)
 
   return true
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
@@ -651,6 +652,17 @@ async function orderStopMarket(price,size) { try {
   console.log('Ordered stop market',responseData.ordStatus)
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function orderTakeProfit({takeProfit,positionSizeUSD,takeProfitTrigger}) { try {
+  console.log('Ordering take profit')
+  let response = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+    orderQty:-positionSizeUSD,
+    price:takeProfit,
+    stopPx:takeProfitTrigger 
+  })
+  let responseData = JSON.parse(response.data)
+  console.log('Ordered take profit',responseData.ordStatus)
+} catch(e) {console.error(e.stack||e);debugger} }
+
 async function initMarket() { try {
   console.log('Initializing market')
   await getMarket(15,96)
@@ -702,6 +714,8 @@ module.exports = {
   findNewLimitOrder: findNewLimitOrder,
   findNewLimitOrderWithSize: findNewLimitOrderWithSize,
   getCandleTimeOffset: getCandleTimeOffset,
+
+  checkPositionParams: checkPositionParams,
 
   enter: enter,
   exit: exit,

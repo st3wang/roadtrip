@@ -171,51 +171,33 @@ function exitTooLong({positionSize,bid,ask,signal}) {
 }
 
 function exitTarget({positionSize,bid,ask,signal}) {
+  var {takeProfitTrigger,takeProfit} = signal
   var exit
   if (positionSize > 0) {
-    if (ask >= signal.takeProfitTrigger) exit = {price:Math.max(signal.takeProfit,ask),reason:'target'}
+    if (ask >= takeProfitTrigger) exit = {price:Math.max(takeProfit,ask),reason:'target'}
   } 
   else if (positionSize < 0) {
-    if (bid <= signal.takeProfitTrigger) exit = {price:Math.min(signal.takeProfit,bid),reason:'target'}
+    if (bid <= takeProfitTrigger) exit = {price:Math.min(takeProfit,bid),reason:'target'}
   }
   return exit
 }
 
-function cancelOrder({positionSize,bid,ask,fundingTimestamp,fundingRate,signal}) {
+function cancelOrder(params) {
+  var {positionSize,signal} = params
+  
   if (positionSize != 0) return
 
   var cancel
   let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
   if (newEntryOrder) {
-    // Check our ourder in the orderbook. Cancel the order if it has reached the target.
-    if (signal.positionSizeUSD > 0) {
-      // LONG
-      if (isFundingWindow(fundingTimestamp) && fundingRate > 0) {
-        logger.info('New LONG will have to pay. Cancel trade.')
-        cancel = {reason:'funding'}
-      }
-      else if (ask >= signal.takeProfit) {
-        logger.info('Missed LONG trade. Cancel trade.', bid, ask, JSON.stringify(newEntryOrder), signal)
-        cancel = {reason:'target'}
-      }
-    }
-    else {
-      // SHORT
-      if (isFundingWindow(fundingTimestamp) && fundingRate < 0) {
-        logger.info('New SHORT will have to pay. Cancel trade.')
-        cancel = {reason:'funding'}
-      }
-      else if (bid <= signal.takeProfit) {
-        logger.info('Missed SHORT trade', bid, ask, JSON.stringify(newEntryOrder), signal)
-        cancel = {reason:'target'}
-      }
+    let exit
+    params.signal = Object.assign({},signal)
+    params.signal.takeProfitTrigger = params.signal.takeProfit
+
+    if (exit = (exitTooLong(params) || exitFunding(params) || exitTarget(params))) {
+      cancel = {reason:exit.reason}
     }
   }
-  // else {
-  //   let newTargetOrder = bitmex.findNewLimitOrderWithSize(signal.positionSizeUSD)
-  //   if (newTargetOrder) cancel = {reason:'stop'}
-  // }
-  
   return cancel
 }
 
@@ -273,10 +255,7 @@ async function checkPosition(params) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function next() { try {
-  var position = bitmex.getPosition()
-  var instrument = bitmex.getInstrument()
-  checkPosition(new Date().toISOString(), position.currentQty, 
-  instrument.bidPrice, instrument.askPrice, instrument.fundingTimestamp, instrument.fundingRate, entrySignal)
+  checkPosition(bitmex.checkPositionParams)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getMarketCsv() { try {
