@@ -31,36 +31,44 @@ const logger = winston.createLogger({
           let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
           switch(info.message) {
             case 'checkPosition':
-              let {walletBalance,lastPrice,positionSize,fundingTimestamp,fundingRate,signal} = splat[0]
-              let {timestamp,entryPrice,stopLoss,takeProfit,lossDistancePercent} = signal
+              let {walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
+              let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal
+              let positionSizeString, lastPriceString
+              walletBalance /= 100000000
               if (positionSize > 0) {
-                positionSize = '\x1b[36;1m' + positionSize + '\x1b[39m'
-                lastPrice = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + (lastPrice?lastPrice.toFixed(1):lastPrice) + '\x1b[39m'
+                positionSizeString = '\x1b[36;1m' + positionSize + '\x1b[39m'
+                lastPriceString = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
               }
               else if (positionSize < 0) {
-                positionSize = '\x1b[35;1m' + positionSize + '\x1b[39m'
-                lastPrice = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + (lastPrice?lastPrice.toFixed(1):lastPrice) + '\x1b[39m'
+                positionSizeString = '\x1b[35;1m' + positionSize + '\x1b[39m'
+                lastPriceString = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
               }
               else {
-                lastPrice = (lastPrice?lastPrice.toFixed(1):lastPrice)
+                positionSizeString = positionSize
+                lastPriceString = lastPrice.toFixed(1)
               }
               let now = new Date().getTime()
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000).toFixed(1)
               let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000).toFixed(1)
-              log += 'W:'+(walletBalance?(walletBalance/100000000).toFixed(4):walletBalance)+' P:'+positionSize+' L:'+lastPrice+
-                ' E:'+(entryPrice?entryPrice.toFixed(1):entryPrice)+' S:'+(stopLoss?stopLoss.toFixed(1):stopLoss)+' T:'+(takeProfit?takeProfit.toFixed(1):takeProfit)+
-                ' D:'+lossDistancePercent.toFixed(4)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+fundingRate
+              let payFunding = fundingRate*positionSize/lastPrice/walletBalance
+              payFunding = (payFunding > 0 ? '\x1b[31m' : '\x1b[32m') + payFunding.toFixed(1) + '\x1b[39m'
+              log += 'W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
+                ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
+                ' D:'+lossDistancePercent.toFixed(4)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
               break
             case 'enterSignal':
               let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
               if (rsiSignal) {
-                log += rsiSignal.condition+' '+rsiSignal.prsi.toFixed(1)+' '+rsiSignal.rsi.toFixed(1)
+                let {condition,prsi=NaN,rsi=NaN} = rsiSignal
+                log += condition+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (conservativeRsiSignal) {
-                log += ' '+conservativeRsiSignal.condition+' '+conservativeRsiSignal.prsi.toFixed(1)+' '+conservativeRsiSignal.rsi.toFixed(1)
+                let {condition,prsi=NaN,rsi=NaN} = conservativeRsiSignal
+                log += ' '+condition+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (orderSignal) {
-                log += ' '+orderSignal.type+' '+(orderSignal.entryPrice?orderSignal.entryPrice.toFixed(1):orderSignal.entryPrice)+' '+orderSignal.positionSizeUSD+' '+(orderSignal.lossDistance?orderSignal.lossDistance.toFixed(1):orderSignal.lossDistance)
+                let {type,entryPrice=NaN,positionSizeUSD,lossDistance=NaN} = orderSignal
+                log += ' '+type+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)
               }
               break
             default:
