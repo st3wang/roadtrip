@@ -227,47 +227,41 @@ function exitTargetTrigger({positionSize,bid,ask,signal}) {
   return exit
 }
 
-function exitTarget({positionSize,bid,ask,signal}) {
-  var {takeProfit} = signal
+function exitTarget({bid,ask,signal}) {
+  var {positionSizeUSD,takeProfit} = signal
   var exit
-  if (positionSize > 0) {
+  if (positionSizeUSD > 0) {
     if (ask >= takeProfit) exit = {price:Math.max(takeProfit,ask),reason:'target'}
   } 
-  else if (positionSize < 0) {
+  else if (positionSizeUSD < 0) {
     if (bid <= takeProfit) exit = {price:Math.min(takeProfit,bid),reason:'target'}
   }
   return exit
 }
 
-function exitStop({positionSize,bid,ask,signal}) {
-  var {stopMarketTrigger} = signal
+function exitStop({bid,ask,signal}) {
+  var {positionSizeUSD,stopMarketTrigger} = signal
   positionSize = 1
   var exit
-  if (positionSize > 0) {
+  if (positionSizeUSD > 0) {
     if (ask <= stopMarketTrigger) exit = {price:Math.min(stopMarketTrigger,ask),reason:'stop'}
   } 
-  else if (positionSize < 0) {
+  else if (positionSizeUSD < 0) {
     if (bid >= stopMarketTrigger) exit = {price:Math.max(stopMarketTrigger,bid),reason:'stop'}
   }
   return exit
 }
 
 function cancelOrder(params) {
-  logger.info('cancelOrder')
   var {positionSize,signal} = params
   
   if (positionSize != 0) return
 
-  logger.info('cancelOrder 1')
-
   var cancel
   let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
   if (newEntryOrder) {
-    logger.info('cancelOrder 2')
     let exit
     if (exit = (exitTooLong(params) || exitFunding(params) || exitTarget(params) || exitStop(params))) {
-      
-  logger.info('cancelOrder 3')
       cancel = {reason:exit.reason}
     }
   }
