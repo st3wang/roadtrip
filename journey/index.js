@@ -261,7 +261,9 @@ function cancelOrder(params) {
   let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
   if (newEntryOrder) {
     let exit
-    if (exit = (exitTooLong(params) || exitFunding(params) || exitTarget(params) || exitStop(params))) {
+    let cancelParams = Object.assign({},params)
+    cancelParams.positionSize = signal.positionSizeUSD
+    if (exit = (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStop(cancelParams))) {
       cancel = {reason:exit.reason}
     }
   }
