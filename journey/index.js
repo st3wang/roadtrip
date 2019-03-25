@@ -253,15 +253,21 @@ function exitStop({positionSize,bid,ask,signal}) {
 }
 
 function cancelOrder(params) {
+  logger.info('cancelOrder')
   var {positionSize,signal} = params
   
   if (positionSize != 0) return
 
+  logger.info('cancelOrder 1')
+
   var cancel
   let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
   if (newEntryOrder) {
+    logger.info('cancelOrder 2')
     let exit
     if (exit = (exitTooLong(params) || exitFunding(params) || exitTarget(params) || exitStop(params))) {
+      
+  logger.info('cancelOrder 3')
       cancel = {reason:exit.reason}
     }
   }
