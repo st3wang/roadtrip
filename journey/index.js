@@ -206,10 +206,16 @@ function exitTargetTrigger({positionSize,bid,ask,signal}) {
   var {takeProfitTrigger,takeProfit} = signal
   var exit
   if (positionSize > 0) {
-    if (ask >= takeProfitTrigger) exit = {price:Math.max(takeProfit,ask),reason:'targettrigger'}
+    if (ask >= takeProfitTrigger) {
+      logger.info('exitTargetTrigger',positionSize,bid,ask,signal)
+      exit = {price:Math.max(takeProfit,ask),reason:'targettrigger'}
+    }
   } 
   else if (positionSize < 0) {
-    if (bid <= takeProfitTrigger) exit = {price:Math.min(takeProfit,bid),reason:'targettrigger'}
+    if (bid <= takeProfitTrigger) {
+      logger.info('exitTargetTrigger',positionSize,bid,ask,signal)
+      exit = {price:Math.min(takeProfit,bid),reason:'targettrigger'}
+    }
   }
   return exit
 }
@@ -275,7 +281,8 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
     logger.info('enterSignal',signals)
   }
 
-  if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG')) {
+  if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG') && 
+    orderSignal.entryPrice && orderSignal.positionSizeUSD) {
     if (isFundingWindow(fundingTimestamp) &&
       ((orderSignal.positionSizeUSD > 0 && fundingRate > 0) || 
       (orderSignal.positionSizeUSD < 0 && fundingRate < 0))) {

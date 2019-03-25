@@ -593,6 +593,10 @@ async function updateLeverage(leverage) { try {
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function enter(signal) { try {
+  if (!signal.entryPrice || !signal.positionSizeUSD) {
+    return
+  }
+  
   await cancelAll()
 
   let response = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
