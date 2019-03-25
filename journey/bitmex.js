@@ -634,7 +634,7 @@ async function orderLimitRetry(cid,price,size,execInst,retryOn) { try {
       count = 0,
       waitTime = 2
   do {
-    responseData = await orderLimit(cid,price,size,execInst)
+    response = await orderLimit(cid,price,size,execInst)
     count++
     waitTime *= 2
     // if cancelled retry with new quote 
