@@ -25,6 +25,10 @@ const isoTimestamp = winston.format((info, opts) => {
   return info;
 });
 
+function orderString({ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst}) {
+  return ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
+}
+
 const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
@@ -42,15 +46,15 @@ const logger = winston.createLogger({
             case 'orderStopMarket':
             case 'orderLimitRetry':
             case 'ENTER':
-            case 'EXIT':
-              let {ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst} = splat[0].obj
-              log += ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
-              break
-            case 'cancelAll':
+            case 'EXIT': {
+              log += orderString(splat[0].obj)
+            } break
+            case 'cancelAll': {
               log += splat[0].obj.length
-              break
-            default:
+            } break
+            default: {
               log += (splat ? `${JSON.stringify(splat)}` : '')
+            }
           }
           return log
         })
@@ -597,7 +601,7 @@ async function enter(signal) { try {
   if (response.obj.ordStatus === 'Canceled' || response.obj.ordStatus === 'Overloaded') {
     return false
   }
-  console.log('ENTER',response)
+  logger.info('ENTER',response)
   await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
 
   // await orderTakeProfit(signal)

@@ -35,7 +35,7 @@ const logger = winston.createLogger({
           let {timestamp,level,label,message} = info
           let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,label)+'] '+message+' '
           switch(info.message) {
-            case 'checkPosition':
+            case 'checkPosition': {
               let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal
               let positionSizeString, lastPriceString
@@ -60,8 +60,8 @@ const logger = winston.createLogger({
               log += caller + ' W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercent.toFixed(4)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
-              break
-            case 'enterSignal':
+            } break
+            case 'enterSignal': {
               let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
               if (rsiSignal) {
                 let {condition,prsi=NaN,rsi=NaN} = rsiSignal
@@ -75,9 +75,14 @@ const logger = winston.createLogger({
                 let {type,entryPrice=NaN,positionSizeUSD,lossDistance=NaN} = orderSignal
                 log += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)
               }
-              break
-            default:
+            } break
+            case 'ENTER': {
+              let {positionSizeUSD,entryPrice} = splat[0]
+              log += positionSizeUSD+' '+entryPrice
+            } break
+            default: {
               log += (splat ? `${JSON.stringify(splat)}` : '')
+            }
           }
           return log
         })
