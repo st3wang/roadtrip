@@ -1,5 +1,6 @@
 const log = require('./log')
 const winston = require('winston')
+// const l = require('./logger')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
 const server = require('./server')
@@ -77,7 +78,7 @@ const logger = winston.createLogger({
               }
             } break
             case 'ENTER': {
-              let {positionSizeUSD,entryPrice} = splat[0]
+              let {positionSizeUSD,entryPrice} = splat[0].signal
               log += positionSizeUSD+' '+entryPrice
             } break
             default: {
@@ -251,7 +252,7 @@ function cancelOrder(params) {
   if (positionSize != 0) return
 
   var cancel
-  let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD)
+  let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')
   if (newEntryOrder) {
     let exit
     let cancelParams = Object.assign({},params)
@@ -307,13 +308,18 @@ async function checkEntry(params) { try {
     response = await bitmex.cancelAll()
   }
   if (enter = await enterSignal(params)) {
-    logger.info('ENTER',enter)
     let entrySignal = enter.signal
-    let orderSent = await bitmex.enter(entrySignal)
-    if (orderSent) {
-      entrySignalTable.info('entry',entrySignal)
-      log.writeEntrySignal(entrySignal) // current trade
-      log.writeOrderSignal(setup.bankroll,entrySignal) // trade
+    if (bitmex.findNewLimitOrder(entrySignal.entryPrice,entrySignal.positionSizeUSD,'ParticipateDoNotInitiate')) {
+      logger.info('ENTRY ORDER EXISTS')
+    }
+    else {
+      logger.info('ENTER',enter)
+      let orderSent = await bitmex.enter(entrySignal)
+      if (orderSent) {
+        entrySignalTable.info('entry',entrySignal)
+        log.writeEntrySignal(entrySignal) // current trade
+        log.writeOrderSignal(setup.bankroll,entrySignal) // trade
+      }
     }
   }
 } catch(e) {console.error(e.stack||e);debugger} }
@@ -321,7 +327,7 @@ async function checkEntry(params) { try {
 async function checkExit(params) { try {
   var exit
   if (exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)) {
-    if (exit.reason == 'targettrigger' && bitmex.findNewLimitOrder(exit.price,-params.positionSize)) {
+    if (exit.reason == 'targettrigger' && bitmex.findNewLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')) {
       logger.info('EXIT ORDER EXISTS')
     }
     else {

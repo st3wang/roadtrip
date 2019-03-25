@@ -291,22 +291,22 @@ function getQuote() {
   }
 }
 
-function findNewLimitOrder(price,size) {
+function findNewLimitOrder(price,size,execInst) {
   size = Math.abs(size)
   return lastOrders.find(order => {
     return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
-      order.price == price && order.orderQty == size)
+      order.price == price && order.orderQty == size && order.execInst == execInst)
   })
 }
 
-function findNewLimitOrderWithSize(size) {
-  var side = size > 0 ? 'Buy' : 'Sell'
-  size = Math.abs(size)
-  return lastOrders.find(order => {
-    return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
-      order.side == side && order.orderQty == size)
-  })
-}
+// function findNewLimitOrderWithSize(size) {
+//   var side = size > 0 ? 'Buy' : 'Sell'
+//   size = Math.abs(size)
+//   return lastOrders.find(order => {
+//     return (order.ordStatus == 'New' && order.ordType == 'Limit' && 
+//       order.side == side && order.orderQty == size)
+//   })
+// }
 
 var exitRequesting
 
@@ -596,7 +596,7 @@ async function enter(signal) { try {
   if (!signal.entryPrice || !signal.positionSizeUSD) {
     return
   }
-  
+
   await cancelAll()
 
   let response = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
@@ -775,7 +775,6 @@ module.exports = {
   getNextFunding: getNextFunding,
 
   findNewLimitOrder: findNewLimitOrder,
-  findNewLimitOrderWithSize: findNewLimitOrderWithSize,
   getCandleTimeOffset: getCandleTimeOffset,
 
   checkPositionParams: checkPositionParams,
