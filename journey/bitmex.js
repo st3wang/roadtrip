@@ -35,6 +35,7 @@ const logger = winston.createLogger({
         winston.format.prettyPrint(),
         winston.format.printf(info => {
           let splat = info[Symbol.for('splat')]
+          let {timestamp,level,label,message} = info
           let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,label)+'] '+message+' '
           switch(info.message) {
             case 'orderLimit':
