@@ -598,10 +598,16 @@ async function enter(signal) { try {
   // console.log('ENTER',signal)
 
   let response = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
-  if (response.obj.ordStatus === 'Canceled' || response.obj.ordStatus === 'Overloaded') {
-    return false
-  }
+  
   logger.info('ENTER',response)
+  
+  switch (response.obj.ordStatus) {
+    case 'Canceled':
+    case 'Overloaded':
+    case 'Duplicate':
+      return false
+  }
+
   await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
 
   // await orderTakeProfit(signal)
@@ -674,8 +680,11 @@ async function orderLimit(cid,price,size,execInst) {
       e.data = undefined
       e.statusText = undefined
       logger.error('orderLimit error',e)
-      if (e.obj.error && e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
+      if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
         resolve({obj:{ordStatus:'Overloaded'}})
+      }
+      else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
+        resolve({obj:{ordStatus:'Duplicate'}})
       }
       else {
         debugger
