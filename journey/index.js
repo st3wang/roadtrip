@@ -91,7 +91,18 @@ const logger = winston.createLogger({
       ),
     })
   ]
-});
+})
+
+const entrySignalTable = winston.createLogger({
+  transports: [
+    new winston.transports.File({filename:'entry_signal_table.log',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.json()
+      ),
+    })
+  ]
+})
 
 var entrySignal
 
@@ -285,11 +296,12 @@ async function checkEntry(params) { try {
   }
   if (enter = await enterSignal(params)) {
     logger.info('ENTER',enter)
-    let orderSent = await bitmex.enter(enter.signal)
+    let entrySignal = enter.signal
+    let orderSent = await bitmex.enter(entrySignal)
     if (orderSent) {
-      entrySignal = enter.signal
-      log.writeEntrySignal(enter.signal)
-      log.writeOrderSignal(setup.bankroll,enter.signal)
+      entrySignalTable.info('entry',entrySignal)
+      log.writeEntrySignal(entrySignal) // current trade
+      log.writeOrderSignal(setup.bankroll,entrySignal) // trade
     }
   }
 } catch(e) {console.error(e.stack||e);debugger} }
