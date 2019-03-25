@@ -127,6 +127,7 @@ async function pruneCanceledOrders(orders) {
 }
 
 async function handleMargin(data) { try {
+  console.log('handleMargin')
   lastMargin = data[0]
   checkPositionParams.availableMargin = lastMargin.availableMargin
   checkPositionParams.walletBalance = lastMargin.walletBalance
@@ -139,6 +140,7 @@ async function handleOrder(data) { try {
   })
 
   if (!pruneCanceledOrders(data)) {
+    checkPositionParams.caller = 'order'
     checkPositionCallback(checkPositionParams)
   }
 } catch(e) {console.error(e.stack||e);debugger} }
@@ -149,21 +151,11 @@ function handlePosition(data) {
   var qty = lastPosition.currentQty
   if (qty != lastQty) {
     checkPositionParams.positionSize = qty
+    checkPositionParams.caller = 'position'
     checkPositionCallback(checkPositionParams)
   }
 
   lastQty = lastPosition.currentQty
-}
-
-async function appendCandleLastPrice() {
-  var candleTimeOffset = getCandleTimeOffset()
-  if (candleTimeOffset >= currentCandleTimeOffset) {
-    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),lastInstrument.lastPrice)
-  }
-  else {
-    startNextCandle()
-  }
-  currentCandleTimeOffset = candleTimeOffset
 }
 
 async function handleInstrument(data) { try {
@@ -180,12 +172,24 @@ async function handleInstrument(data) { try {
     checkPositionParams.lastPrice = lastInstrument.lastPrice
     checkPositionParams.fundingTimestamp = lastInstrument.fundingTimestamp
     checkPositionParams.fundingRate = lastInstrument.fundingRate
+    checkPositionParams.caller = 'instrument'
     checkPositionCallback(checkPositionParams)
   }
 
   lastBid = bid
   lastAsk = ask
 } catch(e) {console.error(e.stack||e);debugger} }
+
+async function appendCandleLastPrice() {
+  var candleTimeOffset = getCandleTimeOffset()
+  if (candleTimeOffset >= currentCandleTimeOffset) {
+    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),lastInstrument.lastPrice)
+  }
+  else {
+    startNextCandle()
+  }
+  currentCandleTimeOffset = candleTimeOffset
+}
 
 function getCandleTimeOffset() {
   return ((new Date().getTime()) % 900000)

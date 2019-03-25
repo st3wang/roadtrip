@@ -35,7 +35,7 @@ const logger = winston.createLogger({
           let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
           switch(info.message) {
             case 'checkPosition':
-              let {walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
+              let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal
               let positionSizeString, lastPriceString
               walletBalance /= 100000000
@@ -56,7 +56,7 @@ const logger = winston.createLogger({
               let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000).toFixed(1)
               let payFunding = fundingRate*positionSize/lastPrice/walletBalance
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
-              log += 'W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
+              log += caller + ' W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercent.toFixed(4)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
               break
@@ -96,31 +96,6 @@ var entrySignal
 
 logger.info('setup', setup)
 
-function testCheckPosition() {
-  var interval = 500
-  var order = {
-    entryPrice: 3900,
-    positionSizeUSD: 1000,
-    stopLossTrigger: 3860.5,
-    stopLoss: 3860,
-    takeProfitTrigger: 4000.5,
-    takeProfit: 40001
-  }
-  var testArgs1 = [
-    [order.positionSizeUSD,order.entryPrice,order.entryPrice+0.5,order],
-    [order.positionSizeUSD,order.entryPrice+1,order.entryPrice+1.5,order],
-    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
-    [order.positionSizeUSD,order.stopLoss,order.stopLoss+0.5,order],
-    [order.positionSizeUSD,order.stopLoss+1,order.stopLoss+1.5,order],
-    // [order.positionSizeUSD,order.stopLoss-2,order.stopLoss-1.5,order]
-  ]
-  testArgs1.forEach((args,i) => {
-    setTimeout(() => {
-      checkPosition.apply(this, args);
-    }, interval*(i+1))
-  })
-}
-
 function isFundingWindow(fundingTimestamp) {
   var fundingTime = new Date(fundingTimestamp).getTime()
   var checkFundingPositionTime = fundingTime - 1800000
@@ -140,11 +115,6 @@ function isInPositionForTooLong(signal) {
       (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) > 0.002))
   }
 }
-
-async function checkPositionCallback(params) { try {
-  params.signal = entrySignal
-  return await checkPosition(params)
-} catch(e) {console.error(e.stack||e);debugger} }
 
 async function getOrderSignalWithCurrentCandle(availableMargin) {
   var market = await bitmex.getMarketWithCurrentCandle(15,96)
@@ -277,12 +247,12 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
   let candleTimeOffset = bitmex.getCandleTimeOffset()
 
   let signals, orderSignal
-  if (candleTimeOffset >= 894000) {
+  if (candleTimeOffset >= 888000) {
     signals = await getOrderSignalWithCurrentCandle(availableMargin)
     orderSignal = signals.orderSignal
     logger.info('enterSignal',signals)
   }
-  else if (candleTimeOffset <= 6000) {
+  else if (candleTimeOffset <= 12000) {
     signals = await getOrderSignal(availableMargin)
     orderSignal = signals.orderSignal
     logger.info('enterSignal',signals)
@@ -301,10 +271,30 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
   return enter
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function checkPosition(params) { try {
-  logger.info('checkPosition',params)
+async function checkPositionCallback(params) { try {
+  params.signal = entrySignal
+  return await checkPosition(params)
+} catch(e) {console.error(e.stack||e);debugger} }
 
-  var exit, cancel, enter
+async function checkEntry(params) { try {
+  var cancel, enter
+  if (cancel = cancelOrder(params)) {
+    logger.info('CANCEL',cancel)
+    response = await bitmex.cancelAll()
+  }
+  if (enter = await enterSignal(params)) {
+    logger.info('ENTER',enter)
+    let orderSent = await bitmex.enter(enter.signal)
+    if (orderSent) {
+      entrySignal = enter.signal
+      log.writeEntrySignal(enter.signal)
+      log.writeOrderSignal(setup.bankroll,enter.signal)
+    }
+  }
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function checkExit(params) { try {
+  var exit
   if (exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)) {
     if (exit.reason == 'targettrigger' && bitmex.findNewLimitOrder(exit.price,-params.positionSize)) {
       logger.info('EXIT ORDER EXISTS')
@@ -314,25 +304,17 @@ async function checkPosition(params) { try {
       response = await bitmex.exit('',exit.price,-params.positionSize)
     }
   }
-  else {
-    if (cancel = cancelOrder(params)) {
-      logger.info('CANCEL',cancel)
-      response = await bitmex.cancelAll()
-    }
-    if (enter = await enterSignal(params)) {
-      logger.info('ENTER',enter)
-      let orderSent = await bitmex.enter(enter.signal)
-      if (orderSent) {
-        entrySignal = enter.signal
-        log.writeEntrySignal(enter.signal)
-        log.writeOrderSignal(setup.bankroll,enter.signal)
-      }
-    }
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function checkPosition(params) { try {
+  logger.info('checkPosition',params)
+  if (!(await checkExit(params))) {
+    await checkEntry(params)
   }
-  // log.writeInterval(rsiSignal,market,setup.bankroll,position,margin,orderSignal,orderSent)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function next() { try {
+  bitmex.checkPositionParams.caller = 'interval'
   checkPosition(bitmex.checkPositionParams)
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -396,14 +378,17 @@ async function getFundingCsv() { try {
 function createInterval(candleDelay) {
   var now = new Date().getTime()
   var interval = 15*60000
-  var startIn = interval-now%(interval) + candleDelay
-  var startInSec = startIn % 60000
-  var startInMin = (startIn - startInSec) / 60000
-  logger.info('next one in ' + startInMin + ':' + Math.floor(startInSec/1000) + ' minutes')
+  var startsIn = interval-now%(interval) + candleDelay
+
+  if (startsIn <= 100) startsIn += interval
+  var startsInSec = startsIn % 60000
+  var startsInMin = (startsIn - startsInSec) / 60000
+  logger.info('createInterval ' + candleDelay + ' starts in ' + startsInMin + ':' + Math.floor(startsInSec/1000) + ' minutes')
+
   setTimeout(_ => {
     next()
     setInterval(next,interval)
-  },startIn)
+  },startsIn)
 }
 
 async function start() { try {
@@ -416,9 +401,21 @@ async function start() { try {
   await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
 
   next()
+  createInterval(-5*60000)
+  createInterval(-2*60000)
+  createInterval(-60000)
+  createInterval(-30000)
+  createInterval(-15000)
+  createInterval(-10000)
   createInterval(-5000)
-  createInterval(500)
+  createInterval(200)
   createInterval(5000)
+  createInterval(10000)
+  createInterval(15000)
+  createInterval(30000)
+  createInterval(60000)
+  createInterval(2*60000)
+  createInterval(5*60000)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 start()
