@@ -32,7 +32,8 @@ const logger = winston.createLogger({
         winston.format.prettyPrint(),
         winston.format.printf(info => {
           let splat = info[Symbol.for('splat')]
-          let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
+          let {timestamp,level,label,message} = info
+          let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,label)+'] '+message+' '
           switch(info.message) {
             case 'checkPosition':
               let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
@@ -378,9 +379,7 @@ async function getFundingCsv() { try {
 function createInterval(candleDelay) {
   var now = new Date().getTime()
   var interval = 15*60000
-  var startsIn = interval-now%(interval) + candleDelay
-
-  if (startsIn <= 100) startsIn += interval
+  var startsIn = ((interval*2)-now%(interval) + candleDelay) % interval
   var startsInSec = startsIn % 60000
   var startsInMin = (startsIn - startsInSec) / 60000
   logger.info('createInterval ' + candleDelay + ' starts in ' + startsInMin + ':' + Math.floor(startsInSec/1000) + ' minutes')

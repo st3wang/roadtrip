@@ -35,10 +35,13 @@ const logger = winston.createLogger({
         winston.format.prettyPrint(),
         winston.format.printf(info => {
           let splat = info[Symbol.for('splat')]
-          let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
+          let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,label)+'] '+message+' '
           switch(info.message) {
             case 'orderLimit':
             case 'orderStopMarket':
+            case 'orderLimitRetry':
+            case 'ENTER':
+            case 'EXIT':
               let {ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst} = splat[0].obj
               log += ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
               break
@@ -127,7 +130,6 @@ async function pruneCanceledOrders(orders) {
 }
 
 async function handleMargin(data) { try {
-  console.log('handleMargin')
   lastMargin = data[0]
   checkPositionParams.availableMargin = lastMargin.availableMargin
   checkPositionParams.walletBalance = lastMargin.walletBalance
@@ -588,14 +590,15 @@ async function updateLeverage(leverage) { try {
 async function enter(signal) { try {
   await cancelAll()
 
-  console.log('ENTER', signal)
+  // console.log('ENTER',signal)
 
-  let responseData = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
-  if (responseData.ordStatus === 'Canceled' || responseData.ordStatus === 'Overloaded') {
+  let response = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
+  if (response.obj.ordStatus === 'Canceled' || response.obj.ordStatus === 'Overloaded') {
     return false
   }
-
+  console.log('ENTER',response)
   await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
+
   // await orderTakeProfit(signal)
 
   return true
@@ -609,13 +612,13 @@ async function exit(timestamp,price,size) { try {
 
   // var cid = timestamp + 'EXIT+'
   var cid = ''
-  logger.info('EXIT',{price:price,size:size})
+  // logger.info('EXIT',{price:price,size:size})
 
   exitRequesting = true
-  var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
+  var response = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
   exitRequesting = false
-  logger.info('EXIT response status', responseData)
-  return responseData
+  logger.info('EXIT', response)
+  return response
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function wait(ms) {
@@ -625,9 +628,8 @@ async function wait(ms) {
 }
 
 async function orderLimitRetry(cid,price,size,execInst,retryOn) { try {
-  logger.info('Ordering limit retry')
   retryOn += 'Overloaded'
-  let responseData, 
+  let response, 
       count = 0,
       waitTime = 2
   do {
@@ -636,9 +638,9 @@ async function orderLimitRetry(cid,price,size,execInst,retryOn) { try {
     waitTime *= 2
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
-  } while((retryOn.indexOf(responseData.ordStatus) >= 0) && count < 10 && await wait(waitTime))
-  logger.info('Ordered limit retry status', responseData)
-  return responseData
+  } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 10 && await wait(waitTime))
+  logger.info('orderLimitRetry', response)
+  return response
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderLimit(cid,price,size,execInst) { 
@@ -668,7 +670,7 @@ async function orderLimit(cid,price,size,execInst) {
       e.statusText = undefined
       logger.error('orderLimit error',e)
       if (e.obj.error && e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
-        resolve({ordStatus:'Overloaded'})
+        resolve({obj:{ordStatus:'Overloaded'}})
       }
       else {
         debugger
@@ -676,11 +678,11 @@ async function orderLimit(cid,price,size,execInst) {
       }
     })
     
-    if (response && response.obj) {
+    if (response) {
       response.data = undefined
       response.statusText = undefined
       logger.info('orderLimit',response)
-      resolve(response.obj)
+      resolve(response)
     }
 
     resolve()
@@ -696,6 +698,7 @@ async function orderStopMarket(price,size) { try {
   response.data = undefined
   response.statusText = undefined
   logger.info('orderStopMarket',response)
+  return response
 } catch(e) {console.error(e.stack||e);debugger} }
 
 // async function orderTakeProfit({takeProfit,positionSizeUSD,takeProfitTrigger}) { try {
