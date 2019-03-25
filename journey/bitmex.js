@@ -595,24 +595,20 @@ async function updateLeverage(leverage) { try {
 async function enter(signal) { try {
   await cancelAll()
 
-  // console.log('ENTER',signal)
-
   let response = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
   
   logger.info('ENTER',response)
-  
+
   switch (response.obj.ordStatus) {
     case 'Canceled':
     case 'Overloaded':
     case 'Duplicate':
       return false
+    default:
+      await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
+      // await orderTakeProfit(signal)
+      return true
   }
-
-  await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
-
-  // await orderTakeProfit(signal)
-
-  return true
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function exit(timestamp,price,size) { try {
