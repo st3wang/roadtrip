@@ -558,12 +558,6 @@ async function exit(timestamp,price,size) { try {
     return
   }
 
-  var newExitOrder = findNewLimitOrder(price,size)
-  if (newExitOrder) {
-    //console.log('Order already submitted')
-    return
-  }
-
   // var cid = timestamp + 'EXIT+'
   var cid = ''
   console.log('New exit',cid,price,size)

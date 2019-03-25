@@ -55,7 +55,7 @@ const logger = winston.createLogger({
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000).toFixed(1)
               let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000).toFixed(1)
               let payFunding = fundingRate*positionSize/lastPrice/walletBalance
-              payFunding = (payFunding > 0 ? '\x1b[31m' : '\x1b[32m') + payFunding.toFixed(5) + '\x1b[39m'
+              payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
               log += 'W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercent.toFixed(4)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
@@ -295,8 +295,13 @@ async function checkPosition(params) { try {
 
   var exit, cancel, enter
   if (exit = exitTooLong(params) || exitFunding(params) || exitTarget(params)) {
-    logger.info('EXIT',exit)
-    response = await bitmex.exit('',exit.price,-params.positionSize)
+    if (exit.reason == 'target' && bitmex.findNewLimitOrder(exit.price,-params.positionSize)) {
+      // order exists
+    }
+    else {
+      logger.info('EXIT',exit)
+      response = await bitmex.exit('',exit.price,-params.positionSize)
+    }
   }
   else {
     if (cancel = cancelOrder(params)) {
