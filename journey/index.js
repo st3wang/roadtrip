@@ -306,7 +306,7 @@ async function checkPosition(params) { try {
 
   var exit, cancel, enter
   if (exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)) {
-    if (exit.reason == 'target' && bitmex.findNewLimitOrder(exit.price,-params.positionSize)) {
+    if (exit.reason == 'targettrigger' && bitmex.findNewLimitOrder(exit.price,-params.positionSize)) {
       logger.info('EXIT ORDER EXISTS')
     }
     else {
