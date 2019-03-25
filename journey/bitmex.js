@@ -663,7 +663,7 @@ async function orderLimit(cid,price,size,execInst) {
       e.data = undefined
       e.statusText = undefined
       logger.error('orderLimit error',e)
-      if (e.statusText && e.statusText.indexOf('The system is currently overloaded') >= 0) {
+      if (e.obj.error && e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
         resolve({ordStatus:'Overloaded'})
       }
       else {
