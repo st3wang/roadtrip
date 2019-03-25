@@ -1,7 +1,7 @@
 const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
 const SwaggerClient = require("swagger-client")
 const shoes = require('./shoes')
-const log = require('./log')
+const winston = require('winston')
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 
@@ -12,11 +12,55 @@ var client, checkPositionCallback, checkPositionParams = {}
 var marketCache, marketWithCurrentCandleCache
 var binSize = 5
 
-var ws, wsHeartbeatTimeout
+var ws
 var lastInstrument = {}, lastPosition = {}, lastOrders = []
 var lastBid, lastAsk, lastQty
 
 var currentCandle, currentCandleTimeOffset
+
+const colorizer = winston.format.colorize();
+
+const isoTimestamp = winston.format((info, opts) => {
+  info.timestamp = new Date().toISOString()
+  return info;
+});
+
+const logger = winston.createLogger({
+  format: winston.format.label({label:'index'}),
+  transports: [
+    new winston.transports.Console({
+      level:shoes.log.level||'info',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.prettyPrint(),
+        winston.format.printf(info => {
+          let splat = info[Symbol.for('splat')]
+          let log = `${info.timestamp} [` + colorizer.colorize(info.level,`${info.label}`) + `] ${info.message} `
+          switch(info.message) {
+            case 'orderLimit':
+            case 'orderStopMarket':
+              let {ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst} = splat[0].obj
+              log += ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
+              break
+            case 'cancelAll':
+              log += splat[0].obj.length
+              break
+            default:
+              log += (splat ? `${JSON.stringify(splat)}` : '')
+          }
+          return log
+        })
+      ),
+    }),
+    new winston.transports.File({filename:'combined.log',
+      level:'debug',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.json()
+      ),
+    })
+  ]
+})
 
 function heartbeat() {
   setInterval(_ => {
@@ -199,7 +243,6 @@ function addTradeToCandle(time,price) {
   else {
     let lastIndex = marketCache.candles.length - 1
     let lastCandle = marketCache.candles[lastIndex]
-    // console.log('add trade to lastCandle', new Date().toISOString(), new Date(time).toISOString(), price, JSON.stringify(lastCandle))
     if (time >= lastCandle.startTimeMs && time <= lastCandle.endTimeMs) {
       if (price > lastCandle.high) {
         marketCache.highs[lastIndex] = lastCandle.high = price
@@ -525,21 +568,23 @@ async function getCurrentCandle() {
 }
 
 async function cancelAll() { try {
-  console.log('Cancelling All Orders')
+  // logger.info('Cancelling All Orders')
   let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
-  console.log('Cancelled All Orders')
+  response.data = undefined
+  response.statusText = undefined
+  logger.info('cancelAll',response)
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function updateLeverage(leverage) { try {
   console.log('Updating Leverage',leverage)
   let response = await client.Position.Position_updateLeverage({symbol:'XBTUSD',leverage:leverage})
-  console.log('Updated Leverage ')
+  console.log('Updated Leverage')
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function enter(signal) { try {
   await cancelAll()
 
-  console.log('ENTER ', JSON.stringify(signal))
+  console.log('ENTER', signal)
 
   let responseData = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
   if (responseData.ordStatus === 'Canceled' || responseData.ordStatus === 'Overloaded') {
@@ -554,18 +599,18 @@ async function enter(signal) { try {
 
 async function exit(timestamp,price,size) { try {
   if (!price || !size || exitRequesting) {
-    //console.log('exitRequesting')
+    //logger.info('exitRequesting')
     return
   }
 
   // var cid = timestamp + 'EXIT+'
   var cid = ''
-  console.log('New exit',cid,price,size)
+  logger.info('EXIT',{price:price,size:size})
 
   exitRequesting = true
   var responseData = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
   exitRequesting = false
-  console.log('EXIT response status', responseData.ordStatus)
+  logger.info('EXIT response status', responseData)
   return responseData
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -576,7 +621,7 @@ async function wait(ms) {
 }
 
 async function orderLimitRetry(cid,price,size,execInst,retryOn) { try {
-  console.log('Ordering limit retry')
+  logger.info('Ordering limit retry')
   retryOn += 'Overloaded'
   let responseData, 
       count = 0,
@@ -588,22 +633,22 @@ async function orderLimitRetry(cid,price,size,execInst,retryOn) { try {
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
   } while((retryOn.indexOf(responseData.ordStatus) >= 0) && count < 10 && await wait(waitTime))
-  console.log('Ordered limit retry status', responseData.ordStatus)
+  logger.info('Ordered limit retry status', responseData)
   return responseData
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderLimit(cid,price,size,execInst) { 
   return new Promise(async (resolve,reject) => { try {
-    console.log('Ordering limit',price,size,execInst)
+    // logger.info('Ordering limit',{price:price,size:size,execInst:execInst})
     if (size > 0) {
       if (price > lastInstrument.bidPrice) {
-        console.log('orderLimit price',price,'is more than last bidPrice',lastInstrument.bidPrice)
+        logger.info('orderLimit price',price,'is more than last bidPrice',lastInstrument.bidPrice)
         price = lastInstrument.bidPrice
       }
     }
     else {
       if (price < lastInstrument.askPrice) {
-        console.log('orderLimit price',price,'is less than last askPrice',lastInstrument.askPrice)
+        logger.info('orderLimit price',price,'is less than last askPrice',lastInstrument.askPrice)
         price = lastInstrument.askPrice
       }
     }
@@ -615,48 +660,50 @@ async function orderLimit(cid,price,size,execInst) {
       orderQty:size,
       execInst:'ParticipateDoNotInitiate'+(execInst||'')
     }).catch(function(e) {
-      console.log(e.statusText)
+      e.data = undefined
+      e.statusText = undefined
+      logger.error('orderLimit error',e)
       if (e.statusText && e.statusText.indexOf('The system is currently overloaded') >= 0) {
         resolve({ordStatus:'Overloaded'})
       }
       else {
         debugger
+        reject(e)
       }
     })
-
-    let data = {}
-    if (response && response.data) {
-      data = JSON.parse(response.data)
-      console.log('Ordered Limit', response.data)
-    }
-    else {
-      console.log('Failed order limit')
+    
+    if (response && response.obj) {
+      response.data = undefined
+      response.statusText = undefined
+      logger.info('orderLimit',response)
+      resolve(response.obj)
     }
 
-    resolve(data)
+    resolve()
   } catch(e) {console.error(e.stack||e);debugger} })
 }
 
 async function orderStopMarket(price,size) { try {
-  console.log('Ordering stop market')
+  // logger.info('Ordering stop market',{price:price,size:size})
   let response = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
     orderQty:size,
     stopPx:price 
-  })
-  let responseData = JSON.parse(response.data)
-  console.log('Ordered stop market',responseData.ordStatus)
+  })  
+  response.data = undefined
+  response.statusText = undefined
+  logger.info('orderStopMarket',response)
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function orderTakeProfit({takeProfit,positionSizeUSD,takeProfitTrigger}) { try {
-  console.log('Ordering take profit')
-  let response = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
-    orderQty:-positionSizeUSD,
-    price:takeProfit,
-    stopPx:takeProfitTrigger 
-  })
-  let responseData = JSON.parse(response.data)
-  console.log('Ordered take profit',responseData.ordStatus)
-} catch(e) {console.error(e.stack||e);debugger} }
+// async function orderTakeProfit({takeProfit,positionSizeUSD,takeProfitTrigger}) { try {
+//   logger.info('Ordering take profit')
+//   let response = await client.Order.Order_new({ordType:'LimitIfTouched',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
+//     orderQty:-positionSizeUSD,
+//     price:takeProfit,
+//     stopPx:takeProfitTrigger 
+//   })
+//   let responseData = JSON.parse(response.data)
+//   logger.info('Ordered take profit',responseData)
+// } catch(e) {console.error(e.stack||e);debugger} }
 
 async function initMarket() { try {
   console.log('Initializing market')
