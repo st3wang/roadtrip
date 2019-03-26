@@ -40,10 +40,10 @@ async function getSignal(closes,{length,shortPrsi,shortRsi,longPrsi,longRsi}) { 
   else if (longCondition) {
     signal.condition = 'LONG'
   }
-  else if (prsi > rsiOverbought) {
+  else if (prsi > shortPrsi) {
     signal.condition = 'S'
   }
-  else if (prsi < rsiOversold) {
+  else if (prsi < longPrsi) {
     signal.condition = 'L'
   }
   return signal
