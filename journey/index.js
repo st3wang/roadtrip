@@ -233,27 +233,22 @@ function exitTargetTrigger({positionSize,bid,ask,signal}) {
 
 function exitTarget({positionSize,bid,ask,signal}) {
   var {takeProfit} = signal
-  var exit
   if (positionSize > 0) {
-    if (ask >= takeProfit) exit = {price:Math.max(takeProfit,ask),reason:'target'}
+    if (ask >= takeProfit) return {price:Math.max(takeProfit,ask),reason:'target'}
   } 
   else if (positionSize < 0) {
-    if (bid <= takeProfit) exit = {price:Math.min(takeProfit,bid),reason:'target'}
+    if (bid <= takeProfit) return {price:Math.min(takeProfit,bid),reason:'target'}
   }
-  return exit
 }
 
-function exitStop({positionSize,bid,ask,signal}) {
+function exitStopMarketTrigger({positionSize,bid,ask,signal}) {
   var {stopMarketTrigger} = signal
-  positionSize = 1
-  var exit
   if (positionSize > 0) {
-    if (ask <= stopMarketTrigger) exit = {price:Math.min(stopMarketTrigger,ask),reason:'stop'}
+    if (ask <= stopMarketTrigger) return {price:Math.min(stopMarketTrigger,ask),reason:'stop'}
   } 
   else if (positionSize < 0) {
-    if (bid >= stopMarketTrigger) exit = {price:Math.max(stopMarketTrigger,bid),reason:'stop'}
+    if (bid >= stopMarketTrigger) return {price:Math.max(stopMarketTrigger,bid),reason:'stop'}
   }
-  return exit
 }
 
 function cancelOrder(params) {
@@ -265,7 +260,7 @@ function cancelOrder(params) {
   if (newEntryOrder) {
     let cancelParams = Object.assign({},params)
     cancelParams.positionSize = signal.positionSizeUSD
-    let exit = (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStop(cancelParams))
+    let exit = (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStopMarketTrigger(cancelParams))
     if (exit) {
       return {reason:exit.reason}
     }
