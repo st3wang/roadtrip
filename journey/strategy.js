@@ -15,7 +15,7 @@ async function getRsi(data,length) {
   return Array(length).fill(0).concat(result.result.outReal)
 }
 
-async function getSignal(closes,rsiLength,rsiOverbought,rsiOversold) { try {
+async function getSignal(closes,{rsiLength,shortPrsi,shortRsi,longPrsi,longRsi}) { try {
   var rsis = await getRsi(closes,rsiLength)
   var len = closes.length
   var last0 = len - 1
@@ -23,8 +23,8 @@ async function getSignal(closes,rsiLength,rsiOverbought,rsiOversold) { try {
   var rsi = rsis[last0]
   var prsi = rsis[last1]
   // var close = closes[last0]
-  var shortCondition = prsi > rsiOverbought && rsi <= rsiOverbought 
-  var longCondition = prsi < rsiOversold && rsi >= rsiOversold 
+  var shortCondition = prsi > shortPrsi && rsi <= shortRsi 
+  var longCondition = prsi < longPrsi && rsi >= longRsi 
   var signal = {
     condition: '-',
     prsi: Math.round(prsi*100)/100,

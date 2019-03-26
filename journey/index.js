@@ -138,7 +138,7 @@ async function getOrderSignalWithCurrentCandle(availableMargin) {
   var market = await bitmex.getMarketWithCurrentCandle(15,96)
   var closes = market.closes
   var lastPrice = closes[closes.length-1]
-  var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+  var rsiSignal = await strategy.getSignal(closes,setup.rsi)
   var conservativeCloses, conservativeRsiSignal, orderSignal
   
   // logger.verbose('getOrderSignalWithCurrentCandle rsiSignal', rsiSignal)
@@ -146,12 +146,12 @@ async function getOrderSignalWithCurrentCandle(availableMargin) {
   if (rsiSignal.condition == 'LONG') { 
     conservativeCloses = market.closes.slice(1)
     conservativeCloses.push(lastPrice-0.5)
-    conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+    conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi)
   }
   else if (rsiSignal.condition == 'SHORT') {
     conservativeCloses = market.closes.slice(1)
     conservativeCloses.push(lastPrice+0.5)
-    conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+    conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi)
   }
 
   // if (conservativeRsiSignal) {
@@ -172,7 +172,7 @@ async function getOrderSignal(availableMargin) {
   var market = await bitmex.getMarket(15,96)
   var closes = market.closes
   // var lastPrice = closes[closes.length-1]
-  var rsiSignal = await strategy.getSignal(closes,setup.rsi.length,setup.rsi.overbought,setup.rsi.oversold)
+  var rsiSignal = await strategy.getSignal(closes,setup.rsi)
   
   // logger.verbose('getOrderSignal rsiSignal',rsiSignal)
 
