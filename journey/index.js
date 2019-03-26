@@ -308,14 +308,14 @@ async function checkEntry(params) { try {
     response = await bitmex.cancelAll()
   }
   if (enter = await enterSignal(params)) {
-    let entrySignal = enter.signal
-    if (bitmex.findNewLimitOrder(entrySignal.entryPrice,entrySignal.positionSizeUSD,'ParticipateDoNotInitiate')) {
+    if (bitmex.findNewLimitOrder(enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
       logger.info('ENTRY ORDER EXISTS')
     }
     else {
       logger.info('ENTER',enter)
-      let orderSent = await bitmex.enter(entrySignal)
+      let orderSent = await bitmex.enter(enter.signal)
       if (orderSent) {
+        entrySignal = enter.signal
         entrySignalTable.info('entry',entrySignal)
         log.writeEntrySignal(entrySignal) // current trade
         log.writeOrderSignal(setup.bankroll,entrySignal) // trade
