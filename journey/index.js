@@ -73,8 +73,8 @@ const logger = winston.createLogger({
                 log += ' '+conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (orderSignal) {
-                let {type,entryPrice=NaN,positionSizeUSD,lossDistance=NaN} = orderSignal
-                log += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)
+                let {type,entryPrice=NaN,positionSizeUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
+                log += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
               }
             } break
             case 'ENTER': {
@@ -181,8 +181,12 @@ async function getOrderSignal(availableMargin) {
   return {rsiSignal:rsiSignal,orderSignal:orderSignal}
 }
 
-function isLargeFee(size,rate,risk) {
-  return (Math.abs(size*rate) > risk/4)
+function getFee(size,rate,risk) {
+  var pay = size*rate
+  return {
+    isLarge: pay > risk/4,
+    pay: pay
+  }
 }
 
 function exitTooLong({positionSize,signal}) {
@@ -200,8 +204,9 @@ function exitTooLong({positionSize,signal}) {
 }
 
 function exitFunding({positionSize,fundingTimestamp,fundingRate,signal}) {
-  if (isFundingWindow(fundingTimestamp) && isLargeFee(positionSize,fundingRate,signal.riskAmountUSD)) {
-    return {reason:'funding'}
+  var fee = getFee(positionSize,fundingRate,signal.riskAmountUSD)
+  if (fee.isLarge && isFundingWindow(fundingTimestamp)) {
+    return {reason:'funding',pay:fee.pay,risk:signal.riskAmountUSD}
   }
 
   // if (positionSize > 0 && fundingRate > 0) {
