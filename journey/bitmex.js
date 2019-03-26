@@ -45,8 +45,8 @@ const logger = winston.createLogger({
             case 'orderLimit':
             case 'orderStopMarket':
             case 'orderLimitRetry':
-            case 'ENTER':
-            case 'EXIT': {
+            case 'orderEnter':
+            case 'orderExit': {
               log += orderString(splat[0].obj)
             } break
             case 'cancelAll': {
@@ -592,7 +592,7 @@ async function updateLeverage(leverage) { try {
   console.log('Updated Leverage')
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function enter(signal) { try {
+async function orderEnter(signal) { try {
   if (!signal.entryPrice || !signal.positionSizeUSD) {
     return
   }
@@ -601,7 +601,7 @@ async function enter(signal) { try {
 
   let response = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
   
-  logger.info('ENTER',response)
+  logger.info('orderEnter',response)
 
   switch (response.obj.ordStatus) {
     case 'Canceled':
@@ -615,7 +615,7 @@ async function enter(signal) { try {
   }
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function exit(timestamp,price,size) { try {
+async function orderExit(timestamp,price,size) { try {
   if (!price || !size || exitRequesting) {
     //logger.info('exitRequesting')
     return
@@ -628,7 +628,7 @@ async function exit(timestamp,price,size) { try {
   exitRequesting = true
   var response = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
   exitRequesting = false
-  logger.info('EXIT', response)
+  logger.info('orderExit', response)
   return response
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -779,7 +779,7 @@ module.exports = {
 
   checkPositionParams: checkPositionParams,
 
-  enter: enter,
-  exit: exit,
+  orderEnter: orderEnter,
+  orderExit: orderExit,
   cancelAll: cancelAll
 }

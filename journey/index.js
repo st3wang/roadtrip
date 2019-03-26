@@ -279,7 +279,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
     orderSignal = signals.orderSignal
     logger.info('enterSignal',signals)
   }
-  else if (candleTimeOffset <= 12000) {
+  else if (candleTimeOffset <= 60000) {
     signals = await getOrderSignal(availableMargin)
     orderSignal = signals.orderSignal
     logger.info('enterSignal',signals)
@@ -316,7 +316,7 @@ async function checkEntry(params) { try {
     }
     else {
       logger.info('ENTER',enter)
-      let orderSent = await bitmex.enter(enter.signal)
+      let orderSent = await bitmex.orderEnter(enter.signal)
       if (orderSent) {
         entrySignal = enter.signal
         entrySignalTable.info('entry',entrySignal)
@@ -333,17 +333,15 @@ async function checkExit(params) { try {
 
   var exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)
   if (exit) {
-    if (exit.reason == 'targettrigger') {
-      let existingOrder = bitmex.findNewLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')
-      if (existingOrder) {
-        logger.info('EXIT EXISTING ORDER')
-        return existingOrder
-      }
+    exit.price = exit.price || (positionSize < 0 ? bid : ask)
+    let existingOrder = bitmex.findNewLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')
+    if (existingOrder) {
+      logger.info('EXIT EXISTING ORDER',exit)
+      return existingOrder
     }
 
-    exit.price = exit.price || (positionSize < 0 ? bid : ask)
     logger.info('EXIT',exit)
-    return await bitmex.exit('',exit.price,-params.positionSize)
+    return await bitmex.orderExit('',exit.price,-params.positionSize)
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -440,23 +438,21 @@ async function start() { try {
   await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
 
   next()
-  createInterval(-5*60000)
-  createInterval(-2*60000)
-  createInterval(-60000)
-  createInterval(-30000)
-  createInterval(-20000)
-  createInterval(-15000)
-  createInterval(-10000)
-  createInterval(-5000)
+  createInterval(-5000*2**6)
+  createInterval(-5000*2**5)
+  createInterval(-5000*2**4)
+  createInterval(-5000*2**3)
+  createInterval(-5000*2**2)
+  createInterval(-5000*2**1)
+  createInterval(-5000*2**0)
   createInterval(200)
-  createInterval(5000)
-  createInterval(10000)
-  createInterval(15000)
-  createInterval(20000)
-  createInterval(30000)
-  createInterval(60000)
-  createInterval(2*60000)
-  createInterval(5*60000)
+  createInterval(5000*2**0)
+  createInterval(5000*2**1)
+  createInterval(5000*2**2)
+  createInterval(5000*2**3)
+  createInterval(5000*2**4)
+  createInterval(5000*2**5)
+  createInterval(5000*2**6)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 start()
