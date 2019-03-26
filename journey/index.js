@@ -247,10 +247,10 @@ function exitStop({positionSize,bid,ask,signal}) {
   var {stopMarketTrigger} = signal
   positionSize = 1
   var exit
-  if (positionSizeUSD > 0) {
+  if (positionSize > 0) {
     if (ask <= stopMarketTrigger) exit = {price:Math.min(stopMarketTrigger,ask),reason:'stop'}
   } 
-  else if (positionSizeUSD < 0) {
+  else if (positionSize < 0) {
     if (bid >= stopMarketTrigger) exit = {price:Math.max(stopMarketTrigger,bid),reason:'stop'}
   }
   return exit
