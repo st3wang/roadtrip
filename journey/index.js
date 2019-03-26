@@ -181,26 +181,36 @@ async function getOrderSignal(availableMargin) {
   return {rsiSignal:rsiSignal,orderSignal:orderSignal}
 }
 
-function exitFunding({positionSize,bid,ask,fundingTimestamp,fundingRate}) {
-  var exit 
-  if (positionSize > 0 && fundingRate > 0) {
-    if (isFundingWindow(fundingTimestamp)) exit = {price:ask,reason:'funding'}
-  } 
-  else if (positionSize < 0 && fundingRate < 0) {
-    if (isFundingWindow(fundingTimestamp)) exit = {price:bid,reason:'funding'}
-  }
-  return exit
+function isLargeFee(size,rate,risk) {
+  return (Math.abs(size*rate) > risk/4)
 }
 
-function exitTooLong({positionSize,bid,ask,signal}) {
-  var exit
-  if (positionSize > 0) {
-    if (isInPositionForTooLong(signal)) exit = {price:ask,reason:'toolong'}
+function exitTooLong({positionSize,signal}) {
+  if (positionSize != 0 && isInPositionForTooLong(signal)) {
+    return {reason:'toolong'}
   }
-  else if (positionSize < 0) {
-    if (isInPositionForTooLong(signal)) exit = {price:bid,reason:'toolong'}
+  // var exit
+  // if (positionSize > 0) {
+  //   if (isInPositionForTooLong(signal)) exit = {price:ask,reason:'toolong'}
+  // }
+  // else if (positionSize < 0) {
+  //   if (isInPositionForTooLong(signal)) exit = {price:bid,reason:'toolong'}
+  // }
+  // return exit
+}
+
+function exitFunding({positionSize,fundingTimestamp,fundingRate,signal}) {
+  if (isFundingWindow(fundingTimestamp) && isLargeFee(positionSize,fundingRate,signal.riskAmountUSD)) {
+    return {reason:'funding'}
   }
-  return exit
+
+  // if (positionSize > 0 && fundingRate > 0) {
+  //   if (isFundingWindow(fundingTimestamp)) exit = {price:ask,reason:'funding'}
+  // } 
+  // else if (positionSize < 0 && fundingRate < 0) {
+  //   if (isFundingWindow(fundingTimestamp)) exit = {price:bid,reason:'funding'}
+  // }
+  // return exit
 }
 
 function exitTargetTrigger({positionSize,bid,ask,signal}) {
@@ -221,20 +231,20 @@ function exitTargetTrigger({positionSize,bid,ask,signal}) {
   return exit
 }
 
-function exitTarget({bid,ask,signal}) {
-  var {positionSizeUSD,takeProfit} = signal
+function exitTarget({positionSize,bid,ask,signal}) {
+  var {takeProfit} = signal
   var exit
-  if (positionSizeUSD > 0) {
+  if (positionSize > 0) {
     if (ask >= takeProfit) exit = {price:Math.max(takeProfit,ask),reason:'target'}
   } 
-  else if (positionSizeUSD < 0) {
+  else if (positionSize < 0) {
     if (bid <= takeProfit) exit = {price:Math.min(takeProfit,bid),reason:'target'}
   }
   return exit
 }
 
-function exitStop({bid,ask,signal}) {
-  var {positionSizeUSD,stopMarketTrigger} = signal
+function exitStop({positionSize,bid,ask,signal}) {
+  var {stopMarketTrigger} = signal
   positionSize = 1
   var exit
   if (positionSizeUSD > 0) {
@@ -251,17 +261,15 @@ function cancelOrder(params) {
   
   if (positionSize != 0) return
 
-  var cancel
   let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')
   if (newEntryOrder) {
-    let exit
     let cancelParams = Object.assign({},params)
     cancelParams.positionSize = signal.positionSizeUSD
-    if (exit = (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStop(cancelParams))) {
-      cancel = {reason:exit.reason}
+    let exit = (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStop(cancelParams))
+    if (exit) {
+      return {reason:exit.reason}
     }
   }
-  return cancel
 }
 
 async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableMargin}) { try {
@@ -305,7 +313,7 @@ async function checkEntry(params) { try {
   var cancel, enter
   if (cancel = cancelOrder(params)) {
     logger.info('CANCEL',cancel)
-    response = await bitmex.cancelAll()
+    await bitmex.cancelAll()
   }
   if (enter = await enterSignal(params)) {
     if (bitmex.findNewLimitOrder(enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
@@ -325,15 +333,22 @@ async function checkEntry(params) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkExit(params) { try {
-  var exit
-  if (exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)) {
-    if (exit.reason == 'targettrigger' && bitmex.findNewLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')) {
-      logger.info('EXIT ORDER EXISTS')
+  let {positionSize,bid,ask} = params
+  if (positionSize == 0) return
+
+  var exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)
+  if (exit) {
+    if (exit.reason == 'targettrigger') {
+      let existingOrder = bitmex.findNewLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')
+      if (existingOrder) {
+        logger.info('EXIT EXISTING ORDER')
+        return existingOrder
+      }
     }
-    else {
-      logger.info('EXIT',exit)
-      response = await bitmex.exit('',exit.price,-params.positionSize)
-    }
+
+    exit.price = exit.price || (positionSize < 0 ? bid : ask)
+    logger.info('EXIT',exit)
+    return await bitmex.exit('',exit.price,-params.positionSize)
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 

@@ -128,7 +128,7 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
   let capitalUSD = capitalBTC * entryPrice
 
   riskAmountBTC = capitalBTC * riskPerTradePercent
-  riskAmountUSD = Math.round(riskAmountBTC * entryPrice)
+  riskAmountUSD = riskAmountBTC * entryPrice
   positionSizeBTC = riskAmountBTC / -lossDistancePercent
   positionSizeUSD = Math.round(positionSizeBTC * entryPrice)
   leverage = Math.max(Math.ceil(Math.abs(positionSizeBTC / leverageMargin)*100)/100,1)
