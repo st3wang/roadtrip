@@ -15,8 +15,8 @@ async function getRsi(data,length) {
   return Array(length).fill(0).concat(result.result.outReal)
 }
 
-async function getSignal(closes,{rsiLength,shortPrsi,shortRsi,longPrsi,longRsi}) { try {
-  var rsis = await getRsi(closes,rsiLength)
+async function getSignal(closes,{length,shortPrsi,shortRsi,longPrsi,longRsi}) { try {
+  var rsis = await getRsi(closes,length)
   var len = closes.length
   var last0 = len - 1
   var last1 = len - 2
