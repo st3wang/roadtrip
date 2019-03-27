@@ -261,15 +261,9 @@ function cancelOrder(params) {
   
   if (positionSize != 0) return
 
-  let newEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')
-  if (newEntryOrder) {
-    let cancelParams = Object.assign({},params)
-    cancelParams.positionSize = signal.positionSizeUSD
-    let exit = (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStopMarketTrigger(cancelParams))
-    if (exit) {
-      return {reason:exit.reason}
-    }
-  }
+  let cancelParams = Object.assign({},params)
+  cancelParams.positionSize = signal.positionSizeUSD
+  return (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStopMarketTrigger(cancelParams))
 }
 
 async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableMargin}) { try {
@@ -310,12 +304,14 @@ async function checkPositionCallback(params) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
+  var {signal} = params
   var cancel, enter
-  if (cancel = cancelOrder(params)) {
+  let existingEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')
+  if (existingEntryOrder && (cancel = cancelOrder(params))) {
     logger.info('CANCEL',cancel)
     await bitmex.cancelAll()
   }
-  if (enter = await enterSignal(params)) {
+  if (!existingEntryOrder && (enter = await enterSignal(params))) {
     if (bitmex.findNewLimitOrder(enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
       logger.info('ENTRY ORDER EXISTS')
     }
