@@ -184,7 +184,7 @@ async function getOrderSignal(availableMargin) {
 function getFee(size,rate,risk) {
   var pay = size*rate
   return {
-    isLarge: pay > risk/4,
+    isLarge: pay > risk/2,
     pay: pay
   }
 }
