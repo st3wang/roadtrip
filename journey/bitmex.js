@@ -710,7 +710,7 @@ async function orderStopMarketRetry(price,size,retryOn) { try {
       count = 0,
       waitTime = 2
   do {
-    response = await orderStopMarket(price,size,execInst)
+    response = await orderStopMarket(price,size)
     count++
     waitTime *= 2
     // if cancelled retry with new quote 
