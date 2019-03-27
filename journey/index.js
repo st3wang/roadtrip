@@ -306,10 +306,11 @@ async function checkPositionCallback(params) { try {
 async function checkEntry(params) { try {
   var {signal} = params
   var cancel, enter
-  let existingEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')
+  let existingEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')  
   if (existingEntryOrder && (cancel = cancelOrder(params))) {
     logger.info('CANCEL',cancel)
     await bitmex.cancelAll()
+    existingEntryOrder = null
   }
   if (!existingEntryOrder && (enter = await enterSignal(params))) {
     if (bitmex.findNewLimitOrder(enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
