@@ -42,8 +42,9 @@ const logger = winston.createLogger({
           let {timestamp,level,label,message} = info
           let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,label)+'] '+message+' '
           switch(info.message) {
-            case 'orderLimit':
             case 'orderStopMarket':
+            case 'orderStopMarketRetry':
+            case 'orderLimit':
             case 'orderLimitRetry':
             case 'orderEnter':
             case 'orderExit': {
@@ -609,7 +610,7 @@ async function orderEnter(signal) { try {
     case 'Duplicate':
       return false
     default:
-      await orderStopMarket(signal.stopMarketTrigger,-signal.positionSizeUSD)
+      await orderStopMarketRetry(signal.stopMarketTrigger,-signal.positionSizeUSD,RETRYON_CANCELED)
       // await orderTakeProfit(signal)
       return true
   }
@@ -702,6 +703,22 @@ async function orderLimit(cid,price,size,execInst) {
     resolve()
   } catch(e) {console.error(e.stack||e);debugger} })
 }
+
+async function orderStopMarketRetry(price,size,retryOn) { try {
+  retryOn += 'Overloaded'
+  let response, 
+      count = 0,
+      waitTime = 2
+  do {
+    response = await orderStopMarket(cid,price,size,execInst)
+    count++
+    waitTime *= 2
+    // if cancelled retry with new quote 
+    // this means the quote move to a better price before the order reaches bitmex server
+  } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 10 && await wait(waitTime))
+  logger.info('orderStopMarketRetry', response)
+  return response
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderStopMarket(price,size) { try {
   // logger.info('Ordering stop market',{price:price,size:size})
