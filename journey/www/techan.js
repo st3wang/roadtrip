@@ -1546,7 +1546,7 @@ module.exports = function(indicatorMixin, accessor_ohlc, indicator_ema) {  // In
     var p = {},  // Container for private, direct access mixed in variables
         overbought = 55,
         middle = 50,
-        oversold = 50,
+        oversold = 45,
         lossAverage = indicator_ema(),
         gainAverage = indicator_ema();
 
