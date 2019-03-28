@@ -55,8 +55,9 @@ const logger = winston.createLogger({
               }
               let now = new Date().getTime()
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000).toFixed(1)
-              let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000).toFixed(1)
-              let payFunding = fundingRate*positionSize/lastPrice/walletBalance
+              let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000)
+              candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
+              let payFunding = fundingRate*positionSize/lastPrice // /walletBalance
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
               log += caller + ' W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
