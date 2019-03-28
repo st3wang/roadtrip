@@ -609,11 +609,11 @@ async function orderEnter(signal) { try {
     case 'Overloaded':
     case 'Duplicate':
       return false
-    default:
-      await orderStopMarketRetry(signal.stopMarketTrigger,-signal.positionSizeUSD,RETRYON_CANCELED)
-      // await orderTakeProfit(signal)
-      return true
   }
+
+  await orderStopMarketRetry(signal.stopMarketTrigger,-signal.positionSizeUSD,RETRYON_CANCELED)
+  // handle response
+  return true
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderExit(timestamp,price,size) { try {
@@ -721,15 +721,31 @@ async function orderStopMarketRetry(price,size,retryOn) { try {
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderStopMarket(price,size) { try {
-  // logger.info('Ordering stop market',{price:price,size:size})
   let response = await client.Order.Order_new({ordType:'StopMarket',symbol:'XBTUSD',execInst:'LastPrice,ReduceOnly',
     orderQty:size,
     stopPx:price 
-  })  
-  response.data = undefined
-  response.statusText = undefined
-  logger.info('orderStopMarket',response)
-  return response
+  }).catch(function(e) {
+    e.data = undefined
+    e.statusText = undefined
+    logger.error('orderStopMarket error',e)
+    if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
+      return {obj:{ordStatus:'Overloaded'}}
+    }
+    else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
+      return {obj:{ordStatus:'Duplicate'}}
+    }
+    else {
+      debugger
+      return e
+    }
+  })
+
+  if (response) {
+    response.data = undefined
+    response.statusText = undefined
+    logger.info('orderStopMarket',response)
+    return response
+  }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 // async function orderTakeProfit({takeProfit,positionSizeUSD,takeProfitTrigger}) { try {
