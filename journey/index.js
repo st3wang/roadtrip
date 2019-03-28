@@ -223,13 +223,13 @@ function exitTargetTrigger({positionSize,bid,ask,signal}) {
   var exit
   if (positionSize > 0) {
     if (ask >= takeProfitTrigger) {
-      logger.info('exitTargetTrigger',positionSize,bid,ask,signal)
+      logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
       exit = {price:Math.max(takeProfit,ask),reason:'targettrigger'}
     }
   } 
   else if (positionSize < 0) {
     if (bid <= takeProfitTrigger) {
-      logger.info('exitTargetTrigger',positionSize,bid,ask,signal)
+      logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
       exit = {price:Math.min(takeProfit,bid),reason:'targettrigger'}
     }
   }
@@ -338,7 +338,7 @@ async function checkExit(params) { try {
     exit.price = exit.price || (positionSize < 0 ? bid : ask)
     let existingOrder = bitmex.findNewLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')
     if (existingOrder) {
-      logger.info('EXIT EXISTING ORDER',exit)
+      logger.debug('EXIT EXISTING ORDER',exit)
       return existingOrder
     }
 
