@@ -39,7 +39,7 @@ const logger = winston.createLogger({
             case 'checkPosition': {
               let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal
-              let positionSizeString, lastPriceString
+              let lossDistancePercentString, positionSizeString, lastPriceString
               walletBalance /= 100000000
               if (positionSize > 0) {
                 positionSizeString = '\x1b[36m' + positionSize + '\x1b[39m'
@@ -53,16 +53,17 @@ const logger = winston.createLogger({
                 positionSizeString = positionSize
                 lastPriceString = lastPrice.toFixed(1)
               }
+              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
               let now = new Date().getTime()
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000)
-              candlesInTrade = (candlesInTrade < 15 ? candlesInTrade.toFixed(1) : ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m'))
+              candlesInTrade = (candlesInTrade >= 15 || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
               let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000)
               candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
               let payFunding = fundingRate*positionSize/lastPrice // /walletBalance
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
               log += caller + ' W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
-                ' D:'+lossDistancePercent.toFixed(4)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
+                ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
             case 'enterSignal': {
               let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
@@ -132,7 +133,7 @@ function isInPositionForTooLong(signal) {
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
     return (delta > cutOffTimeForAll || 
-      (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) > 0.002))
+      (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) >= 0.002))
   }
 }
 
