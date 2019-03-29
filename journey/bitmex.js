@@ -47,7 +47,8 @@ const logger = winston.createLogger({
             case 'orderLimit':
             case 'orderLimitRetry':
             case 'orderEnter':
-            case 'orderExit': {
+            case 'orderExit': 
+            case 'pruneOrders': {
               log += orderString(splat[0].obj)
             } break
             case 'cancelAll': {
@@ -123,13 +124,15 @@ async function connect() { try {
   heartbeat()
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function pruneCanceledOrders(orders) {
+async function pruneOrders(orders) {
   var found, pruned
   var yesterday = new Date().getTime() - 86400000
+  var prunedCanceledOrder = false
   do {
     found = orders.findIndex(order => {
       switch (order.ordStatus) {
         case 'Canceled':
+          prunedCanceledOrder = true
           return true
         case 'Filled':
           return (new Date(order.timestamp).getTime() < yesterday)
@@ -137,11 +140,11 @@ async function pruneCanceledOrders(orders) {
       return false
     })
     if (found >= 0) {
+      logger.info('pruneOrders',orders[found])
       orders.splice(found,1)
-      pruned = true
     }
   } while(found >= 0)
-  return pruned
+  return prunedCanceledOrder
 }
 
 async function handleMargin(data) { try {
@@ -156,7 +159,8 @@ async function handleOrder(data) { try {
     console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.cumQty+'/'+order.orderQty)
   })
 
-  if (!pruneCanceledOrders(data)) {
+  var prunedCanceledOrder = pruneOrders(data)
+  if (!prunedCanceledOrder) {
     checkPositionParams.caller = 'order'
     checkPositionCallback(checkPositionParams)
   }
