@@ -53,7 +53,7 @@ const logger = winston.createLogger({
                 positionSizeString = positionSize
                 lastPriceString = lastPrice.toFixed(1)
               }
-              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
+              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34;1m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
               let now = new Date().getTime()
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000)
               candlesInTrade = (candlesInTrade >= 15 || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
