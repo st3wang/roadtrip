@@ -125,8 +125,17 @@ async function connect() { try {
 
 async function pruneCanceledOrders(orders) {
   var found, pruned
+  var yesterday = new Date().getTime() - 86400000
   do {
-    found = orders.findIndex(order => {return order.ordStatus == 'Canceled'})
+    found = orders.findIndex(order => {
+      switch (order.ordStatus) {
+        case 'Canceled':
+          return true
+        case 'Filled':
+          return (new Date(order.timestamp).getTime() < yesterday)
+      }
+      return false
+    })
     if (found >= 0) {
       orders.splice(found,1)
       pruned = true
