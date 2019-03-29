@@ -47,12 +47,15 @@ const logger = winston.createLogger({
             case 'orderLimit':
             case 'orderLimitRetry':
             case 'orderEnter':
-            case 'orderExit': 
-            case 'pruneOrders': {
+            case 'orderExit': {
               log += orderString(splat[0].obj)
             } break
             case 'cancelAll': {
               log += splat[0].obj.length
+            } break
+            case 'handleOrder':
+            case 'pruneOrders': {
+              log += orderString(splat[0])
             } break
             default: {
               log += (splat ? `${JSON.stringify(splat)}` : '')
@@ -124,7 +127,7 @@ async function connect() { try {
   heartbeat()
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function pruneOrders(orders) {
+async function pruneOrders(orders) { try {
   var found, pruned
   var yesterday = new Date().getTime() - 86400000
   var prunedCanceledOrder = false
@@ -145,7 +148,7 @@ async function pruneOrders(orders) {
     }
   } while(found >= 0)
   return prunedCanceledOrder
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 async function handleMargin(data) { try {
   lastMargin = data[0]
@@ -156,8 +159,10 @@ async function handleMargin(data) { try {
 async function handleOrder(data) { try {
   lastOrders = data
   lastOrders.forEach((order,i) => {
-    console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.cumQty+'/'+order.orderQty)
+    logger.info('handleOrder',order)
+    // console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.cumQty+'/'+order.orderQty)
   })
+  console.log('---------------------')
 
   var prunedCanceledOrder = pruneOrders(data)
   if (!prunedCanceledOrder) {
