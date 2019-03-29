@@ -34,7 +34,7 @@ const logger = winston.createLogger({
         winston.format.printf(info => {
           let splat = info[Symbol.for('splat')]
           let {timestamp,level,label,message} = info
-          let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,label)+'] '+message+' '
+          let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'idx')+'] '+message+' '
           switch(info.message) {
             case 'checkPosition': {
               let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]

@@ -30,7 +30,7 @@ function orderString({ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,ex
 }
 
 const logger = winston.createLogger({
-  format: winston.format.label({label:'index'}),
+  format: winston.format.label({label:'bitmex'}),
   transports: [
     new winston.transports.Console({
       level:shoes.log.level||'info',
@@ -40,7 +40,7 @@ const logger = winston.createLogger({
         winston.format.printf(info => {
           let splat = info[Symbol.for('splat')]
           let {timestamp,level,label,message} = info
-          let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,label)+'] '+message+' '
+          let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '+message+' '
           switch(info.message) {
             case 'orderStopMarket':
             case 'orderStopMarketRetry':
