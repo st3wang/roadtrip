@@ -39,29 +39,43 @@ const logger = winston.createLogger({
         winston.format.prettyPrint(),
         winston.format.printf(info => {
           let splat = info[Symbol.for('splat')]
-          let {timestamp,level,label,message} = info
-          let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '+message+' '
-          switch(info.message) {
+          let {timestamp,level,message} = info
+          let prefix = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
+          let line = message
+          switch(message) {
             case 'orderStopMarket':
             case 'orderStopMarketRetry':
             case 'orderLimit':
             case 'orderLimitRetry':
             case 'orderEnter':
             case 'orderExit': {
-              log += orderString(splat[0].obj)
+              line += orderString(splat[0].obj)
             } break
             case 'cancelAll': {
-              log += splat[0].obj.length
+              line += splat[0].obj.length
             } break
             case 'handleOrder':
             case 'pruneOrders': {
-              log += orderString(splat[0])
+              line += orderString(splat[0])
+            } break
+            case 'orderLimit error':
+            case 'orderStopMarket error': {
+              let {status,obj} = splat[0]
+              line += status + ' ' + obj.message + ' ' + JSON.stringify(splat[1])
             } break
             default: {
-              log += (splat ? `${JSON.stringify(splat)}` : '')
+              line += (splat ? `${JSON.stringify(splat)}` : '')
             }
           }
-          return log
+          switch(level) {
+            case 'error': {
+              line = '\x1b[31m' + line + '\x1b[39m'
+            } break
+            case 'warn': {
+              line = '\x1b[33m' + line + '\x1b[39m'
+            } break
+          }
+          return prefix+line
         })
       ),
     }),
@@ -618,7 +632,12 @@ async function orderEnter(signal) { try {
 
   await cancelAll()
 
-  let response = await orderLimitRetry(signal.timestamp+'ENTER',signal.entryPrice,signal.positionSizeUSD,'',RETRYON_CANCELED)
+  let response = await orderLimitRetry({
+    cid:signal.timestamp+'ENTER',
+    price:signal.entryPrice,
+    size:signal.positionSizeUSD,
+    execInst:''
+  })
   
   logger.info('orderEnter',response)
 
@@ -645,7 +664,7 @@ async function orderExit(timestamp,price,size) { try {
   // logger.info('EXIT',{price:price,size:size})
 
   exitRequesting = true
-  var response = await orderLimitRetry(cid,price,size,EXECINST_REDUCEONLY,RETRYON_CANCELED)
+  var response = await orderLimitRetry({cid:cid,price:price,size:size,execInst:EXECINST_REDUCEONLY})
   exitRequesting = false
   logger.info('orderExit', response)
   return response
@@ -657,70 +676,99 @@ async function wait(ms) {
   })
 }
 
-async function orderLimitRetry(cid,price,size,execInst,retryOn) { try {
-  retryOn += 'Overloaded'
-  let response, 
+var pendingLimitOrder, pendingLimitOrderRetry
+var orderQueueArray = []
+
+async function orderQueue(cid,price,size,execInst) { try {
+    orderQueueStart({cid:cid,price:price,size:size,execInst:execInst})
+} catch(e) {console.error(e.stack||(e));debugger} }
+
+async function orderQueueStart(ord) { try {
+  // new order comes in, cancel older orders
+  orderQueueArray.forEach(o => {
+    if (o.execInst == ord.execInst) {
+      o.obsoleted = true
+    }
+  })
+  orderQueueArray.push(ord)
+  while (pendingLimitOrderRetry) {
+    await pendingLimitOrderRetry
+  }
+  // your turn, see if there is a newer order
+  if (ord.obsoleted) return ({obj:{ordStatus:'Obsoleted'}})
+  cancelAll()
+  pendingLimitOrderRetry = orderLimitRetry(ord)
+  // ord.pending = pendingLimitOrderRetry
+  var response = await pendingLimitOrderRetry
+  pendingLimitOrderRetry = null
+  return response
+} catch(e) {console.error(e.stack||(e));debugger} }
+
+async function orderLimitRetry(ord) { try {
+  var {cid,price,size,execInst} = ord
+  var retryOn = 'Canceled,Overloaded',
+      response, 
       count = 0,
       waitTime = 2
   do {
-    response = await orderLimit(cid,price,size,execInst)
+    while (pendingLimitOrder) {
+      await pendingLimitOrder
+    }
+    pendingLimitOrder = orderLimit(cid,price,size,execInst)
+    response = await pendingLimitOrder 
+    pendingLimitOrder = null
     count++
     waitTime *= 2
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
-  } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 10 && await wait(waitTime))
+  } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 10 && await wait(waitTime) && !ord.obsoleted)
   logger.info('orderLimitRetry', response)
   return response
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function orderLimit(cid,price,size,execInst) { 
-  return new Promise(async (resolve,reject) => { try {
-    // logger.info('Ordering limit',{price:price,size:size,execInst:execInst})
-    if (size > 0) {
-      if (price > lastInstrument.bidPrice) {
-        logger.info('orderLimit price',price,'is more than last bidPrice',lastInstrument.bidPrice)
-        price = lastInstrument.bidPrice
-      }
+async function orderLimit(cid,price,size,execInst) { try {
+  if (size > 0) {
+    if (price > lastInstrument.bidPrice) {
+      logger.warn('orderLimit price',price,'is more than last bidPrice',lastInstrument.bidPrice)
+      price = lastInstrument.bidPrice
+    }
+  }
+  else {
+    if (price < lastInstrument.askPrice) {
+      logger.warn('orderLimit price',price,'is less than last askPrice',lastInstrument.askPrice)
+      price = lastInstrument.askPrice
+    }
+  }
+
+  let response 
+  response = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
+    clOrdID: cid,
+    price:price,
+    orderQty:size,
+    execInst:'ParticipateDoNotInitiate'+(execInst||'')
+  }).catch(function(e) {
+    e.data = undefined
+    e.statusText = undefined
+    logger.error('orderLimit error',e,{cid:cid,price:price,size:price,execInst:execInst})
+    if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
+      return ({obj:{ordStatus:'Overloaded'}})
+    }
+    else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
+      return ({obj:{ordStatus:'Duplicate'}})
     }
     else {
-      if (price < lastInstrument.askPrice) {
-        logger.info('orderLimit price',price,'is less than last askPrice',lastInstrument.askPrice)
-        price = lastInstrument.askPrice
-      }
+      debugger
+      return e
     }
+  })
   
-    let response 
-    response = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
-      clOrdID: cid,
-      price:price,
-      orderQty:size,
-      execInst:'ParticipateDoNotInitiate'+(execInst||'')
-    }).catch(function(e) {
-      e.data = undefined
-      e.statusText = undefined
-      logger.error('orderLimit error',e)
-      if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
-        resolve({obj:{ordStatus:'Overloaded'}})
-      }
-      else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
-        resolve({obj:{ordStatus:'Duplicate'}})
-      }
-      else {
-        debugger
-        reject(e)
-      }
-    })
-    
-    if (response) {
-      response.data = undefined
-      response.statusText = undefined
-      logger.info('orderLimit',response)
-      resolve(response)
-    }
-
-    resolve()
-  } catch(e) {console.error(e.stack||e);debugger} })
-}
+  if (response) {
+    response.data = undefined
+    response.statusText = undefined
+    logger.info('orderLimit',response)
+    return response
+  }
+} catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderStopMarketRetry(price,size,retryOn) { try {
   retryOn += 'Overloaded'
