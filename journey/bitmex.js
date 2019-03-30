@@ -632,7 +632,7 @@ async function orderEnter(signal) { try {
 
   await cancelAll()
 
-  let response = await orderLimitRetry({
+  let response = await orderQueue({
     cid:signal.timestamp+'ENTER',
     price:signal.entryPrice,
     size:signal.positionSizeUSD,
@@ -664,7 +664,7 @@ async function orderExit(timestamp,price,size) { try {
   // logger.info('EXIT',{price:price,size:size})
 
   exitRequesting = true
-  var response = await orderLimitRetry({cid:cid,price:price,size:size,execInst:EXECINST_REDUCEONLY})
+  var response = await orderQueue({cid:cid,price:price,size:size,execInst:EXECINST_REDUCEONLY})
   exitRequesting = false
   logger.info('orderExit', response)
   return response
@@ -679,16 +679,12 @@ async function wait(ms) {
 var pendingLimitOrder, pendingLimitOrderRetry
 var orderQueueArray = []
 
-async function orderQueue(cid,price,size,execInst) { try {
-    orderQueueStart({cid:cid,price:price,size:size,execInst:execInst})
-} catch(e) {console.error(e.stack||(e));debugger} }
-
-async function orderQueueStart(ord) { try {
+async function orderQueue(ord) { try {
   // new order comes in, cancel older orders
   orderQueueArray.forEach(o => {
-    if (o.execInst == ord.execInst) {
+    // if (o.execInst == ord.execInst) {
       o.obsoleted = true
-    }
+    // }
   })
   orderQueueArray.push(ord)
   while (pendingLimitOrderRetry) {
