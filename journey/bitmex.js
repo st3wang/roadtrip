@@ -630,8 +630,6 @@ async function orderEnter(signal) { try {
     return
   }
 
-  await cancelAll()
-
   let response = await orderQueue({
     cid:signal.timestamp+'ENTER',
     price:signal.entryPrice,
@@ -676,25 +674,29 @@ async function wait(ms) {
   })
 }
 
-var pendingLimitOrder, pendingLimitOrderRetry
-var orderQueueArray = []
+var pendingLimitOrderRetry, orderQueueArray = []
 
 async function orderQueue(ord) { try {
-  // new order comes in, cancel older orders
+  logger.info('orderQueue',ord)
   orderQueueArray.forEach(o => {
-    // if (o.execInst == ord.execInst) {
-      o.obsoleted = true
-    // }
+    logger.info('newer order, obsolete old one',o)
+    o.obsoleted = true
   })
   orderQueueArray.push(ord)
   while (pendingLimitOrderRetry) {
+    logger.info('await pendingLimitOrderRetry',pendingLimitOrderRetry.ord)
     await pendingLimitOrderRetry
   }
   // your turn, see if there is a newer order
-  if (ord.obsoleted) return ({obj:{ordStatus:'Obsoleted'}})
-  cancelAll()
+  if (ord.obsoleted) {
+    logger.info('orderQueue obsoleted',ord)
+    return ({obj:{ordStatus:'Obsoleted'}})
+  }
+  if (!ord.execInst || ord.execInst.length == 0) {
+    cancelAll()
+  }
   pendingLimitOrderRetry = orderLimitRetry(ord)
-  // ord.pending = pendingLimitOrderRetry
+  pendingLimitOrderRetry.ord = ord
   var response = await pendingLimitOrderRetry
   pendingLimitOrderRetry = null
   return response
@@ -707,17 +709,15 @@ async function orderLimitRetry(ord) { try {
       count = 0,
       waitTime = 2
   do {
-    while (pendingLimitOrder) {
-      await pendingLimitOrder
-    }
-    pendingLimitOrder = orderLimit(cid,price,size,execInst)
-    response = await pendingLimitOrder 
-    pendingLimitOrder = null
+    response = await orderLimit(cid,price,size,execInst) 
     count++
     waitTime *= 2
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
   } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 10 && await wait(waitTime) && !ord.obsoleted)
+  if (ord.obsoleted) {
+    logger.info('orderLimitRetry obsoleted',ord)
+  }
   logger.info('orderLimitRetry', response)
   return response
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
