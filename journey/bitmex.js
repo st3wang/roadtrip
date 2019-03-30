@@ -41,7 +41,7 @@ const logger = winston.createLogger({
           let splat = info[Symbol.for('splat')]
           let {timestamp,level,message} = info
           let prefix = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
-          let line = message
+          let line = message + ' '
           switch(message) {
             case 'orderStopMarket':
             case 'orderStopMarketRetry':
