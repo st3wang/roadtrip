@@ -677,8 +677,15 @@ async function wait(ms) {
 
 var pendingLimitOrderRetry, orderQueueArray = []
 
+function popOrderQueue(ord) {
+  var index = orderQueueArray.indexOf(ord);
+  if (index > -1) {
+    orderQueueArray.splice(index, 1);
+  }
+}
+
 async function orderQueue(ord) { try {
-  logger.info('orderQueue',ord)
+  logger.info('orderQueue -->',ord)
   orderQueueArray.forEach(o => {
     logger.info('newer order, obsolete old one',o)
     o.obsoleted = true
@@ -691,6 +698,7 @@ async function orderQueue(ord) { try {
   // your turn, see if there is a newer order
   if (ord.obsoleted) {
     logger.info('orderQueue obsoleted',ord)
+    popOrderQueue(ord)
     return ({obj:{ordStatus:'Obsoleted'}})
   }
   if (!ord.execInst || ord.execInst.length == 0) {
@@ -701,6 +709,7 @@ async function orderQueue(ord) { try {
   var response = await pendingLimitOrderRetry
   pendingLimitOrderRetry = null
   logger.info('orderQueue',response)
+  popOrderQueue(ord)
   return response
 } catch(e) {console.error(e.stack||(e));debugger} }
 
