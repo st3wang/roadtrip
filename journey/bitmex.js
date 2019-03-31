@@ -47,16 +47,17 @@ const logger = winston.createLogger({
             case 'orderStopMarketRetry':
             case 'orderLimit':
             case 'orderLimitRetry':
+            case 'orderQueue':
             case 'orderEnter':
             case 'orderExit': {
-              line += orderString(splat[0].obj)
+              line += (splat[0].obj ? orderString(splat[0].obj) : ('splat[0].obj is null ' + JSON.stringify(splat[0])))
             } break
             case 'cancelAll': {
               line += splat[0].obj.length
             } break
             case 'handleOrder':
             case 'pruneOrders': {
-              line += orderString(splat[0])
+              line += (splat[0] ? orderString(splat[0]) : 'splat[0] is null')
             } break
             case 'orderLimit error':
             case 'orderStopMarket error': {
@@ -699,6 +700,7 @@ async function orderQueue(ord) { try {
   pendingLimitOrderRetry.ord = ord
   var response = await pendingLimitOrderRetry
   pendingLimitOrderRetry = null
+  logger.info('orderQueue',response)
   return response
 } catch(e) {console.error(e.stack||(e));debugger} }
 
