@@ -702,7 +702,7 @@ async function orderQueue(ord) { try {
     return ({obj:{ordStatus:'Obsoleted'}})
   }
   if (!ord.execInst || ord.execInst.length == 0) {
-    cancelAll()
+    await cancelAll()
   }
   pendingLimitOrderRetry = orderLimitRetry(ord)
   pendingLimitOrderRetry.ord = ord
