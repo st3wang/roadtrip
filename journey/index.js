@@ -1,5 +1,8 @@
 const log = require('./log')
 const winston = require('winston')
+const path = require('path')
+global.logDir = path.resolve(__dirname, 'log')
+
 // const l = require('./logger')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
@@ -33,9 +36,10 @@ const logger = winston.createLogger({
         winston.format.prettyPrint(),
         winston.format.printf(info => {
           let splat = info[Symbol.for('splat')]
-          let {timestamp,level,label,message} = info
-          let log = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'idx')+'] '+message+' '
-          switch(info.message) {
+          let {timestamp,level,message} = info
+          let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
+          let line = message + ' '
+          switch(message) {
             case 'checkPosition': {
               let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal
@@ -61,7 +65,7 @@ const logger = winston.createLogger({
               candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
               let payFunding = fundingRate*positionSize/lastPrice // /walletBalance
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
-              log += caller + ' W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
+              line += caller + ' W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
@@ -69,31 +73,46 @@ const logger = winston.createLogger({
               let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
               if (rsiSignal) {
                 let {condition,prsi=NaN,rsi=NaN} = rsiSignal
-                log += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
+                line += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (conservativeRsiSignal) {
                 let {condition,prsi=NaN,rsi=NaN} = conservativeRsiSignal
-                log += ' '+conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
+                line += ' '+conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (orderSignal) {
                 let {type,entryPrice=NaN,positionSizeUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
-                log += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
+                line += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
               }
             } break
             case 'ENTER': {
               let {positionSizeUSD,entryPrice} = splat[0].signal
-              log += positionSizeUSD+' '+entryPrice
+              line += positionSizeUSD+' '+entryPrice
             } break
             default: {
-              log += (splat ? `${JSON.stringify(splat)}` : '')
+              line += (splat ? `${JSON.stringify(splat)}` : '')
             }
           }
-          return log
+          switch(level) {
+            case 'error': {
+              line = '\x1b[31m' + line + '\x1b[39m'
+            } break
+            case 'warn': {
+              line = '\x1b[33m' + line + '\x1b[39m'
+            } break
+          }
+          return prefix+line
         })
       ),
     }),
-    new winston.transports.File({filename:'combined.log',
+    new winston.transports.File({filename:global.logDir+'/'+'combined.log',
       level:'debug',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.json()
+      ),
+    }),
+    new winston.transports.File({filename:global.logDir+'/'+'warn.log',
+      level:'warn',
       format: winston.format.combine(
         isoTimestamp(),
         winston.format.json()
@@ -299,12 +318,12 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
     }
   }
   return enter
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkPositionCallback(params) { try {
   params.signal = entrySignal
   return await checkPosition(params)
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
   var {signal} = params
@@ -330,7 +349,7 @@ async function checkEntry(params) { try {
       }
     }
   }
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkExit(params) { try {
   let {positionSize,bid,ask} = params
@@ -348,19 +367,19 @@ async function checkExit(params) { try {
     logger.info('EXIT',exit)
     return await bitmex.orderExit('',exit.price,-params.positionSize)
   }
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkPosition(params) { try {
   logger.info('checkPosition',params)
   if (!(await checkExit(params))) {
     await checkEntry(params)
   }
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function next() { try {
   bitmex.checkPositionParams.caller = 'interval'
   checkPosition(bitmex.checkPositionParams)
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getMarketCsv() { try {
   var market = await bitmex.getMarketWithCurrentCandle(15,96)
@@ -371,7 +390,7 @@ async function getMarketCsv() { try {
     candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+','+rsis[i]+'\n'
   })
   return csv
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
   var status = order.ordStatus.toUpperCase()
@@ -407,7 +426,7 @@ async function getTradeCsv() { try {
     }
   }
   return csv
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getFundingCsv() { try {
   var csv = 'Date,Rate\n'
@@ -417,7 +436,7 @@ async function getFundingCsv() { try {
     csv += funding.timestamp+','+funding.fundingRate+'\n'
   })
   return csv
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 function createInterval(candleDelay) {
   var now = new Date().getTime()
@@ -458,6 +477,6 @@ async function start() { try {
   createInterval(5000*2**4)
   createInterval(5000*2**5)
   createInterval(5000*2**6)
-} catch(e) {console.error(e.stack||e);debugger} }
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 start()
