@@ -651,6 +651,12 @@ function popOrderQueue(ord) {
 
 async function orderQueue(ord) { try {
   logger.info('orderQueue -->',ord)
+  var foundPendingQueue = orderQueueArray.find(o => {
+    return (o.price == ord.price && o.size == ord.price && o.execInst == ord.execInst && !ord.obsoleted)
+  })
+  if (foundPendingQueue) {
+    return ({obj:{ordStatus:'Duplicate'}}) 
+  }
   orderQueueArray.forEach(o => {
     logger.info('newer order, obsolete old one',o)
     o.obsoleted = true
@@ -666,9 +672,7 @@ async function orderQueue(ord) { try {
     popOrderQueue(ord)
     return ({obj:{ordStatus:'Obsoleted'}})
   }
-  if (!ord.execInst || ord.execInst.length == 0) {
-    await cancelAll()
-  }
+
   pendingLimitOrderRetry = orderLimitRetry(ord)
   pendingLimitOrderRetry.ord = ord
   var response = await pendingLimitOrderRetry
@@ -679,6 +683,9 @@ async function orderQueue(ord) { try {
 } catch(e) {logger.error(e.stack||(e));debugger} }
 
 async function orderLimitRetry(ord) { try {
+  if (!ord.execInst || ord.execInst.length == 0) {
+    await cancelAll()
+  }
   var {cid,price,size,execInst} = ord
   var retryOn = 'Canceled,Overloaded',
       response, 
