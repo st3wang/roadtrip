@@ -1,6 +1,6 @@
 const log = require('./log')
 const winston = require('winston')
-// const l = require('./logger')
+const mock = require('./mock')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
 const server = require('./server')
@@ -14,8 +14,16 @@ global.log = log
 // const { combine, timestamp, label, printf } = format;
 const colorizer = winston.format.colorize();
 
+function getNow() {
+  return new Date()
+}
+
+if (mock) {
+  getNow = mock.getNow
+}
+
 const isoTimestamp = winston.format((info, opts) => {
-  info.timestamp = new Date().toISOString()
+  info.timestamp = getNow().toISOString()
   return info;
 });
 
@@ -47,14 +55,14 @@ const logger = winston.createLogger({
               }
               else if (positionSize < 0) {
                 positionSizeString = '\x1b[35m' + positionSize + '\x1b[39m'
-                lastPriceString = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
+                lastPriceString = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(2) + '\x1b[39m'
               }
               else {
                 positionSizeString = positionSize
-                lastPriceString = lastPrice.toFixed(1)
+                lastPriceString = lastPrice.toFixed(2)
               }
               lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34;1m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
-              let now = new Date().getTime()
+              let now = getNow().getTime()
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000)
               candlesInTrade = (candlesInTrade >= 15 || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
               let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000)
@@ -76,8 +84,8 @@ const logger = winston.createLogger({
                 log += ' '+conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (orderSignal) {
-                let {type,entryPrice=NaN,positionSizeUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
-                log += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
+                let {type,entryPrice=NaN,positionSizeUSD,stopLoss=NaN,takeProfit=NaN,riskAmountUSD=NaN} = orderSignal
+                log += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+stopLoss.toFixed(1)+' '+takeProfit.toFixed(1)+' '+riskAmountUSD.toFixed(4)
               }
             } break
             case 'ENTER': {
@@ -120,16 +128,16 @@ logger.info('setup', setup)
 function isFundingWindow(fundingTimestamp) {
   var fundingTime = new Date(fundingTimestamp).getTime()
   var checkFundingPositionTime = fundingTime - 1800000
-  var now = new Date().getTime()
+  var now = getNow().getTime()
   return (now > checkFundingPositionTime)
 }
 
 var cutOffTimeForAll = 4*60*60000
 var cutOffTimeForLargeTrade = 59*60000
 
-function isInPositionForTooLong(signal) {
+function isInPositionForTooLong(timestamp,signal) {
   if (signal) {
-    var time = new Date().getTime()
+    var time = new Date(timestamp).getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
     return (delta > cutOffTimeForAll || 
@@ -192,8 +200,8 @@ function getFee(size,rate,risk) {
   }
 }
 
-function exitTooLong({positionSize,signal}) {
-  if (positionSize != 0 && isInPositionForTooLong(signal)) {
+function exitTooLong({timestamp,positionSize,signal}) {
+  if (positionSize != 0 && isInPositionForTooLong(timestamp,signal)) {
     return {reason:'toolong'}
   }
   // var exit
@@ -351,7 +359,9 @@ async function checkExit(params) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkPosition(params) { try {
-  logger.info('checkPosition',params)
+  // console.log('checkPosition',params.lastPrice)
+
+  // logger.info('checkPosition',params)
   if (!(await checkExit(params))) {
     await checkEntry(params)
   }
@@ -383,7 +393,7 @@ function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
 }
 
 async function getTradeCsv() { try {
-  var yesterday = new Date().getTime() - (24*60*60000)
+  var yesterday = getNow().getTime() - (24*60*60000)
   var orders = await bitmex.getOrders(yesterday)
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
   for (var i = 0; i < orders.length; i++) {
@@ -420,7 +430,7 @@ async function getFundingCsv() { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function createInterval(candleDelay) {
-  var now = new Date().getTime()
+  var now = getNow.getTime()
   var interval = 15*60000
   var startsIn = ((interval*2)-now%(interval) + candleDelay) % interval
   var startsInSec = startsIn % 60000
@@ -442,22 +452,22 @@ async function start() { try {
   await bitmex.init(checkPositionCallback)
   await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
 
-  next()
-  createInterval(-5000*2**6)
-  createInterval(-5000*2**5)
-  createInterval(-5000*2**4)
-  createInterval(-5000*2**3)
-  createInterval(-5000*2**2)
-  createInterval(-5000*2**1)
-  createInterval(-5000*2**0)
-  createInterval(200)
-  createInterval(5000*2**0)
-  createInterval(5000*2**1)
-  createInterval(5000*2**2)
-  createInterval(5000*2**3)
-  createInterval(5000*2**4)
-  createInterval(5000*2**5)
-  createInterval(5000*2**6)
+  // next()
+  // createInterval(-5000*2**6)
+  // createInterval(-5000*2**5)
+  // createInterval(-5000*2**4)
+  // createInterval(-5000*2**3)
+  // createInterval(-5000*2**2)
+  // createInterval(-5000*2**1)
+  // createInterval(-5000*2**0)
+  // createInterval(200)
+  // createInterval(5000*2**0)
+  // createInterval(5000*2**1)
+  // createInterval(5000*2**2)
+  // createInterval(5000*2**3)
+  // createInterval(5000*2**4)
+  // createInterval(5000*2**5)
+  // createInterval(5000*2**6)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 start()

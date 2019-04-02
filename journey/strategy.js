@@ -2,6 +2,15 @@ const util = require('util')
 const talib = require('talib')
 const talibExecute = util.promisify(talib.execute)
 const bitmex = require('./bitmex')
+const mock = require('./mock')
+
+function getNow() {
+  return new Date()
+}
+
+if (mock) {
+  getNow = mock.getNow
+}
 
 async function getRsi(data,length) {
   var result = await talibExecute({
@@ -74,7 +83,7 @@ function highestBody(market,start,length) {
 }
 
 async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
-  var timestamp = new Date().toISOString()
+  var timestamp = getNow().toISOString()
   let signalCondition = signal.condition
   
   let lastIndex = market.closes.length - 1
@@ -98,11 +107,13 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
       entryPrice = Math.max(quote.askPrice,close) // use askPrice or close
       entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
       lossDistance = Math.abs(stopLoss - entryPrice)
-      stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2 // round to 0.5
-      profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
+      stopMarketDistance = lossDistance*stopMarketFactor
+      // stopMarketDistance = Math.round(stopMarketDistance*2)/2 // round to 0.5
+      profitDistance = -lossDistance*profitFactor
+      // profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
       stopLossTrigger = stopLoss - 0.5
-      takeProfitTrigger = entryPrice - 2 //takeProfit + 0.5
+      takeProfitTrigger = entryPrice - (lossDistance/4)
       stopMarketTrigger = entryPrice + stopMarketDistance
       lossDistancePercent = lossDistance/entryPrice
       // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
@@ -112,17 +123,21 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
       entryPrice = Math.min(quote.bidPrice,close)
       entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       lossDistance = -Math.abs(entryPrice - stopLoss)
-      stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
+      stopMarketDistance = lossDistance*stopMarketFactor
+      // stopMarketDistance = Math.round(stopMarketDistance*2)/2 // round to 0.5
       profitDistance = -lossDistance * profitFactor
-      profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
+      // profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
       stopLossTrigger = stopLoss + 0.5
-      takeProfitTrigger = entryPrice + 2 //takeProfit - 0.5
+      takeProfitTrigger = entryPrice - (lossDistance/4)
       stopMarketTrigger = entryPrice + stopMarketDistance
       lossDistancePercent = lossDistance/entryPrice
       // positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
       break;
   }
+
+  //(3950*4000)/(4000-3950)*0.01
+  // LONG positionSizeUSD = (stopLoss*entryPrice)/(entryPrice-stopLoss)*riskPerTradePercent
 
   let capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + availableMargin/100000000
   let capitalUSD = capitalBTC * entryPrice

@@ -301,11 +301,13 @@ async function initMarketServer() { try {
 
   let getMarketData = async function(setup) {
     let startYMD = setup.startYMD
-    if (!markets[startYMD]) {
-      markets[startYMD] = await marketHelper.getMarket('bitmex',15,startYMD,20190319)
-      markets[startYMD].rsis = []
+    let endYMD = setup.endYMD
+    let dateKey = startYMD+'-'+endYMD
+    if (!markets[dateKey]) {
+      markets[dateKey] = await marketHelper.getMarket('bitmex',15,startYMD,endYMD)
+      markets[dateKey].rsis = []
     }
-    return markets[startYMD]
+    return markets[dateKey]
   }
   let getMarketJson = async function(setup) {
     let market = await getMarketData(setup)
@@ -317,6 +319,7 @@ async function initMarketServer() { try {
       return '{"errorMessage":"Invalid rsiLength"}'
     }
     let startYMD = setup.startYMD
+    let endYMD = setup.endYMD
     let overviewJson
     let market = await getMarketData(setup)
     if (!market.rsis[rsiLength]) {
@@ -341,8 +344,8 @@ async function initMarketServer() { try {
 async function start() { try {
   // await bitmex.updateCandleFiles()
   // await binance.updateCandleFiles()
-
   await initMarketServer()
+  await strategy.testGetRsiCase()
 } catch(e) {console.error(e.stack||e);debugger} }
 
 start()

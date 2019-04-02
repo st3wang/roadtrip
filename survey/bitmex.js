@@ -199,7 +199,7 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
 async function updateCandleFiles() { try {
   var interval = 15
   var startYmd = historyStartYmd
-  var endYmd = 20190319
+  var endYmd = new Date(new Date().getTime() - (24*60*60000)).toISOString().substring(0,10).replace(/-/g,'')
   await downloadTradeData(startYmd,endYmd)
   await generateCandleDayFiles(startYmd,endYmd,interval)
   // var market = await getMarket(startYmd,endYmd,interval)

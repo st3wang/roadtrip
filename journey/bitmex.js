@@ -2,6 +2,7 @@ const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
 const SwaggerClient = require("swagger-client")
 const shoes = require('./shoes')
 const winston = require('winston')
+const mock = require('./mock')
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 
@@ -20,8 +21,12 @@ var currentCandle, currentCandleTimeOffset
 
 const colorizer = winston.format.colorize();
 
+function getNow() {
+  return new Date()
+}
+
 const isoTimestamp = winston.format((info, opts) => {
-  info.timestamp = new Date().toISOString()
+  info.timestamp = getNow().toISOString()
   return info;
 });
 
@@ -114,7 +119,7 @@ async function wsAddStream(table, handler) { try {
   })
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function connect() { try {
+var connect = async() => { try {
   ws = new BitMEXRealtimeAPI({
     testnet: shoes.bitmex.test,
     apiKeyID: shoes.bitmex.key,
@@ -142,9 +147,9 @@ async function connect() { try {
   heartbeat()
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function pruneOrders(orders) { try {
+function pruneOrders(orders) { try {
   var found, pruned
-  var yesterday = new Date().getTime() - 86400000
+  var yesterday = getNow().getTime() - 86400000
   var prunedCanceledOrder = false
   do {
     found = orders.findIndex(order => {
@@ -182,21 +187,23 @@ async function handleOrder(data) { try {
   var prunedCanceledOrder = pruneOrders(data)
   if (!prunedCanceledOrder) {
     checkPositionParams.caller = 'order'
-    checkPositionCallback(checkPositionParams)
+    await checkPositionCallback(checkPositionParams)
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
-function handlePosition(data) {
+async function handlePosition(data) {
   lastPosition = data[0]
 
   var qty = lastPosition.currentQty
   if (qty != lastQty) {
     checkPositionParams.positionSize = qty
     checkPositionParams.caller = 'position'
-    checkPositionCallback(checkPositionParams)
+    lastQty = lastPosition.currentQty
+    await checkPositionCallback(checkPositionParams)
   }
-
-  lastQty = lastPosition.currentQty
+  else {
+    lastQty = lastPosition.currentQty
+  }
 }
 
 async function handleInstrument(data) { try {
@@ -206,19 +213,25 @@ async function handleInstrument(data) { try {
   var ask = lastInstrument.askPrice
 
   appendCandleLastPrice()
-  
+  if (bid == 966.28) {
+    console.log('bid',966.28)
+  }
   if (bid !== lastBid || ask !== lastAsk) {
+    checkPositionParams.timestamp = lastInstrument.timestamp
     checkPositionParams.bid = bid
     checkPositionParams.ask = ask
     checkPositionParams.lastPrice = lastInstrument.lastPrice
     checkPositionParams.fundingTimestamp = lastInstrument.fundingTimestamp
     checkPositionParams.fundingRate = lastInstrument.fundingRate
     checkPositionParams.caller = 'instrument'
-    checkPositionCallback(checkPositionParams)
+    lastBid = bid
+    lastAsk = ask
+    await checkPositionCallback(checkPositionParams)
   }
-
-  lastBid = bid
-  lastAsk = ask
+  else {
+    lastBid = bid
+    lastAsk = ask
+  }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function appendCandleLastPrice() {
@@ -233,11 +246,11 @@ async function appendCandleLastPrice() {
 }
 
 function getCandleTimeOffset() {
-  return ((new Date().getTime()) % 900000)
+  return ((getNow().getTime()) % 900000)
 }
 
 function startNextCandle() {
-  var now = new Date().getTime()
+  var now = getNow().getTime()
   var candleTimeOffset = now % 900000
   var currentCandleTime = now - candleTimeOffset
   var currentCandleISOString = new Date(currentCandleTime).toISOString()
@@ -383,8 +396,11 @@ var exitRequesting
 //   return responseData
 // } catch(e) {console.error(e.stack||e);debugger} }
 
-async function authorize() { try {
+var authorize = async() => { try {
   console.log('Authorizing')
+  if (mock) {
+    await mock.authorize()
+  }
   let swaggerClient = await new SwaggerClient({
     url: shoes.bitmex.swagger,
     usePromise: true
@@ -404,7 +420,7 @@ function inspect(client) {
 }
 
 function getPageTimes(interval,length,binSize) {
-  var current = new Date()
+  var current = getNow()
   var currentMS = current.getTime()
   var offset = (length * interval * 60000) + (currentMS % (interval * 60000))
   var bitMexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
@@ -453,9 +469,9 @@ function toCandle(group) {
   return candle
 }
 
-async function getCurrentTradeBucketed(interval) { try {
+var getCurrentTradeBucketed = async(interval) => { try {
   interval = interval || 15
-  let now = new Date().getTime()
+  let now = getNow().getTime()
   let candleTimeOffset = now % (interval*60000)
   let startTime = new Date(now - candleTimeOffset + 60000).toISOString()
   let response = await client.Trade.Trade_getBucketed({symbol:'XBTUSD', binSize:'1m', 
@@ -477,7 +493,7 @@ async function getCurrentTradeBucketed(interval) { try {
 
 var getTradeBucketedRequesting 
 
-async function getTradeBucketed(interval,length) { try {
+var getTradeBucketed = async(interval,length) => { try {
   if (getTradeBucketedRequesting) {
     await getTradeBucketedRequesting
   }
@@ -511,7 +527,7 @@ async function getTradeBucketed(interval,length) { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function getMarket(interval,length) { try {
+var getMarket = async(interval,length) => { try {
   if (marketCache) {
     // update current candle
     appendCandleLastPrice()
@@ -558,7 +574,7 @@ async function getMargin() { try {
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getTradeHistory(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  startTime = startTime || (getNow().getTime() - (24*60*60000))
   let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
   startTime: new Date(startTime).toISOString(),
   columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
@@ -571,7 +587,7 @@ async function getTradeHistory(startTime) { try {
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getFundingHistory(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  startTime = startTime || (getNow().getTime() - (24*60*60000))
   let response = await client.Funding.Funding_get({symbol: 'XBTUSD',
   startTime: new Date(startTime).toISOString()
   })
@@ -584,7 +600,7 @@ async function getFundingHistory(startTime) { try {
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getNewOrders(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  startTime = startTime || (getNow().getTime() - (24*60*60000))
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
     filter: '{"ordStatus":"New"}',
@@ -595,7 +611,7 @@ async function getNewOrders(startTime) { try {
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getOrders(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  startTime = startTime || (getNow().getTime() - (24*60*60000))
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
     // filter: '{"ordType":"Limit"}',
@@ -630,7 +646,7 @@ async function orderEnter(signal) { try {
   if (!signal.entryPrice || !signal.positionSizeUSD) {
     return
   }
-
+  // console.log('orderEnter -->', signal)
   let response = await orderQueue({
     cid:signal.timestamp+'ENTER',
     price:signal.entryPrice,
@@ -864,6 +880,19 @@ async function init(checkPositionCb) { try {
   // await getInstrument()
   // await getOrders(yesterday)
 } catch(e) {console.error(e.stack||e);debugger} }
+
+if (mock) {
+  mock.init(handleMargin,handleOrder,handlePosition,handleInstrument)
+  connect = mock.connect
+  authorize = mock.authorize
+  getTradeBucketed = mock.getTradeBucketed
+  getCurrentTradeBucketed = mock.getCurrentTradeBucketed
+  updateLeverage = mock.updateLeverage
+  getNow = mock.getNow
+  cancelAll = mock.cancelAll
+  orderLimit = mock.orderLimit
+  orderStopMarket = mock.orderStopMarket
+}
 
 module.exports = {
   init: init,
