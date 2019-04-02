@@ -786,6 +786,36 @@ async function orderStopMarket(price,size) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
+function findNewLimitOrder(p,s,e) {
+  s = Math.abs(s)
+  return lastOrders.find((order) => {
+    let {ordStatus,ordType,price,orderQty,execInst} = order
+    return (price == p && orderQty == s && execInst == e && ordType == 'Limit' && ordStatus == 'New')
+  })
+}
+
+function findNewOrFilledLimitOrder(p,s,e) {
+  s = Math.abs(s)
+  return lastOrders.find((order) => {
+    let {ordStatus,ordType,price,orderQty,execInst,timestamp} = order
+    if (ordType == 'Limit') {
+      switch (ordStatus) {
+        case 'New': {
+          return (price == p && orderQty == s && execInst == e)
+        }
+        case 'Filled': {
+          if (execInst == e && price > (p*0.999) && price < (p*1.001) && orderQty > (s*0.98) && orderQty < (s*1.02)) {
+            let ordTime = new Date(timestamp).getTime
+            let now = new Date().getTime()
+            logger.warn('findNewLimitOrder found filled',order)
+            return (now - ordTime < 10000)
+          }
+        }
+      }
+    }
+  })
+}
+
 async function initMarket() { try {
   console.log('Initializing market')
   await getMarket(15,96)
@@ -835,6 +865,7 @@ module.exports = {
   getNextFunding: getNextFunding,
 
   findNewLimitOrder: findNewLimitOrder,
+  findNewOrFilledLimitOrder: findNewOrFilledLimitOrder,
   getCandleTimeOffset: getCandleTimeOffset,
 
   checkPositionParams: checkPositionParams,

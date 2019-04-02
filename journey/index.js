@@ -326,6 +326,8 @@ async function checkPositionCallback(params) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
+  if (params.positionSize != 0) return
+  
   var {signal} = params
   var cancel, enter
   let existingEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')  
@@ -335,7 +337,7 @@ async function checkEntry(params) { try {
     existingEntryOrder = null
   }
   if (!existingEntryOrder && (enter = await enterSignal(params))) {
-    if (bitmex.findNewLimitOrder(enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
+    if (bitmex.findNewOrFilledLimitOrder(enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
       logger.info('ENTRY ORDER EXISTS')
     }
     else {
@@ -358,7 +360,7 @@ async function checkExit(params) { try {
   var exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)
   if (exit) {
     exit.price = exit.price || (positionSize < 0 ? bid : ask)
-    let existingOrder = bitmex.findNewLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')
+    let existingOrder = bitmex.findNewOrFilledLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')
     if (existingOrder) {
       logger.debug('EXIT EXISTING ORDER',exit)
       return existingOrder
