@@ -144,7 +144,7 @@ async function connect() { try {
 
 async function pruneOrders(orders) { try {
   var found, pruned
-  var yesterday = new Date().getTime() - 86400000
+  var yesterday = new Date().getTime() - 28800000
   var prunedCanceledOrder = false
   do {
     found = orders.findIndex(order => {
