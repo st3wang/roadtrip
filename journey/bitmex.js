@@ -40,7 +40,7 @@ const logger = winston.createLogger({
         winston.format.printf(info => {
           let splat = info[Symbol.for('splat')]
           let {timestamp,level,message} = info
-          let prefix = timestamp.replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
+          let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
           let line = message + ' '
           switch(message) {
             case 'orderStopMarket':
