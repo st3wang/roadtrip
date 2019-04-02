@@ -62,7 +62,7 @@ const logger = winston.createLogger({
             case 'orderLimit error':
             case 'orderStopMarket error': {
               let {status,obj} = splat[0]
-              line += status + ' ' + obj.message + ' ' + JSON.stringify(splat[1])
+              line += status + ' ' + obj.error.message + ' ' + JSON.stringify(splat[1])
             } break
             default: {
               line += (splat ? `${JSON.stringify(splat)}` : '')
