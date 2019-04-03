@@ -6,7 +6,6 @@ const winston = require('winston')
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 
 const EXECINST_REDUCEONLY = ',ReduceOnly'
-const RETRYON_CANCELED = 'Canceled'
 
 var client, checkPositionCallback, checkPositionParams = {}
 var marketCache, marketWithCurrentCandleCache
@@ -618,7 +617,7 @@ async function orderEnter(signal) { try {
       return false
   }
 
-  await orderStopMarketRetry(signal.stopMarketTrigger,-signal.positionSizeUSD,RETRYON_CANCELED)
+  await orderStopMarketRetry(signal.stopMarketTrigger,-signal.positionSizeUSD)
   // handle response
   return true
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
@@ -687,17 +686,38 @@ async function orderLimitRetry(ord) { try {
     await cancelAll()
   }
   var {cid,price,size,execInst} = ord
-  var retryOn = 'Canceled,Overloaded',
+  var retry = false,
       response, 
       count = 0,
-      waitTime = 2
+      waitTime = 2,
+      canceledCount = 0
   do {
     response = await orderLimit(cid,price,size,execInst) 
     count++
     waitTime *= 2
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
-  } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 10 && await wait(waitTime) && !ord.obsoleted)
+    switch (response.obj.ordStatus) {
+      case 'Overloaded': {
+        retry = true
+      } break
+      case 'Canceled': {
+        retry = true
+        canceledCount++
+        if (canceledCount > 2) {
+          let {price,orderQty,execInst} = orderresponse.obj
+          let existingOrder = findNewLimitOrder(price,orderQty,execInst)
+          if (existingOrder) {
+            logger.warn('orderLimitRetry canceled duplicate order',ord)
+            response.obj.ordStatus = 'Duplicate'
+            retry = false
+          }
+        }
+      } break
+      default:
+        retry = false
+    }
+  } while(retry && count < 10 && !ord.obsoleted && await wait(waitTime))
   if (ord.obsoleted) {
     logger.info('orderLimitRetry obsoleted',ord)
   }
@@ -749,8 +769,8 @@ async function orderLimit(cid,price,size,execInst) { try {
   }
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function orderStopMarketRetry(price,size,retryOn) { try {
-  retryOn += 'Overloaded'
+async function orderStopMarketRetry(price,size) { try {
+  retryOn = 'Canceled,Overloaded'
   let response, 
       count = 0,
       waitTime = 2
@@ -812,9 +832,9 @@ function findNewOrFilledLimitOrder(p,s,e) {
         }
         case 'Filled': {
           if (execInst == e && price > (p*0.999) && price < (p*1.001) && orderQty > (s*0.98) && orderQty < (s*1.02)) {
-            let ordTime = new Date(timestamp).getTime
+            let ordTime = new Date(timestamp).getTime()
             let now = new Date().getTime()
-            logger.warn('findNewLimitOrder found filled',order)
+            logger.warn('findNewOrFilledLimitOrder found filled',order)
             return (now - ordTime < 10000)
           }
         }
