@@ -651,7 +651,7 @@ function popOrderQueue(ord) {
 async function orderQueue(ord) { try {
   logger.info('orderQueue -->',ord)
   var foundPendingQueue = orderQueueArray.find(o => {
-    return (o.price == ord.price && o.size == ord.price && o.execInst == ord.execInst && !ord.obsoleted)
+    return (o.price == ord.price && o.size == ord.size && o.execInst == ord.execInst && !ord.obsoleted)
   })
   if (foundPendingQueue) {
     return ({obj:{ordStatus:'Duplicate'}}) 
@@ -705,7 +705,7 @@ async function orderLimitRetry(ord) { try {
         retry = true
         canceledCount++
         if (canceledCount > 2) {
-          let {price,orderQty,execInst} = orderresponse.obj
+          let {price,orderQty,execInst} = order.response.obj
           let existingOrder = findNewLimitOrder(price,orderQty,execInst)
           if (existingOrder) {
             logger.warn('orderLimitRetry canceled duplicate order',ord)
