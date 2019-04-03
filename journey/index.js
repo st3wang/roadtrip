@@ -245,13 +245,13 @@ function exitTargetTrigger({positionSize,bid,ask,signal}) {
   var exit
   if (positionSize > 0) {
     if (ask >= takeProfitTrigger) {
-      logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
+      // logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
       exit = {type:'Limit',price:Math.max(takeProfit,ask),execInst:'ParticipateDoNotInitiate,ReduceOnly',reason:'targettrigger'}
     }
   } 
   else if (positionSize < 0) {
     if (bid <= takeProfitTrigger) {
-      logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
+      // logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
       exit = {type:'Limit',price:Math.min(takeProfit,bid),execInst:'ParticipateDoNotInitiate,ReduceOnly',reason:'targettrigger'}
     }
   }
@@ -272,13 +272,13 @@ function exitStopTrigger({positionSize,bid,ask,signal}) {
   var {stopLossTrigger,stopLoss} = signal
   if (positionSize > 0) {
     if (ask <= stopLossTrigger) {
-      logger.warn('exitStopTrigger',positionSize,bid,ask,signal)
+      // logger.warn('exitStopTrigger',positionSize,bid,ask,signal)
       return {type:'Stop',price:stopLoss,execInst:'LastPrice,ReduceOnly',reason:'stoptrigger'}
     }
   } 
   else if (positionSize < 0) {
     if (bid >= stopLossTrigger) {
-      logger.warn('exitStopTrigger',positionSize,bid,ask,signal)
+      // logger.warn('exitStopTrigger',positionSize,bid,ask,signal)
       return {type:'Stop',price:stopLoss,execInst:'LastPrice,ReduceOnly',reason:'stoptrigger'}
     }
   }

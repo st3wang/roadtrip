@@ -613,7 +613,9 @@ async function orderEnter(signal) { try {
   switch (response.obj.ordStatus) {
     case 'Canceled':
     case 'Overloaded':
+      return false
     case 'Duplicate':
+      await orderStopMarketRetry(signal.stopLoss,-signal.positionSizeUSD)
       return false
   }
 
