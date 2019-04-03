@@ -824,7 +824,8 @@ function findNewLimitOrder(p,s,e) {
 function findNewOrFilledOrder(t,p,s,e) {
   s = Math.abs(s)
   return lastOrders.find((order) => {
-    let {ordStatus,ordType,price,orderQty,execInst,timestamp} = order
+    let {ordStatus,ordType,price,stopPx,orderQty,execInst,timestamp} = order
+    price = price || stopPx
     if (ordType == t) {
       switch (ordStatus) {
         case 'New': {
