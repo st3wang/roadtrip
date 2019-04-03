@@ -386,7 +386,7 @@ async function checkExit(params) { try {
 
     logger.info('EXIT',exit)
     if (exit.reason == 'stoptrigger') {
-      return await bitmex.orderStopMarket(exit.price,-params.positionSizeUSD)
+      return await bitmex.orderStopMarketRetry(exit.price,-params.positionSizeUSD)
     }
     else {
       return await bitmex.orderExit('',exit.price,-params.positionSize)

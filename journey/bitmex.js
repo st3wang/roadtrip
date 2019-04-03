@@ -899,6 +899,7 @@ module.exports = {
   checkPositionParams: checkPositionParams,
 
   orderEnter: orderEnter,
+  orderStopMarketRetry: orderStopMarketRetry,
   orderExit: orderExit,
   cancelAll: cancelAll
 }
