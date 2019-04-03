@@ -385,7 +385,12 @@ async function checkExit(params) { try {
     }
 
     logger.info('EXIT',exit)
-    return await bitmex.orderExit('',exit.price,-params.positionSize)
+    if (exit.reason == 'stoptrigger') {
+      return await bitmex.orderStopMarket(exit.price,-params.positionSizeUSD)
+    }
+    else {
+      return await bitmex.orderExit('',exit.price,-params.positionSize)
+    }
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
