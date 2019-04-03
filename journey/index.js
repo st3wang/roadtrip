@@ -246,13 +246,13 @@ function exitTargetTrigger({positionSize,bid,ask,signal}) {
   if (positionSize > 0) {
     if (ask >= takeProfitTrigger) {
       logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
-      exit = {price:Math.max(takeProfit,ask),reason:'targettrigger'}
+      exit = {type:'Limit',price:Math.max(takeProfit,ask),execInst:'ParticipateDoNotInitiate,ReduceOnly',reason:'targettrigger'}
     }
   } 
   else if (positionSize < 0) {
     if (bid <= takeProfitTrigger) {
       logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
-      exit = {price:Math.min(takeProfit,bid),reason:'targettrigger'}
+      exit = {type:'Limit',price:Math.min(takeProfit,bid),execInst:'ParticipateDoNotInitiate,ReduceOnly',reason:'targettrigger'}
     }
   }
   return exit
@@ -268,13 +268,29 @@ function exitTarget({positionSize,bid,ask,signal}) {
   }
 }
 
-function exitStopMarketTrigger({positionSize,bid,ask,signal}) {
-  var {stopMarketTrigger} = signal
+function exitStopTrigger({positionSize,bid,ask,signal}) {
+  var {stopLossTrigger,stopLoss} = signal
   if (positionSize > 0) {
-    if (ask <= stopMarketTrigger) return {price:Math.min(stopMarketTrigger,ask),reason:'stop'}
+    if (ask <= stopLossTrigger) {
+      logger.warn('exitStopTrigger',positionSize,bid,ask,signal)
+      return {type:'Stop',price:stopLoss,execInst:'LastPrice,ReduceOnly',reason:'stoptrigger'}
+    }
   } 
   else if (positionSize < 0) {
-    if (bid >= stopMarketTrigger) return {price:Math.max(stopMarketTrigger,bid),reason:'stop'}
+    if (bid >= stopLossTrigger) {
+      logger.warn('exitStopTrigger',positionSize,bid,ask,signal)
+      return {type:'Stop',price:stopLoss,execInst:'LastPrice,ReduceOnly',reason:'stoptrigger'}
+    }
+  }
+}
+
+function exitStop({positionSize,bid,ask,signal}) {
+  var {stopLoss} = signal
+  if (positionSize > 0) {
+    if (ask <= stopLoss) return {price:stopLoss,reason:'stop'}
+  } 
+  else if (positionSize < 0) {
+    if (bid >= stopLoss) return {price:stopLoss,reason:'stop'}
   }
 }
 
@@ -285,7 +301,7 @@ function cancelOrder(params) {
 
   let cancelParams = Object.assign({},params)
   cancelParams.positionSize = signal.positionSizeUSD
-  return (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStopMarketTrigger(cancelParams))
+  return (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStop(cancelParams))
 }
 
 async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableMargin}) { try {
@@ -337,7 +353,7 @@ async function checkEntry(params) { try {
     existingEntryOrder = null
   }
   if (!existingEntryOrder && (enter = await enterSignal(params))) {
-    if (bitmex.findNewOrFilledLimitOrder(enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
+    if (bitmex.findNewOrFilledOrder('Limit',enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
       logger.info('ENTRY ORDER EXISTS')
     }
     else {
@@ -357,10 +373,12 @@ async function checkExit(params) { try {
   let {positionSize,bid,ask} = params
   if (positionSize == 0) return
 
-  var exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)
+  var exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params) || exitStopTrigger(params)
   if (exit) {
     exit.price = exit.price || (positionSize < 0 ? bid : ask)
-    let existingOrder = bitmex.findNewOrFilledLimitOrder(exit.price,-params.positionSize,'ParticipateDoNotInitiate,ReduceOnly')
+    exit.type = exit.type || 'Limit'
+    exit.execInst = exit.execInst || 'ParticipateDoNotInitiate,ReduceOnly'
+    let existingOrder = bitmex.findNewOrFilledOrder(exit.type,exit.price,-params.positionSize,exit.execInst)
     if (existingOrder) {
       logger.debug('EXIT EXISTING ORDER',exit)
       return existingOrder

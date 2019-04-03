@@ -87,7 +87,7 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
   let stopLossLookBack = bankroll.stopLossLookBack
   let leverageMargin = availableMargin*0.000000008
   let entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
-    stopLossTrigger, takeProfitTrigger, stopMarketTrigger,lossDistancePercent,
+    stopLossTrigger, takeProfitTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
 
   let quote = bitmex.getQuote()
@@ -101,9 +101,8 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
       stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2 // round to 0.5
       profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
-      stopLossTrigger = stopLoss - 0.5
-      takeProfitTrigger = entryPrice - 2 //takeProfit + 0.5
-      stopMarketTrigger = entryPrice + stopMarketDistance
+      stopLossTrigger = entryPrice + (lossDistance/4)
+      takeProfitTrigger = entryPrice - (lossDistance/4)
       lossDistancePercent = lossDistance/entryPrice
       // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
@@ -116,9 +115,8 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
       profitDistance = -lossDistance * profitFactor
       profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
-      stopLossTrigger = stopLoss + 0.5
-      takeProfitTrigger = entryPrice + 2 //takeProfit - 0.5
-      stopMarketTrigger = entryPrice + stopMarketDistance
+      stopLossTrigger = entryPrice + (lossDistance/4)
+      takeProfitTrigger = entryPrice - (lossDistance/4)
       lossDistancePercent = lossDistance/entryPrice
       // positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
       break;
@@ -149,7 +147,6 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
     takeProfit: takeProfit,
     stopLossTrigger: stopLossTrigger,
     takeProfitTrigger: takeProfitTrigger,
-    stopMarketTrigger: stopMarketTrigger,
     riskAmountBTC: riskAmountBTC,
     riskAmountUSD: riskAmountUSD,
     positionSizeBTC: positionSizeBTC,

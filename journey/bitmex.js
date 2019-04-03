@@ -617,7 +617,7 @@ async function orderEnter(signal) { try {
       return false
   }
 
-  await orderStopMarketRetry(signal.stopMarketTrigger,-signal.positionSizeUSD)
+  await orderStopMarketRetry(signal.stopLoss,-signal.positionSizeUSD)
   // handle response
   return true
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
@@ -821,11 +821,11 @@ function findNewLimitOrder(p,s,e) {
   })
 }
 
-function findNewOrFilledLimitOrder(p,s,e) {
+function findNewOrFilledOrder(t,p,s,e) {
   s = Math.abs(s)
   return lastOrders.find((order) => {
     let {ordStatus,ordType,price,orderQty,execInst,timestamp} = order
-    if (ordType == 'Limit') {
+    if (ordType == t) {
       switch (ordStatus) {
         case 'New': {
           return (price == p && orderQty == s && execInst == e)
@@ -834,7 +834,7 @@ function findNewOrFilledLimitOrder(p,s,e) {
           if (execInst == e && price > (p*0.999) && price < (p*1.001) && orderQty > (s*0.98) && orderQty < (s*1.02)) {
             let ordTime = new Date(timestamp).getTime()
             let now = new Date().getTime()
-            logger.warn('findNewOrFilledLimitOrder found filled',order)
+            logger.warn('findNewOrFilledOrder found filled',order)
             return (now - ordTime < 10000)
           }
         }
@@ -892,7 +892,7 @@ module.exports = {
   getNextFunding: getNextFunding,
 
   findNewLimitOrder: findNewLimitOrder,
-  findNewOrFilledLimitOrder: findNewOrFilledLimitOrder,
+  findNewOrFilledOrder: findNewOrFilledOrder,
   getCandleTimeOffset: getCandleTimeOffset,
 
   checkPositionParams: checkPositionParams,
