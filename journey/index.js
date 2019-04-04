@@ -9,6 +9,8 @@ const strategy = require('./strategy')
 const server = require('./server')
 const shoes = require('./shoes')
 const setup = shoes.setup
+const oneCandleMS = setup.candle.interval*60000
+const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
 global.bitmex = bitmex
 global.log = log
@@ -59,9 +61,9 @@ const logger = winston.createLogger({
               }
               lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34;1m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
               let now = new Date().getTime()
-              let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / 900000)
-              candlesInTrade = (candlesInTrade >= 15 || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
-              let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/900000)
+              let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / oneCandleMS)
+              candlesInTrade = (candlesInTrade >= setup.candle.inTradeMax || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
+              let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/oneCandleMS)
               candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
               let payFunding = fundingRate*positionSize/lastPrice // /walletBalance
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
@@ -136,14 +138,16 @@ var entrySignal
 
 logger.info('setup', setup)
 
+var fundingWindowTime = setup.candle.fundingWindow*setup.candle.interval*60000
+
 function isFundingWindow(fundingTimestamp) {
   var fundingTime = new Date(fundingTimestamp).getTime()
-  var checkFundingPositionTime = fundingTime - 1800000
+  var checkFundingPositionTime = fundingTime - fundingWindowTime //1800000
   var now = new Date().getTime()
   return (now > checkFundingPositionTime)
 }
 
-var cutOffTimeForAll = 4*60*60000
+var cutOffTimeForAll = setup.candle.inTradeMax*60000
 var cutOffTimeForLargeTrade = 59*60000
 
 function isInPositionForTooLong(signal) {
@@ -151,13 +155,13 @@ function isInPositionForTooLong(signal) {
     var time = new Date().getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
-    return (delta > cutOffTimeForAll || 
-      (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) >= 0.002))
+    return (delta > cutOffTimeForAll)
+     //|| (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) >= 0.002))
   }
 }
 
 async function getOrderSignalWithCurrentCandle(availableMargin) {
-  var market = await bitmex.getMarketWithCurrentCandle(15,96)
+  var market = await bitmex.getMarketWithCurrentCandle()
   var closes = market.closes
   var lastPrice = closes[closes.length-1]
   var rsiSignal = await strategy.getSignal(closes,setup.rsi)
@@ -191,7 +195,7 @@ async function getOrderSignalWithCurrentCandle(availableMargin) {
 }
 
 async function getOrderSignal(availableMargin) {
-  var market = await bitmex.getMarket(15,96)
+  var market = await bitmex.getMarket()
   var closes = market.closes
   // var lastPrice = closes[closes.length-1]
   var rsiSignal = await strategy.getSignal(closes,setup.rsi)
@@ -311,12 +315,12 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
   let candleTimeOffset = bitmex.getCandleTimeOffset()
 
   let signals, orderSignal
-  if (candleTimeOffset >= 888000) {
+  if (candleTimeOffset >= setup.candle.signalTimeOffsetMax) {
     signals = await getOrderSignalWithCurrentCandle(availableMargin)
     orderSignal = signals.orderSignal
     logger.info('enterSignal',signals)
   }
-  else if (candleTimeOffset <= 60000) {
+  else if (candleTimeOffset <= setup.candle.signalTimeOffsetMin) {
     signals = await getOrderSignal(availableMargin)
     orderSignal = signals.orderSignal
     logger.info('enterSignal',signals)
@@ -403,11 +407,12 @@ async function checkPosition(params) { try {
 
 async function next() { try {
   bitmex.checkPositionParams.caller = 'interval'
+  bitmex.checkPositionParams.signal = entrySignal
   checkPosition(bitmex.checkPositionParams)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getMarketCsv() { try {
-  var market = await bitmex.getMarketWithCurrentCandle(15,96)
+  var market = await bitmex.getMarketWithCurrentCandle()
   var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
   var csv = 'Date,Open,High,Low,Close,Rsi\n'
   market.candles.forEach((candle,i) => {
@@ -427,7 +432,7 @@ function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
 }
 
 async function getTradeCsv() { try {
-  var yesterday = new Date().getTime() - (24*60*60000)
+  var yesterday = new Date().getTime() - (candleLengthMS)
   var orders = await bitmex.getOrders(yesterday)
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
   for (var i = 0; i < orders.length; i++) {
@@ -465,7 +470,7 @@ async function getFundingCsv() { try {
 
 function createInterval(candleDelay) {
   var now = new Date().getTime()
-  var interval = 15*60000
+  var interval = setup.candle.interval*60000
   var startsIn = ((interval*2)-now%(interval) + candleDelay) % interval
   var startsInSec = startsIn % 60000
   var startsInMin = (startsIn - startsInSec) / 60000
@@ -487,10 +492,10 @@ async function start() { try {
   await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
 
   next()
-  createInterval(-5000*2**6)
-  createInterval(-5000*2**5)
-  createInterval(-5000*2**4)
-  createInterval(-5000*2**3)
+  // createInterval(-5000*2**6)
+  // createInterval(-5000*2**5)
+  // createInterval(-5000*2**4)
+  // createInterval(-5000*2**3)
   createInterval(-5000*2**2)
   createInterval(-5000*2**1)
   createInterval(-5000*2**0)
@@ -498,10 +503,10 @@ async function start() { try {
   createInterval(5000*2**0)
   createInterval(5000*2**1)
   createInterval(5000*2**2)
-  createInterval(5000*2**3)
-  createInterval(5000*2**4)
-  createInterval(5000*2**5)
-  createInterval(5000*2**6)
+  // createInterval(5000*2**3)
+  // createInterval(5000*2**4)
+  // createInterval(5000*2**5)
+  // createInterval(5000*2**6)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 start()

@@ -2,6 +2,9 @@ const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
 const SwaggerClient = require("swagger-client")
 const shoes = require('./shoes')
 const winston = require('winston')
+const setup = shoes.setup
+const oneCandleMS = setup.candle.interval*60000
+const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 
@@ -9,7 +12,10 @@ const EXECINST_REDUCEONLY = ',ReduceOnly'
 
 var client, checkPositionCallback, checkPositionParams = {}
 var marketCache, marketWithCurrentCandleCache
-var binSize = 5
+var binSize = 1
+if (setup.candle.interval >= 5) {
+  binSize = 5
+}
 
 var ws
 var lastInstrument = {}, lastPosition = {}, lastOrders = []
@@ -239,12 +245,12 @@ async function appendCandleLastPrice() {
 }
 
 function getCandleTimeOffset() {
-  return ((new Date().getTime()) % 900000)
+  return ((new Date().getTime()) % oneCandleMS)
 }
 
 function startNextCandle() {
   var now = new Date().getTime()
-  var candleTimeOffset = now % 900000
+  var candleTimeOffset = now % oneCandleMS
   var currentCandleTime = now - candleTimeOffset
   var currentCandleISOString = new Date(currentCandleTime).toISOString()
 
@@ -379,7 +385,9 @@ function getPageTimes(interval,length,binSize) {
   var offset = (length * interval * 60000) + (currentMS % (interval * 60000))
   var bitMexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
   offset -= bitMexOffset
-  var pageIncrement = 8*60*60000
+  var totalMinutes = interval*length
+  var maxPageSize = binSize*100
+  var pageIncrement = totalMinutes/Math.ceil(totalMinutes/maxPageSize)*60000
   var pages = []
   if (offset > pageIncrement) {
     var end = pageIncrement - bitMexOffset
@@ -401,7 +409,7 @@ function getPageTimes(interval,length,binSize) {
 
 function toCandle(group) {
   var open = group[0].open
-  let timeMs = new Date(group[0].timestamp).getTime()-300000
+  let timeMs = new Date(group[0].timestamp).getTime()-(binSize*60000)
   let candle = {
     time: new Date(timeMs).toISOString(),
     startTimeMs: timeMs,
@@ -481,18 +489,18 @@ async function getTradeBucketed(interval,length) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getMarket(interval,length) { try {
+async function getMarket() { try {
   if (marketCache) {
     // update current candle
     appendCandleLastPrice()
   }
   else {
-    marketCache = await getTradeBucketed(interval,length)
+    marketCache = await getTradeBucketed(setup.candle.interval,setup.candle.length)
   }
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getMarketWithCurrentCandle(interval,length) { try {
+async function getMarketWithCurrentCandle() { try {
   appendCandleLastPrice()
   if (marketWithCurrentCandleCache) {
     let lastIndex = marketWithCurrentCandleCache.candles.length - 1
@@ -503,7 +511,7 @@ async function getMarketWithCurrentCandle(interval,length) { try {
     marketWithCurrentCandleCache.closes[lastIndex] = currentCandle.close
   }
   else {
-    var market = await getMarket(15,96)
+    var market = await getMarket()
     var candles = market.candles.slice(1)
     var opens = market.opens.slice(1)
     var highs = market.highs.slice(1)
@@ -528,7 +536,7 @@ async function getMargin() { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getTradeHistory(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  startTime = startTime || (new Date().getTime() - (candleLengthMS))
   let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
   startTime: new Date(startTime).toISOString(),
   columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
@@ -541,7 +549,7 @@ async function getTradeHistory(startTime) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getFundingHistory(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  startTime = startTime || (new Date().getTime() - (candleLengthMS))
   let response = await client.Funding.Funding_get({symbol: 'XBTUSD',
   startTime: new Date(startTime).toISOString()
   })
@@ -554,7 +562,7 @@ async function getFundingHistory(startTime) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getNewOrders(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  startTime = startTime || (new Date().getTime() - (candleLengthMS))
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
     filter: '{"ordStatus":"New"}',
@@ -565,7 +573,7 @@ async function getNewOrders(startTime) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getOrders(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (24*60*60000))
+  startTime = startTime || (new Date().getTime() - (candleLengthMS))
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
     // filter: '{"ordType":"Limit"}',
@@ -705,7 +713,7 @@ async function orderLimitRetry(ord) { try {
         retry = true
         canceledCount++
         if (canceledCount > 2) {
-          let {price,orderQty,execInst} = order.response.obj
+          let {price,orderQty,execInst} = response.obj
           let existingOrder = findNewLimitOrder(price,orderQty,execInst)
           if (existingOrder) {
             logger.warn('orderLimitRetry canceled duplicate order',ord)
@@ -846,7 +854,7 @@ function findNewOrFilledOrder(t,p,s,e) {
 
 async function initMarket() { try {
   console.log('Initializing market')
-  await getMarket(15,96)
+  await getMarket()
   let currentTradeBucketed = await getCurrentTradeBucketed()
   currentCandleTimeOffset = currentTradeBucketed.candleTimeOffset
   if (currentTradeBucketed.candle.open) {
@@ -868,6 +876,7 @@ async function init(checkPositionCb) { try {
 
   // inspect(client.apis)
   // await getTradeHistory()
+
   await connect()
 
   // await getOrderBook()
