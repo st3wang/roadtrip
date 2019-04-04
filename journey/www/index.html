@@ -238,7 +238,7 @@
             var exitTrade = trades[i+1]
             var startDate = new Date(trade.date)
             var date = new Date()
-            var endDate = (exitTrade && (exitTrade.type.indexOf('FILLED') != -1)) ? exitTrade.date : (new Date(date.getTime() + (date.getTimezoneOffset()-15)*60000))
+            var endDate = (exitTrade && (exitTrade.type.indexOf('FILLED') != -1)) ? exitTrade.date : (new Date(date.getTime() + (date.getTimezoneOffset()-1)*60000))
             let color = trade.type.indexOf('SHORT') != -1 ? '#CC47ED' : '#008fff'
             let stopMarketColor = trade.type.indexOf('SHORT') != -1 ? 'pink' : 'lightskyblue'
             let halfTarget = (trade.takeProfit+trade.price)/2
