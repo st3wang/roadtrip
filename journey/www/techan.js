@@ -1544,7 +1544,7 @@ function datum(date, macd, signal, difference, zero) {
 module.exports = function(indicatorMixin, accessor_ohlc, indicator_ema) {  // Injected dependencies
   return function() { // Closure function
     var p = {},  // Container for private, direct access mixed in variables
-        overbought = 55,
+        overbought = 70,
         middle = 50,
         oversold = 45,
         lossAverage = indicator_ema(),
