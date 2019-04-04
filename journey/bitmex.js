@@ -115,7 +115,7 @@ async function wsAddStream(table, handler) { try {
     },200)
     var timeout = setTimeout(_ => {
       clearInterval(checkValueInterval)
-      reject()
+      reject('wsAddStream '+table+' timeout')
     }, 5000)
   })
 } catch(e) {logger.error(e.stack||e);debugger} }
