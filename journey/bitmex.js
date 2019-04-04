@@ -38,7 +38,7 @@ const logger = winston.createLogger({
   format: winston.format.label({label:'bitmex'}),
   transports: [
     new winston.transports.Console({
-      level:shoes.log.level||'info',
+      level:'error', //shoes.log.level||'info',
       format: winston.format.combine(
         isoTimestamp(),
         winston.format.prettyPrint(),
@@ -86,7 +86,7 @@ const logger = winston.createLogger({
       ),
     }),
     new winston.transports.File({filename:'combined.log',
-      level:'debug',
+      level:'error',
       format: winston.format.combine(
         isoTimestamp(),
         winston.format.json()
@@ -163,7 +163,7 @@ function pruneOrders(orders) { try {
       return false
     })
     if (found >= 0) {
-      logger.info('pruneOrders',orders[found])
+      // logger.info('pruneOrders',orders[found])
       orders.splice(found,1)
     }
   } while(found >= 0)
@@ -179,10 +179,10 @@ async function handleMargin(data) { try {
 async function handleOrder(data) { try {
   lastOrders = data
   lastOrders.forEach((order,i) => {
-    logger.info('handleOrder',order)
+    // logger.info('handleOrder',order)
     // console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.cumQty+'/'+order.orderQty)
   })
-  console.log('---------------------')
+  // console.log('---------------------')
 
   var prunedCanceledOrder = pruneOrders(data)
   if (!prunedCanceledOrder) {
@@ -701,7 +701,7 @@ function popOrderQueue(ord) {
 }
 
 async function orderQueue(ord) { try {
-  logger.info('orderQueue -->',ord)
+  // logger.info('orderQueue -->',ord)
   orderQueueArray.forEach(o => {
     logger.info('newer order, obsolete old one',o)
     o.obsoleted = true
@@ -724,7 +724,7 @@ async function orderQueue(ord) { try {
   pendingLimitOrderRetry.ord = ord
   var response = await pendingLimitOrderRetry
   pendingLimitOrderRetry = null
-  logger.info('orderQueue',response)
+  // logger.info('orderQueue',response)
   popOrderQueue(ord)
   return response
 } catch(e) {console.error(e.stack||(e));debugger} }
@@ -745,7 +745,7 @@ async function orderLimitRetry(ord) { try {
   if (ord.obsoleted) {
     logger.info('orderLimitRetry obsoleted',ord)
   }
-  logger.info('orderLimitRetry', response)
+  // logger.info('orderLimitRetry', response)
   return response
 } catch(e) {console.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 

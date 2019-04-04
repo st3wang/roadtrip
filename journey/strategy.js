@@ -112,9 +112,9 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
       profitDistance = -lossDistance*profitFactor
       // profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
-      stopLossTrigger = stopLoss - 0.5
+      stopLossTrigger = entryPrice + (lossDistance/4)
       takeProfitTrigger = entryPrice - (lossDistance/4)
-      stopMarketTrigger = entryPrice + stopMarketDistance
+      // stopMarketTrigger = entryPrice + stopMarketDistance
       lossDistancePercent = lossDistance/entryPrice
       // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
@@ -128,9 +128,9 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
       profitDistance = -lossDistance * profitFactor
       // profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
       takeProfit = entryPrice + profitDistance
-      stopLossTrigger = stopLoss + 0.5
+      stopLossTrigger = entryPrice + (lossDistance/4)
       takeProfitTrigger = entryPrice - (lossDistance/4)
-      stopMarketTrigger = entryPrice + stopMarketDistance
+      // stopMarketTrigger = entryPrice + stopMarketDistance
       lossDistancePercent = lossDistance/entryPrice
       // positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
       break;

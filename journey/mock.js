@@ -4,8 +4,8 @@ const readline = require('readline')
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 
 var handleMargin,handleOrder,handlePosition,handleInstrument
-var startYMD = 20170101, endYMD = 20170201 //20190330
-var instrumentTime = new Date('2017-01-01').getTime()
+var startYMD = 20190101, endYMD = 20190330 //20190330
+var instrumentTime = new Date('2019-01-01').getTime()
 var _orders = [], 
     _margin = {availableMargin: 100000000, walletBalance: 100000000}
     _position = {currentQty: 0}, 
@@ -64,6 +64,10 @@ async function readTrades(ymd) {
   })
 }
 
+function getCandleTimeOffset(time) {
+  return ((new Date(time).getTime()) % 900000)
+}
+
 async function connect() { try {
   await handleMargin([_margin])
   await handlePosition([_position])
@@ -71,8 +75,19 @@ async function connect() { try {
   for (var ymd = startYMD; ymd < endYMD; ymd = nextDay(ymd)) {
     let trades = await readTrades(ymd)
     let len = trades.length
+    console.log(ymd,len,_margin.availableMargin/100000000)
+    // console.log('availableMargin', _margin.availableMargin/100000000)
     for (let i = 0; i < len; i++) {
       let [time,side,size,price] = trades[i]
+
+      let lastCandleTimeOffset = instrumentTime%900000
+      let currentCandleTimeOffset = (+time)%900000
+      if (lastCandleTimeOffset - currentCandleTimeOffset > 450000) {
+        instrumentTime += (900000-lastCandleTimeOffset)
+        _instrument.timestamp = new Date(instrumentTime).toISOString()
+        await handleInstrument([_instrument])
+      }
+
       price = +price
       instrumentTime = +time
       
@@ -87,6 +102,8 @@ async function connect() { try {
       await handleInstrument([_instrument])
     }
   }
+  console.log('availableMargin', _margin.availableMargin/100000000)
+  debugger
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function authorize() {
@@ -128,8 +145,28 @@ async function orderLimit(cid,price,size,execInst) {
     stopPx: null,
     execInst:'ParticipateDoNotInitiate'+(execInst||'')
   }
+  
+  if (execInst.indexOf('ReduceOnly') >= 0) {
+    _orders.forEach(o => {
+      if (o.orderQty == order.orderQty && o.ordStatus == 'New' && o.execInst.indexOf('ReduceOnly') >= 0) {
+        o.ordStatus = 'Canceled'
+      }
+    })
+  }
   _orders.push(order)
+
+  if (execInst == '') {
+    if (size > 0) {
+      fillOrders(price-1)
+    }
+    else {
+      fillOrders(price+1)
+    }
+    
+  }
+
   await handleOrder(_orders)
+  
   return ({obj:order})
 }
 
@@ -189,45 +226,53 @@ async function fillOrders(lastPrice) {
       order.ordStatus = 'Canceled'
     }
     else {
-      if (price) {
-        let execPrice = price
-        let execBTC = execQty/execPrice
-        let execCost = (-execBTC //- (Math.abs(execBTC)*0.000225)
-        )*100000000
-        if (order.execInst == 'ParticipateDoNotInitiate') {
-          if (_position.currentQty != 0) debugger
-          // Entry
-          order.cumQty = orderQty
-          order.ordStatus = 'Filled'
-          _position.execQty = execQty
-          _position.avgEntryPrice = execPrice
-          _position.execCost = execCost
-        }
-        else {
-          // Take Profit
-          order.cumQty = orderQty
-          order.ordStatus = 'Filled'
-          let profit = _position.execCost + execCost
-          if (profit > 0) debugger
-          _margin.availableMargin -= profit
-          _margin.walletBalance = _margin.availableMargin
-        }
-      }
-      else if (stopPx) {
-        // Stop Market
-        let execPrice = stopPx
-        let execBTC = execQty/execPrice
-        let execCost = (-execBTC //+ (Math.abs(execBTC)*0.000675)
-        )*100000000
+      let execPrice = price || stopPx
+      let execCost = execQty/execPrice*100000000
+
+      if (price && order.execInst == 'ParticipateDoNotInitiate') {
+        if (_position.currentQty != 0) debugger
+        // console.log('ENTRY',side,execQty,execPrice)
+
         order.cumQty = orderQty
         order.ordStatus = 'Filled'
+        _position.execQty = execQty
+        _position.avgEntryPrice = execPrice
+        _position.execCost = execCost
+        // debugger
+      }
+      else {
         let profit = _position.execCost + execCost
-        if (profit < 0) debugger
-        _margin.availableMargin -= profit
+        order.cumQty = orderQty
+        order.ordStatus = 'Filled'
+        if (price) {
+          // console.log('STOP',side,execQty,execPrice,profit/100000000)
+          // debugger
+          // if (profit < 0) debugger
+        }
+        else if (stopPx && profit < 0) {
+          // console.log('STOP MARKET',execQty,execPrice,profit/100000000)
+          // debugger
+          if (profit > 0) debugger
+        }
+        _margin.availableMargin += profit
         _margin.walletBalance = _margin.availableMargin
       }
+      // }
+      // else if (stopPx) {
+      //   // Stop Market
+      //   let execPrice = stopPx
+      //   let execBTC = execQty/execPrice
+      //   let execCost = (-execBTC //+ (Math.abs(execBTC)*0.000675)
+      //   )*100000000
+      //   order.cumQty = orderQty
+      //   order.ordStatus = 'Filled'
+      //   let profit = _position.execCost + execCost
+      //   if (profit < 0) debugger
+      //   _margin.availableMargin -= profit
+      //   _margin.walletBalance = _margin.availableMargin
+      // }
       _position.currentQty += execQty
-      console.log(_position.currentQty)
+      // console.log(_position.currentQty)
       await handlePosition([_position])
     }
     await handleOrder(_orders)

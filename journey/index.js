@@ -35,7 +35,7 @@ const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
     new winston.transports.Console({
-      level:shoes.log.level||'info',
+      level:'error',//shoes.log.level||'info',
       format: winston.format.combine(
         isoTimestamp(),
         winston.format.prettyPrint(),
@@ -101,7 +101,7 @@ const logger = winston.createLogger({
       ),
     }),
     new winston.transports.File({filename:'combined.log',
-      level:'debug',
+      level:'error',
       format: winston.format.combine(
         isoTimestamp(),
         winston.format.json()
@@ -140,8 +140,9 @@ function isInPositionForTooLong(timestamp,signal) {
     var time = new Date(timestamp).getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
-    return (delta > cutOffTimeForAll || 
-      (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) >= 0.002))
+    return (delta > cutOffTimeForAll)
+    // || 
+      //(delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) >= 0.002))
   }
 }
 
@@ -325,7 +326,7 @@ async function checkEntry(params) { try {
   }
   if (!existingEntryOrder && (enter = await enterSignal(params))) {
     if (bitmex.findNewLimitOrder(enter.signal.entryPrice,enter.signal.positionSizeUSD,'ParticipateDoNotInitiate')) {
-      logger.info('ENTRY ORDER EXISTS')
+      // logger.info('ENTRY ORDER EXISTS')
     }
     else {
       logger.info('ENTER',enter)
@@ -333,8 +334,8 @@ async function checkEntry(params) { try {
       if (orderSent) {
         entrySignal = enter.signal
         entrySignalTable.info('entry',entrySignal)
-        log.writeEntrySignal(entrySignal) // current trade
-        log.writeOrderSignal(setup.bankroll,entrySignal) // trade
+        // log.writeEntrySignal(entrySignal) // current trade
+        // log.writeOrderSignal(setup.bankroll,entrySignal) // trade
       }
     }
   }
@@ -353,7 +354,8 @@ async function checkExit(params) { try {
       return existingOrder
     }
 
-    logger.info('EXIT',exit)
+    // logger.info('EXIT',exit)
+    // console.log('EXIT',exit)
     return await bitmex.orderExit('',exit.price,-params.positionSize)
   }
 } catch(e) {console.error(e.stack||e);debugger} }
