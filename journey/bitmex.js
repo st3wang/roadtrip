@@ -707,7 +707,7 @@ async function orderLimitRetry(ord) { try {
         retry = true
         canceledCount++
         if (canceledCount > 2) {
-          let {price,orderQty,execInst} = order.response.obj
+          let {price,orderQty,execInst} = response.obj
           let existingOrder = findNewLimitOrder(price,orderQty,execInst)
           if (existingOrder) {
             logger.warn('orderLimitRetry canceled duplicate order',ord)
