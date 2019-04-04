@@ -70,7 +70,7 @@ const logger = winston.createLogger({
               line += status + ' ' + obj.error.message + ' ' + JSON.stringify(splat[1])
             } break
             default: {
-              line += (splat ? `${JSON.stringify(splat)}` : '')
+              line += (splat ? JSON.stringify(splat) : '')
             }
           }
           switch(level) {

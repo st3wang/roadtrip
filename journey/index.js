@@ -88,10 +88,14 @@ const logger = winston.createLogger({
             } break
             case 'ENTER': {
               let {positionSizeUSD,entryPrice} = splat[0].signal
-              line += positionSizeUSD+' '+entryPrice
+              line = '\x1b[1m'+line+'\x1b[0m'+positionSizeUSD+' '+entryPrice
             } break
+            case 'EXIT':
+            case 'CANCEL': {
+              line = '\x1b[1m'+line+'\x1b[0m'+JSON.stringify(splat)
+            }
             default: {
-              line += (splat ? `${JSON.stringify(splat)}` : '')
+              line += (splat ? JSON.stringify(splat) : '')
             }
           }
           switch(level) {
@@ -352,7 +356,7 @@ async function checkEntry(params) { try {
   var cancel, enter
   let existingEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')  
   if (existingEntryOrder && (cancel = cancelOrder(params))) {
-    logger.info('CANCEL',cancel)
+    logger.warn('CANCEL',cancel)
     await bitmex.cancelAll()
     existingEntryOrder = null
   }
