@@ -151,8 +151,8 @@ function isInPositionForTooLong(signal) {
     var time = new Date().getTime()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
-    return (delta > cutOffTimeForAll || 
-      (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) >= 0.002))
+    return (delta > cutOffTimeForAll)
+     //|| (delta > cutOffTimeForLargeTrade && Math.abs(signal.lossDistancePercent) >= 0.002))
   }
 }
 
