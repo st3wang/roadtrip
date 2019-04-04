@@ -59,7 +59,7 @@ const logger = winston.createLogger({
                 positionSizeString = positionSize
                 lastPriceString = lastPrice.toFixed(1)
               }
-              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34;1m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
+              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
               let now = new Date().getTime()
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / oneCandleMS)
               candlesInTrade = (candlesInTrade >= setup.candle.inTradeMax || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
@@ -88,11 +88,11 @@ const logger = winston.createLogger({
             } break
             case 'ENTER': {
               let {positionSizeUSD,entryPrice} = splat[0].signal
-              line = '\x1b[1m'+line+'\x1b[0m'+positionSizeUSD+' '+entryPrice
+              line = '\x1b[34m'+line+'\x1b[39m'+positionSizeUSD+' '+entryPrice
             } break
             case 'EXIT':
             case 'CANCEL': {
-              line = '\x1b[1m'+line+'\x1b[0m'+JSON.stringify(splat)
+              line = '\x1b[34m'+line+'\x1b[39m'+JSON.stringify(splat)
             }
             default: {
               line += (splat ? JSON.stringify(splat) : '')
