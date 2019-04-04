@@ -322,7 +322,7 @@
     drawRsi = function(error, data) {
         var accessor = rsi.accessor();
 
-        data = data.slice(0, 200).map(function(d) {
+        data = data.map(function(d) {
             // Open, high, low, close generally not required, is being used here to demonstrate colored volume
             // bars
             return {
