@@ -2,7 +2,7 @@
   <!-- Plotly.js -->
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <style>
-    body {
+    body, label {
       font-family: Helvetica;
       font-size: 12px;
     }
@@ -17,6 +17,9 @@
     #plotDiv {
       width: 100%;
       height: 620px;
+    }
+    #startDateInput, #endDateInput {
+      width: 170px;
     }
   </style>
 </head>
@@ -33,67 +36,94 @@
 
   </div>
   <div id="plotDiv"></div>
-  <div>
-    <button onclick="decrease(rsiLengthInput)">-</button>
-    <input id="rsiLengthInput" type="text" value="2"></input>
-    <button onclick="increase(rsiLengthInput)">+</button>
-    <label>Length</label>
-  </div>
-<!--   <div>
-    <button onclick="decrease(rsiOverboughtInput)">-</button>
-    <input id="rsiOverboughtInput" type="text" value="70"></input>
-    <button onclick="increase(rsiOverboughtInput)">+</button>
-    <label>Overbought</label>
-  </div> -->
-  <div>
-    <button onclick="decrease(rsiOverboughtExecuteInput)">-</button>
-    <input id="rsiOverboughtExecuteInput" type="text" value="55"></input>
-    <button onclick="increase(rsiOverboughtExecuteInput)">+</button>
-    <label>Overbought Execute</label>
-  </div>
-  <div>
-    <button onclick="decrease(rsiOversoldExecuteInput)">-</button>
-    <input id="rsiOversoldExecuteInput" type="text" value="50"></input>
-    <button onclick="increase(rsiOversoldExecuteInput)">+</button>
-    <label>Oversold Execute</label>
-  </div>
-<!--   <div>
-    <button onclick="decrease(rsiOversoldInput)">-</button>
-    <input id="rsiOversoldInput" type="text" value="30"></input>
-    <button onclick="increase(rsiOversoldInput)">+</button>
-    <label>Oversold</label>
-  </div> -->
-  <div>
-    <button onclick="decrease(stopLossLookBackInput)">-</button>
-    <input id="stopLossLookBackInput" type="text" value="4"></input>
-    <button onclick="increase(stopLossLookBackInput)">+</button>
-    <label>LookBack</label>
-  </div>
-  <div>
-    <button onclick="decrease(profitFactorInput)">-</button>
-    <input id="profitFactorInput" type="text" value="160"></input>
-    <button onclick="increase(profitFactorInput)">+</button>
-    <label>ProfitFactor</label>
-  </div>
-  <div>
-    <button onclick="decrease(minStopLoss)">-</button>
-    <input id="minStopLoss" type="text" value="6"></input>
-    <button onclick="increase(minStopLoss)">+</button>
-    <label>MinStopLoss</label>
-  </div>
-  <div>
-    <button onclick="decrease(maxStopLoss)">-</button>
-    <input id="maxStopLoss" type="text" value="120"></input>
-    <button onclick="increase(maxStopLoss)">+</button>
-    <label>MaxStopLoss</label>
-  </div>
-  <div>
-    <input type="checkbox" id="compoundInput" onclick="changeCompound(compoundInput)">
-    <label>Compound</label>
-  </div>
+  <table>
+    <tr>
+      <td>
+        <button onclick="decrease(rsiLengthInput)">-</button>
+        <input id="rsiLengthInput" type="text" value="2"></input>
+        <button onclick="increase(rsiLengthInput)">+</button>
+        <label>Length</label>
+      </td>
+      <td>
+        <input id="startDateInput" type="text" value="2017-01-01"></input>
+      </td>
+      <td>
+        <input id="endDateInput" type="text" value="2019-03-30"></input>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <button onclick="decrease(rsiOverboughtExecuteInput)">-</button>
+        <input id="rsiOverboughtExecuteInput" type="text" value="80"></input>
+        <button onclick="increase(rsiOverboughtExecuteInput)">+</button>
+        <label>Overbought Execute</label>
+      </td>
+      <td>
+        <button onclick="decrease(stopLossLookBackInput)">-</button>
+        <input id="stopLossLookBackInput" type="text" value="6"></input>
+        <button onclick="increase(stopLossLookBackInput)">+</button>
+        <label>LookBack</label>
+      </td>
+      <td>
+        <input type="checkbox" id="compoundInput" onclick="plot()">
+        <label>Compound</label>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <button onclick="decrease(rsiOversoldInput)">-</button>
+        <input id="rsiOversoldInput" type="text" value="55"></input>
+        <button onclick="increase(rsiOversoldInput)">+</button>
+        <label>Oversold</label>
+      </td>
+      <td>
+        <button onclick="decrease(profitFactorInput)">-</button>
+        <input id="profitFactorInput" type="text" value="200"></input>
+        <button onclick="increase(profitFactorInput)">+</button>
+        <label>ProfitFactor</label>
+      </td>
+      <td>
+        <input type="checkbox" id="skipWinInput" onclick="plot()">
+        <label>Skip After Winning</label>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <button onclick="decrease(rsiOverboughtInput)">-</button>
+        <input id="rsiOverboughtInput" type="text" value="51"></input>
+        <button onclick="increase(rsiOverboughtInput)">+</button>
+        <label>Overbought</label>
+      </td>
+      <td>
+        <button onclick="decrease(minStopLoss)">-</button>
+        <input id="minStopLoss" type="text" value="6"></input>
+        <button onclick="increase(minStopLoss)">+</button>
+        <label>MinStopLoss</label>
+      </td>
+      <td>
+        <input checked type="checkbox" id="enterSameBarInput" onclick="plot()">
+        <label>Enter On The Same Bar</label>
+      </td>
+    </tr>
+    <tr>
+      <td>
+        <button onclick="decrease(rsiOversoldExecuteInput)">-</button>
+        <input id="rsiOversoldExecuteInput" type="text" value="39"></input>
+        <button onclick="increase(rsiOversoldExecuteInput)">+</button>
+        <label>Oversold Execute</label>
+      </td>
+      <td>
+        <button onclick="decrease(maxStopLoss)">-</button>
+        <input id="maxStopLoss" type="text" value="120"></input>
+        <button onclick="increase(maxStopLoss)">+</button>
+        <label>MaxStopLoss</label>
+      </td>
+    </tr>
+  </table>
+  
   <script>
   var market, plotCloses
-  var startDateISO = '2019-01-01T00:00:00.000Z'
+  var startDateISO = '2017-01-01T00:00:00.000Z'
   var startDate = new Date(startDateISO)
   var startYMD = startDateISO.substring(0,10).replace(/-/g,'')
   var layout = {
@@ -121,13 +151,12 @@
     plot()
   }
 
-  function changeCompound(input) {
-    plot()
-  }
-
   async function getMarketData() {
+    var startYMD = startDateInput.value.replace(/-/g,'')
+    var endYMD = endDateInput.value.replace(/-/g,'')
     var setup = {
-      startYMD: startYMD
+      startYMD: startYMD,
+      endYMD: endYMD
     }
     var response = await fetch('http://localhost:3030/market.json', {
       method: 'GET',
@@ -135,7 +164,7 @@
     })
     market = await response.json()
     
-    var t = startDate.getTime()
+    var t = new Date(startDateInput.value+'T00:00:00.000Z').getTime()
     market.dates = market.closes.map(c => {
       var nt = new Date(t).toISOString()
       t += 900000
@@ -152,17 +181,20 @@
 
   async function plot() {
     var setup = {
-      startYMD: startYMD,
+      startYMD: startDateInput.value.replace(/-/g,''),
+      endYMD: endDateInput.value.replace(/-/g,''),
       rsiLength: parseInt(rsiLengthInput.value),
-//       rsiOverbought: parseInt(rsiOverboughtInput.value),
-//       rsiOversold: parseInt(rsiOversoldInput.value),
+      rsiOverbought: parseInt(rsiOverboughtInput.value),
+      rsiOversold: parseInt(rsiOversoldInput.value),
       rsiOverboughtExecute: parseInt(rsiOverboughtExecuteInput.value),
       rsiOversoldExecute: parseInt(rsiOversoldExecuteInput.value),
       stopLossLookBack: parseInt(stopLossLookBackInput.value),
       profitFactor: parseInt(profitFactorInput.value),
       minStopLoss: parseInt(minStopLoss.value),
       maxStopLoss: parseInt(maxStopLoss.value),
-      compound: (compoundInput.checked)
+      compound: (compoundInput.checked),
+      skipWin: (skipWinInput.checked),
+      enterSameBar: (enterSameBarInput.checked)
     }
 
     var response = await fetch('http://localhost:3030/overview.json', {
@@ -205,7 +237,13 @@
     averageBarsNotInTradeSpan.textContent = overview.averageBarsNotInTrade.toFixed(0)
   }
 
-  async function start() {
+  startDateInput.onkeypress = endDateInput.onkeypress = e => {
+    if (e.key == 'Enter') {
+      start()
+    }
+  }
+
+  async function start(e) {
     await getMarketData()
     await plot()
   }
