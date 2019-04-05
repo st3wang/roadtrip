@@ -418,9 +418,6 @@ async function next() { try {
     bitmex.checkPositionParams.signal = entrySignal
     checkPosition(bitmex.checkPositionParams)
   }
-  else {
-    console.log('reject next')
-  }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getMarketCsv() { try {
