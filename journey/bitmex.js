@@ -749,7 +749,7 @@ async function orderLimit(cid,price,size,execInst) { try {
 
   let response 
   response = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
-    clOrdID: cid,
+    // clOrdID: cid,
     price:price,
     orderQty:size,
     execInst:'ParticipateDoNotInitiate'+(execInst||'')
@@ -837,8 +837,9 @@ function findNewOrFilledOrder(t,p,s,e) {
     if (ordType == t) {
       switch (ordStatus) {
         case 'New': {
-          return (price == p && orderQty == s && execInst == e)
+          return (price == p && orderQty > (s*0.98) && orderQty < (s*1.02) && execInst == e)
         }
+        case 'PartiallyFilled':
         case 'Filled': {
           if (execInst == e && price > (p*0.999) && price < (p*1.001) && orderQty > (s*0.98) && orderQty < (s*1.02)) {
             let ordTime = new Date(timestamp).getTime()

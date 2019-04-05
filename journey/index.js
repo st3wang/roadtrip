@@ -59,7 +59,7 @@ const logger = winston.createLogger({
                 positionSizeString = positionSize
                 lastPriceString = lastPrice.toFixed(1)
               }
-              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
+              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34;1m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
               let now = new Date().getTime()
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / oneCandleMS)
               candlesInTrade = (candlesInTrade >= setup.candle.inTradeMax || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
@@ -88,11 +88,11 @@ const logger = winston.createLogger({
             } break
             case 'ENTER': {
               let {positionSizeUSD,entryPrice} = splat[0].signal
-              line = '\x1b[34m'+line+'\x1b[39m'+positionSizeUSD+' '+entryPrice
+              line =  (positionSizeUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+positionSizeUSD+' '+entryPrice
             } break
-            case 'EXIT':
-            case 'CANCEL': {
-              line = '\x1b[34m'+line+'\x1b[39m'+JSON.stringify(splat)
+            case 'EXIT': {
+              let {size,price} = splat[0]
+              line = (size>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+size+' '+price
             }
             default: {
               line += (splat ? JSON.stringify(splat) : '')
@@ -322,12 +322,10 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
   if (candleTimeOffset >= setup.candle.signalTimeOffsetMax) {
     signals = await getOrderSignalWithCurrentCandle(availableMargin)
     orderSignal = signals.orderSignal
-    logger.info('enterSignal',signals)
   }
   else if (candleTimeOffset <= setup.candle.signalTimeOffsetMin) {
     signals = await getOrderSignal(availableMargin)
     orderSignal = signals.orderSignal
-    logger.info('enterSignal',signals)
   }
 
   if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG') && 
@@ -338,6 +336,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
         logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
     }
     else {
+      logger.info('enterSignal',signals)
       enter = {signal:orderSignal}
     }
   }
@@ -384,9 +383,10 @@ async function checkExit(params) { try {
   var exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params) || exitStopTrigger(params)
   if (exit) {
     exit.price = exit.price || (positionSize < 0 ? bid : ask)
+    exit.size = -params.positionSize
     exit.type = exit.type || 'Limit'
     exit.execInst = exit.execInst || 'ParticipateDoNotInitiate,ReduceOnly'
-    let existingOrder = bitmex.findNewOrFilledOrder(exit.type,exit.price,-params.positionSize,exit.execInst)
+    let existingOrder = bitmex.findNewOrFilledOrder(exit.type,exit.price,exit.size,exit.execInst)
     if (existingOrder) {
       logger.debug('EXIT EXISTING ORDER',exit)
       return existingOrder
@@ -394,10 +394,10 @@ async function checkExit(params) { try {
 
     logger.info('EXIT',exit)
     if (exit.reason == 'stoptrigger') {
-      return await bitmex.orderStopMarketRetry(exit.price,-params.positionSize)
+      return await bitmex.orderStopMarketRetry(exit.price,exit.size)
     }
     else {
-      return await bitmex.orderExit('',exit.price,-params.positionSize)
+      return await bitmex.orderExit('',exit.price,exit.size)
     }
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
