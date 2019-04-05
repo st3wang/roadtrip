@@ -15,14 +15,15 @@ const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 global.bitmex = bitmex
 global.log = log
 
-// const { createLogger, format, transports } = require('winston');
-// const { combine, timestamp, label, printf } = format;
-const colorizer = winston.format.colorize();
+var lastCheckPositionTime = new Date().getTime()
+
+const colorizer = winston.format.colorize()
 
 const isoTimestamp = winston.format((info, opts) => {
   info.timestamp = new Date().toISOString()
   return info;
-});
+})
+
 
 function conditionColor(condition) {
   return (condition == 'LONG' ? '\x1b[36m' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
@@ -403,6 +404,7 @@ async function checkExit(params) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkPosition(params) { try {
+  lastCheckPositionTime = new Date().getTime()
   logger.info('checkPosition',params)
   if (!(await checkExit(params))) {
     await checkEntry(params)
@@ -410,9 +412,15 @@ async function checkPosition(params) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function next() { try {
-  bitmex.checkPositionParams.caller = 'interval'
-  bitmex.checkPositionParams.signal = entrySignal
-  checkPosition(bitmex.checkPositionParams)
+  var now = new Date().getTime()
+  if (now-lastCheckPositionTime > 2500) {
+    bitmex.checkPositionParams.caller = 'interval'
+    bitmex.checkPositionParams.signal = entrySignal
+    checkPosition(bitmex.checkPositionParams)
+  }
+  else {
+    console.log('reject next')
+  }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getMarketCsv() { try {
@@ -503,7 +511,7 @@ async function start() { try {
   createInterval(-5000*2**2)
   createInterval(-5000*2**1)
   createInterval(-5000*2**0)
-  createInterval(200)
+  createInterval(100)
   createInterval(5000*2**0)
   createInterval(5000*2**1)
   createInterval(5000*2**2)
