@@ -844,7 +844,7 @@ function findNewOrFilledOrder(t,p,s,e) {
           if (execInst == e && price > (p*0.999) && price < (p*1.001) && orderQty > (s*0.98) && orderQty < (s*1.02)) {
             let ordTime = new Date(timestamp).getTime()
             let now = new Date().getTime()
-            logger.warn('findNewOrFilledOrder found filled',order)
+            // logger.warn('findNewOrFilledOrder found filled',order)
             return (now - ordTime < 10000)
           }
         }
