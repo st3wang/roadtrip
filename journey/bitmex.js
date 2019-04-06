@@ -180,7 +180,9 @@ async function pruneOrders(orders) { try {
 async function handleMargin(data) { try {
   lastMargin = data[0]
   checkPositionParams.availableMargin = lastMargin.availableMargin
+  checkPositionParams.marginBalance = lastMargin.marginBalance
   checkPositionParams.walletBalance = lastMargin.walletBalance
+  // console.log(checkPositionParams.availableMargin, checkPositionParams.marginBalance, checkPositionParams.walletBalance)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function handleOrder(data) { try {

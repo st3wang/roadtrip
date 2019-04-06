@@ -66,9 +66,9 @@ const logger = winston.createLogger({
               candlesInTrade = (candlesInTrade >= setup.candle.inTradeMax || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
               let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/oneCandleMS)
               candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
-              let payFunding = fundingRate*positionSize/lastPrice // /walletBalance
+              let payFunding = fundingRate*positionSize/lastPrice
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
-              line += caller + ' W:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
+              line += caller + ' B:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
@@ -165,7 +165,7 @@ function isInPositionForTooLong(signal) {
   }
 }
 
-async function getOrderSignalWithCurrentCandle(availableMargin) {
+async function getOrderSignalWithCurrentCandle(walletBalance) {
   var market = await bitmex.getMarketWithCurrentCandle()
   var closes = market.closes
   var lastPrice = closes[closes.length-1]
@@ -193,13 +193,13 @@ async function getOrderSignalWithCurrentCandle(availableMargin) {
   // }
 
   if (conservativeRsiSignal && conservativeRsiSignal.condition == rsiSignal.condition) {
-    orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,availableMargin)
+    orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,walletBalance)
     // logger.verbose('getOrderSignalWithCurrentCandle orderSignal', orderSignal)
   }
   return {rsiSignal:rsiSignal,conservativeRsiSignal:conservativeRsiSignal,orderSignal:orderSignal}
 }
 
-async function getOrderSignal(availableMargin) {
+async function getOrderSignal(walletBalance) {
   var market = await bitmex.getMarket()
   var closes = market.closes
   // var lastPrice = closes[closes.length-1]
@@ -207,7 +207,7 @@ async function getOrderSignal(availableMargin) {
   
   // logger.verbose('getOrderSignal rsiSignal',rsiSignal)
 
-  let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,availableMargin)
+  let orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,walletBalance)
   // logger.verbose('getOrderSignal orderSignal',orderSignal)
   return {rsiSignal:rsiSignal,orderSignal:orderSignal}
 }
@@ -313,7 +313,7 @@ function cancelOrder(params) {
   return (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStop(cancelParams))
 }
 
-async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableMargin}) { try {
+async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {
   if (positionSize != 0) return
 
   var enter
@@ -321,12 +321,14 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,availableM
 
   let signals, orderSignal
   if (candleTimeOffset >= setup.candle.signalTimeOffsetMax) {
-    signals = await getOrderSignalWithCurrentCandle(availableMargin)
+    signals = await getOrderSignalWithCurrentCandle(walletBalance)
     orderSignal = signals.orderSignal
+    logger.debug('enterSignal',signals)
   }
   else if (candleTimeOffset <= setup.candle.signalTimeOffsetMin) {
-    signals = await getOrderSignal(availableMargin)
+    signals = await getOrderSignal(walletBalance)
     orderSignal = signals.orderSignal
+    logger.debug('enterSignal',signals)
   }
 
   if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG') && 
@@ -389,7 +391,7 @@ async function checkExit(params) { try {
     exit.execInst = exit.execInst || 'ParticipateDoNotInitiate,ReduceOnly'
     let existingOrder = bitmex.findNewOrFilledOrder(exit.type,exit.price,exit.size,exit.execInst)
     if (existingOrder) {
-      logger.debug('EXIT EXISTING ORDER',exit)
+      // logger.debug('EXIT EXISTING ORDER',exit)
       return existingOrder
     }
 

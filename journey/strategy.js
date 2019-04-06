@@ -73,7 +73,7 @@ function highestBody(market,start,length) {
   return Math.max(highestOpen,highestClose)
 }
 
-async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
+async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var timestamp = new Date().toISOString()
   let signalCondition = signal.condition
   
@@ -85,7 +85,7 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
   let profitFactor = bankroll.profitFactor
   let stopMarketFactor = bankroll.stopMarketFactor
   let stopLossLookBack = bankroll.stopLossLookBack
-  let leverageMargin = availableMargin*0.000000008
+  let leverageMargin = walletBalance*0.000000008
   let entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
@@ -122,7 +122,7 @@ async function getOrderSignal(signal,market,bankroll,availableMargin) { try {
       break;
   }
 
-  let capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + availableMargin/100000000
+  let capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + walletBalance/100000000
   let capitalUSD = capitalBTC * entryPrice
 
   riskAmountBTC = capitalBTC * riskPerTradePercent
