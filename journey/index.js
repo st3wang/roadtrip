@@ -410,7 +410,6 @@ var checking = false, recheckWhenDone = false
 async function checkPosition(params) { try {
   logger.info('checkPosition',params)
   if (checking) {
-    logger.warn('checking')
     recheckWhenDone = true
     return
   }
@@ -420,7 +419,6 @@ async function checkPosition(params) { try {
     await checkEntry(params)
   }
   if (recheckWhenDone) {
-    logger.warn('recheckWhenDone')
     setTimeout(next,50)
     recheckWhenDone = false
   }
