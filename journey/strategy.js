@@ -61,16 +61,42 @@ function highest(values,start,length) {
   return Math.max.apply( Math, array )
 }
 
-function lowestBody(market,start,length) {
-  var lowestOpen = lowest(market.opens,start,length)
-  var lowestClose = lowest(market.closes,start,length)
-  return Math.min(lowestOpen,lowestClose)
+function lowestBody(market,length) {
+  var opens = market.opens, closes = market.closes, lows = market.lows
+  var weightedLows = []
+  var lowest = 0
+  var start = market.closes.length - length
+  var end = market.closes.length
+  for (var i = start; i < end; i++) {
+    var weightedLow = (Math.min(opens[i],closes[i])+lows[i])/2
+    weightedLows.push(weightedLow)
+    if (weightedLow < lowest) {
+      lowest = weightedLow
+    }
+  }
+  return lowest
+  // var lowestOpen = lowest(market.opens,start,length)
+  // var lowestClose = lowest(market.closes,start,length)
+  // return Math.min(lowestOpen,lowestClose)
 }
 
-function highestBody(market,start,length) {
-  var highestOpen = highest(market.opens,start,length)
-  var highestClose = highest(market.closes,start,length)
-  return Math.max(highestOpen,highestClose)
+function highestBody(market,length) {
+  var opens = market.opens, closes = market.closes, highs = market.highs
+  var weightedHighs = []
+  var highest = 0
+  var start = market.closes.length - length
+  var end = market.closes.length
+  for (var i = start; i < end; i++) {
+    var weightedHigh = (Math.max(opens[i],closes[i])+highs[i])/2
+    weightedHighs[i] = weightedHigh
+    if (weightedHigh > highest) {
+      highest = weightedHigh
+    }
+  }
+  return highest
+  // var highestOpen = highest(market.opens,start,length)
+  // var highestClose = highest(market.closes,start,length)
+  // return Math.max(highestOpen,highestClose)
 }
 
 async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
@@ -94,7 +120,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
 
   switch(signalCondition) {
     case 'SHORT':
-      stopLoss = highestBody(market,lastIndex,stopLossLookBack)
+      stopLoss = highestBody(market,stopLossLookBack)
       entryPrice = Math.max(quote.askPrice,close) // use askPrice or close
       entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
       lossDistance = Math.abs(stopLoss - entryPrice)
@@ -107,7 +133,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
       // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
-      stopLoss = lowestBody(market,lastIndex,stopLossLookBack)
+      stopLoss = lowestBody(market,stopLossLookBack)
       entryPrice = Math.min(quote.bidPrice,close)
       entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       lossDistance = -Math.abs(entryPrice - stopLoss)
