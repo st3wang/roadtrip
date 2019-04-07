@@ -64,12 +64,11 @@ function highest(values,start,length) {
 function lowestBody(market,length) {
   var opens = market.opens, closes = market.closes, lows = market.lows
   var weightedLows = []
-  var lowest = 0
+  var lowest = 9999999
   var start = market.closes.length - length
   var end = market.closes.length
   for (var i = start; i < end; i++) {
     var weightedLow = (Math.min(opens[i],closes[i])+lows[i])/2
-    weightedLows.push(weightedLow)
     if (weightedLow < lowest) {
       lowest = weightedLow
     }
@@ -88,7 +87,6 @@ function highestBody(market,length) {
   var end = market.closes.length
   for (var i = start; i < end; i++) {
     var weightedHigh = (Math.max(opens[i],closes[i])+highs[i])/2
-    weightedHighs[i] = weightedHigh
     if (weightedHigh > highest) {
       highest = weightedHigh
     }
