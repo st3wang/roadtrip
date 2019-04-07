@@ -699,7 +699,7 @@ async function orderLimitRetry(ord) { try {
   var retry = false,
       response, 
       count = 0,
-      waitTime = 2,
+      waitTime = 4,
       canceledCount = 0
   do {
     response = await orderLimit(cid,price,size,execInst) 
@@ -727,7 +727,7 @@ async function orderLimitRetry(ord) { try {
       default:
         retry = false
     }
-  } while(retry && count < 10 && !ord.obsoleted && await wait(waitTime))
+  } while(retry && count < 7 && !ord.obsoleted && await wait(waitTime))
   if (ord.obsoleted) {
     logger.info('orderLimitRetry obsoleted',ord)
   }
@@ -783,14 +783,14 @@ async function orderStopMarketRetry(price,size) { try {
   retryOn = 'Canceled,Overloaded'
   let response, 
       count = 0,
-      waitTime = 2
+      waitTime = 4
   do {
     response = await orderStopMarket(price,size)
     count++
     waitTime *= 2
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
-  } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 10 && await wait(waitTime))
+  } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 3 && await wait(waitTime))
   logger.info('orderStopMarketRetry', response)
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }

@@ -405,12 +405,26 @@ async function checkExit(params) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
+var checking = false, recheckWhenDone = false
+
 async function checkPosition(params) { try {
-  lastCheckPositionTime = new Date().getTime()
   logger.info('checkPosition',params)
+  if (checking) {
+    logger.warn('checking')
+    recheckWhenDone = true
+    return
+  }
+  checking = true
+  lastCheckPositionTime = new Date().getTime()
   if (!(await checkExit(params))) {
     await checkEntry(params)
   }
+  if (recheckWhenDone) {
+    logger.warn('recheckWhenDone')
+    setTimeout(next,50)
+    recheckWhenDone = false
+  }
+  checking = false
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function next() { try {
