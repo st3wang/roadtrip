@@ -712,18 +712,24 @@ async function orderLimitRetry(ord) { try {
         retry = true
       } break
       case 'Canceled': {
-        retry = true
-        canceledCount++
-        if (canceledCount > 2) {
-          let {price,orderQty,execInst} = response.obj
-          let existingOrder = findNewLimitOrder(price,orderQty,execInst)
-          if (existingOrder) {
-            logger.warn('orderLimitRetry canceled duplicate order',ord)
-            response.obj.ordStatus = 'Duplicate'
-            retry = false
-          }
-        }
+        logger.warn('orderLimitRetry Canceled')
+        retry = false
       } break
+      // This cause entry price to be closer to stop loss and it may exceed the stop loss
+      // It's better to check with the signal 
+      // case 'Canceled': {
+      //   retry = true
+      //   canceledCount++
+      //   if (canceledCount > 2) {
+      //     let {price,orderQty,execInst} = response.obj
+      //     let existingOrder = findNewLimitOrder(price,orderQty,execInst)
+      //     if (existingOrder) {
+      //       logger.warn('orderLimitRetry canceled duplicate order',ord)
+      //       response.obj.ordStatus = 'Duplicate'
+      //       retry = false
+      //     }
+      //   }
+      // } break
       default:
         retry = false
     }
