@@ -120,33 +120,27 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     case 'SHORT':
       stopLoss = highestBody(market,stopLossLookBack)
       stopLoss = Math.round(stopLoss*2)/2
-      entryPrice = Math.max(quote.askPrice,close) // use askPrice or close
+      entryPrice = Math.max(quote.askPrice,close) // use askPrice or close to be a maker
       entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
-      lossDistance = Math.abs(stopLoss - entryPrice)
-      stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2 // round to 0.5
-      profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
-      takeProfit = entryPrice + profitDistance
-      stopLossTrigger = entryPrice + (lossDistance/4)
-      takeProfitTrigger = entryPrice - (lossDistance/4)
-      lossDistancePercent = lossDistance/entryPrice
-      // positionSizeUSD = Math.round(riskAmountUSD / -lossDistancePercent)
       break;
     case 'LONG':
       stopLoss = lowestBody(market,stopLossLookBack)
       stopLoss = Math.round(stopLoss*2)/2
-      entryPrice = Math.min(quote.bidPrice,close)
+      entryPrice = Math.min(quote.bidPrice,close) // use bidPrice or close to be a maker
       entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
-      lossDistance = -Math.abs(entryPrice - stopLoss)
-      stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2
-      profitDistance = -lossDistance * profitFactor
-      profitDistance = Math.round(profitDistance*2)/2 // round to 0.5
-      takeProfit = entryPrice + profitDistance
-      stopLossTrigger = entryPrice + (lossDistance/4)
-      takeProfitTrigger = entryPrice - (lossDistance/4)
-      lossDistancePercent = lossDistance/entryPrice
-      // positionSizeUSD = Math.round(capitalUSD * riskPerTradePercent / -lossDistancePercent)
       break;
   }
+
+  lossDistance = stopLoss - entryPrice
+  stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2 // round to 0.5
+  stopMarket = entryPrice + stopMarketDistance
+  profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
+  takeProfit = entryPrice + profitDistance
+
+  stopLossTrigger = entryPrice + (lossDistance/4)
+  takeProfitTrigger = entryPrice + (profitDistance/4)
+  stopMarketTrigger = entryPrice + (stopMarketDistance/4)
+  lossDistancePercent = lossDistance/entryPrice
 
   let capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + walletBalance/100000000
   let capitalUSD = capitalBTC * entryPrice
@@ -171,8 +165,10 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     profitDistance: profitDistance,
     stopLoss: stopLoss,
     takeProfit: takeProfit,
+    stopMarket: stopMarket,
     stopLossTrigger: stopLossTrigger,
     takeProfitTrigger: takeProfitTrigger,
+    stopMarketTrigger: stopMarketTrigger,
     riskAmountBTC: riskAmountBTC,
     riskAmountUSD: riskAmountUSD,
     positionSizeBTC: positionSizeBTC,
