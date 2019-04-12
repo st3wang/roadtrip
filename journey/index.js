@@ -289,7 +289,7 @@ function exitStopMarketTrigger({positionSize,lastPrice,signal}) {
   var {stopMarketTrigger,stopMarket} = signal
   if ((positionSize > 0 && lastPrice <= stopMarketTrigger) || (positionSize < 0 && lastPrice >= stopMarketTrigger)) {
     // logger.warn('exitStopMarketTrigger',positionSize,lastPrice,signal)
-    return {type:'Stop',price:stopMarket,size:null,execInst:'Close,LastPrice',reason:'stopmarkettrigger'}
+    return {type:'Stop',price:stopMarket,size:null,side:positionSize>0?'Sell':'Buy',execInst:'Close,LastPrice',reason:'stopmarkettrigger'}
   }
 }
 
