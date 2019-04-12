@@ -280,7 +280,7 @@ function exitTarget({positionSize,bid,ask,signal}) {
 function exitStopTrigger({positionSize,lastPrice,signal}) {
   var {stopLossTrigger,stopLoss} = signal
   if ((positionSize > 0 && lastPrice <= stopLossTrigger) || (positionSize < 0 && lastPrice >= stopLossTrigger)) {
-    logger.warn('exitStopTrigger',positionSize,lastPrice,signal)
+    // logger.warn('exitStopTrigger',positionSize,lastPrice,signal)
     return {type:'StopLimit',price:stopLoss,size:-positionSize,execInst:'LastPrice,ParticipateDoNotInitiate,ReduceOnly',reason:'stoptrigger'}
   }
 }
@@ -288,7 +288,7 @@ function exitStopTrigger({positionSize,lastPrice,signal}) {
 function exitStopMarketTrigger({positionSize,lastPrice,signal}) {
   var {stopMarketTrigger,stopMarket} = signal
   if ((positionSize > 0 && lastPrice <= stopMarketTrigger) || (positionSize < 0 && lastPrice >= stopMarketTrigger)) {
-    logger.warn('exitStopMarketTrigger',positionSize,lastPrice,signal)
+    // logger.warn('exitStopMarketTrigger',positionSize,lastPrice,signal)
     return {type:'Stop',price:stopMarket,size:null,execInst:'Close,LastPrice',reason:'stopmarkettrigger'}
   }
 }
