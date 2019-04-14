@@ -91,6 +91,8 @@ const logger = winston.createLogger({
               let {positionSizeUSD,entryPrice} = splat[0].signal
               line =  (positionSizeUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+positionSizeUSD+' '+entryPrice
             } break
+            case 'STOPMARKET':
+            case 'STOPLIMIT':
             case 'EXIT': {
               let {size,price} = splat[0]
               line = (size>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+size+' '+price
@@ -387,6 +389,7 @@ async function checkExit(params) { try {
   if (exitStopMarket) {
     let existingOrder = bitmex.findNewOrFilledOrder(exitStopMarket)
     if (!existingOrder) {
+      logger.log('STOPMARKET', exit)
       await bitmex.orderStopMarketRetry(exitStopMarket.price,exitStopMarket.size)
     }
   }
@@ -395,6 +398,7 @@ async function checkExit(params) { try {
   if (exitStopLimit) {
     let existingOrder = bitmex.findNewOrFilledOrder(exitStopLimit)
     if (!existingOrder) {
+      logger.log('STOPLIMIT', exit)
       await bitmex.orderStopLimit(exitStopLimit.price,exitStopLimit.size)
     }
   }
