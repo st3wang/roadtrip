@@ -411,6 +411,7 @@ async function checkExit(params) { try {
       return existingOrder
     }
 
+    logger.log('EXIT', exit)
     return await bitmex.orderExit('',exit.price,exit.size)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
