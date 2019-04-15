@@ -389,7 +389,7 @@ async function checkExit(params) { try {
   if (exitStopMarket) {
     let existingOrder = bitmex.findNewOrFilledOrder(exitStopMarket)
     if (!existingOrder) {
-      logger.info('STOPMARKET', exit)
+      logger.info('STOPMARKET', exitStopMarket)
       await bitmex.orderStopMarketRetry(exitStopMarket.price,exitStopMarket.size)
     }
   }
@@ -398,7 +398,7 @@ async function checkExit(params) { try {
   if (exitStopLimit) {
     let existingOrder = bitmex.findNewOrFilledOrder(exitStopLimit)
     if (!existingOrder) {
-      logger.info('STOPLIMIT', exit)
+      logger.info('STOPLIMIT', exitStopLimit)
       await bitmex.orderStopLimit(exitStopLimit.price,exitStopLimit.size)
     }
   }
