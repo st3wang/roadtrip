@@ -936,6 +936,7 @@ function findNewLimitOrder({price:p,size:s},e) {
 // }
 
 function findNewLimitOrders(ords,execInst) {
+  if (!ords) return
   return ords.reduce((a,c) => {
     return a && findNewLimitOrder(c,execInst)
   }, {})
