@@ -945,14 +945,26 @@ function findNewOrFilledOrder({type:t,price:p,size:s,side:sd,execInst:e}) {
   sd = sd || (s > 0 ? 'Buy' : 'Sell')
   s = Math.abs(s)
   return lastOrders.find((order) => {
-    let {ordStatus,ordType,side,price,stopPx,orderQty,execInst,timestamp} = order
+    let {ordStatus,ordType,side,price,stopPx,orderQty,execInst,timestamp,cumQty} = order
     price = price || stopPx
     if (ordType == t) {
       switch (ordStatus) {
         case 'New': {
           return (price == p && side == sd && orderQty >= (s*0.98) && orderQty <= (s*1.02) && execInst == e)
         }
-        case 'PartiallyFilled':
+        case 'PartiallyFilled': {
+          let qty = orderQty
+          if (e == 'ParticipateDoNotInitiate,ReduceOnly') {
+            console.warn('findNewOrFilledOrder ParticipateDoNotInitiate,ReduceOnly qty -= cumQty')
+            qty -= cumQty
+          }
+          if (execInst == e && side == sd && price > (p*0.999) && price < (p*1.001) && qty >= (s*0.98) && qty <= (s*1.02)) {
+            let ordTime = new Date(timestamp).getTime()
+            let now = new Date().getTime()
+            // logger.warn('findNewOrFilledOrder found filled',order)
+            return (now - ordTime < 10000)
+          }
+        }
         case 'Filled': {
           if (execInst == e && side == sd && price > (p*0.999) && price < (p*1.001) && orderQty >= (s*0.98) && orderQty <= (s*1.02)) {
             let ordTime = new Date(timestamp).getTime()

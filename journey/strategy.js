@@ -143,7 +143,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
   takeProfit = entryPrice + profitDistance
 
-  stopLossTrigger = entryPrice + (lossDistance/4)
+  stopLossTrigger = entryPrice + (lossDistance/2)
   takeProfitTrigger = entryPrice + (profitDistance/4)
   stopMarketTrigger = entryPrice + (stopMarketDistance/4)
   lossDistancePercent = lossDistance/entryPrice
