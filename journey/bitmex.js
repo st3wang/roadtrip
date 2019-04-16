@@ -626,7 +626,7 @@ async function orderEnter(signal) { try {
       return false
   }
 
-  await orderStopMarketRetry(signal.stopLoss,-signal.positionSizeUSD)
+  // await orderStopMarketRetry(signal.stopLoss,-signal.positionSizeUSD)
   // handle response
   return true
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
