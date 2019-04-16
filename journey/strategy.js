@@ -109,6 +109,8 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   let profitFactor = bankroll.profitFactor
   let stopMarketFactor = bankroll.stopMarketFactor
   let stopLossLookBack = bankroll.stopLossLookBack
+  let scaleInFactor = bankroll.scaleInFactor
+  let scaleInLength = bankroll.scaleInLength
   let leverageMargin = walletBalance*0.000000008
   let entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
@@ -116,17 +118,21 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
 
   let quote = bitmex.getQuote()
 
+  // Test
+  // if (signalCondition == 'S') signalCondition = 'SHORT'
+  // else if (signalCondition == 'L' || signalCondition == '-') signalCondition = 'LONG'
+
   switch(signalCondition) {
     case 'SHORT':
       stopLoss = highestBody(market,stopLossLookBack)
       stopLoss = Math.round(stopLoss*2)/2
-      entryPrice = Math.max(quote.askPrice,close) // use askPrice or close to be a maker
+      entryPrice = Math.max(quote.askPrice||0,close) // use askPrice or close to be a maker
       entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
       break;
     case 'LONG':
       stopLoss = lowestBody(market,stopLossLookBack)
       stopLoss = Math.round(stopLoss*2)/2
-      entryPrice = Math.min(quote.bidPrice,close) // use bidPrice or close to be a maker
+      entryPrice = Math.min(quote.bidPrice||Infinity,close) // use bidPrice or close to be a maker
       entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       break;
   }
@@ -154,6 +160,23 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
 
+  var scaleInDistance = lossDistance * scaleInFactor
+  if (scaleInDistance && Math.abs(scaleInDistance) < 2) {
+    scaleInDistance = scaleInDistance > 0 ? 2 : -2
+  }
+  var scaleInStep = scaleInDistance/(scaleInLength-1)
+  if (Math.abs(scaleInStep) == Infinity) {
+    scaleInStep = 0
+  }
+  var scaleInSize = Math.round(positionSizeUSD/scaleInLength)
+  var scaleInOrders = []
+  for (var i = 0; i < scaleInLength; i++) {
+    scaleInOrders.push({
+      size:scaleInSize,
+      price:Math.round((entryPrice+scaleInStep*i)*2)/2
+    })
+  }
+
   return {
     timestamp: timestamp,
     capitalBTC: capitalBTC,
@@ -173,7 +196,8 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     riskAmountUSD: riskAmountUSD,
     positionSizeBTC: positionSizeBTC,
     positionSizeUSD: positionSizeUSD,
-    leverage: leverage
+    leverage: leverage,
+    scaleInOrders: scaleInOrders
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 

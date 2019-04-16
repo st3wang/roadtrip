@@ -358,7 +358,7 @@ async function checkEntry(params) { try {
   
   var {signal} = params
   var cancel, enter
-  let existingEntryOrder = bitmex.findNewLimitOrder(signal.entryPrice,signal.positionSizeUSD,'ParticipateDoNotInitiate')  
+  let existingEntryOrder = bitmex.findNewLimitOrders(signal.scaleInOrders,'ParticipateDoNotInitiate')  
   if (existingEntryOrder && (cancel = cancelOrder(params))) {
     logger.warn('CANCEL',cancel)
     await bitmex.cancelAll()
