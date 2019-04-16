@@ -197,15 +197,27 @@ async function handleMargin(data) { try {
   // console.log(checkPositionParams.availableMargin, checkPositionParams.marginBalance, checkPositionParams.walletBalance)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function handleOrder(data) { try {
-  lastOrders = data
+async function handleOrder(orders) { try {
+  orders.forEach(o => {
+    let lastOrderIndex = lastOrders.findIndex(lo => {
+      return (lo.orderID == o.orderID)
+    })
+    if (lastOrderIndex >= 0) {
+      lastOrders[lastOrderIndex] = o
+    }
+    else {
+      lastOrders.push(o)
+    }
+  })
+
   lastOrders.forEach((order,i) => {
     logger.info('handleOrder',order)
     // console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.cumQty+'/'+order.orderQty)
   })
   console.log('---------------------')
 
-  var prunedCanceledOrder = pruneOrders(data)
+  var prunedCanceledOrder = pruneOrders(orders)
+  pruneOrders(lastOrders)
   if (!prunedCanceledOrder) {
     checkPositionParams.caller = 'order'
     checkPositionCallback(checkPositionParams)
@@ -780,6 +792,7 @@ async function orderLimitBulk(ord) { try {
   if (response) {
     response.data = undefined
     response.statusText = undefined
+    handleOrder(response.obj)
     logger.info('orderLimitBulk',response)
     return response
   }
@@ -824,6 +837,7 @@ async function orderLimit(cid,price,size,execInst) { try {
   if (response) {
     response.data = undefined
     response.statusText = undefined
+    handleOrder([response.obj])
     logger.info('orderLimit',response)
     return response
   }
@@ -869,6 +883,7 @@ async function orderStopMarket(price) { try {
   if (response) {
     response.data = undefined
     response.statusText = undefined
+    handleOrder([response.obj])
     logger.info('orderStopMarket',response)
     return response
   }
@@ -900,6 +915,7 @@ async function orderStopLimit(price,size) { try {
   if (response) {
     response.data = undefined
     response.statusText = undefined
+    handleOrder([response.obj])
     logger.info('orderStopLimit',response)
     return response
   }
