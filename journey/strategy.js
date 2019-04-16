@@ -2,6 +2,7 @@ const util = require('util')
 const talib = require('talib')
 const talibExecute = util.promisify(talib.execute)
 const bitmex = require('./bitmex')
+const shoes = require('./shoes')
 
 async function getRsi(data,length) {
   var result = await talibExecute({
@@ -119,8 +120,10 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   let quote = bitmex.getQuote()
 
   // Test
-  // if (signalCondition == 'S') signalCondition = 'SHORT'
-  // else if (signalCondition == 'L' || signalCondition == '-') signalCondition = 'LONG'
+  if (shoes.test ) {
+    if (signalCondition == 'S') signalCondition = 'SHORT'
+    else if (signalCondition == 'L' || signalCondition == '-') signalCondition = 'LONG'
+  }
 
   switch(signalCondition) {
     case 'SHORT':
@@ -175,6 +178,10 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
       size:scaleInSize,
       price:Math.round((entryPrice+scaleInStep*i)*2)/2
     })
+  }
+
+  if (shoes.test && scaleInOrders[0].size < 50) {
+    goodStopDistance = false
   }
 
   return {
