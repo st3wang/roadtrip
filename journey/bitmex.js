@@ -776,7 +776,6 @@ async function orderLimitBulk(ord) { try {
     e.data = undefined
     e.statusText = undefined
     logger.error('orderLimitBulk error',e,orders)
-    debugger
     if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
       return ({obj:{ordStatus:'Overloaded'}})
     }
