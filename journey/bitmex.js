@@ -791,7 +791,9 @@ async function orderLimitBulk(ord) { try {
   if (response) {
     response.data = undefined
     response.statusText = undefined
-    handleOrder(response.obj)
+    if (response.status == 200) {
+      handleOrder(response.obj)
+    }
     logger.info('orderLimitBulk',response)
     return response
   }
@@ -835,8 +837,10 @@ async function orderLimit(cid,price,size,execInst) { try {
   
   if (response) {
     response.data = undefined
-    response.statusText = undefined
-    handleOrder([response.obj])
+    response.statusText = undefined    
+    if (response.status == 200) {
+      handleOrder([response.obj])
+    }
     logger.info('orderLimit',response)
     return response
   }
@@ -882,7 +886,9 @@ async function orderStopMarket(price) { try {
   if (response) {
     response.data = undefined
     response.statusText = undefined
-    handleOrder([response.obj])
+    if (response.status == 200) {
+      handleOrder([response.obj])
+    }
     logger.info('orderStopMarket',response)
     return response
   }
@@ -914,7 +920,9 @@ async function orderStopLimit(price,size) { try {
   if (response) {
     response.data = undefined
     response.statusText = undefined
-    handleOrder([response.obj])
+    if (response.status == 200) {
+      handleOrder([response.obj])
+    }
     logger.info('orderStopLimit',response)
     return response
   }
