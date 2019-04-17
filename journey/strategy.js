@@ -104,14 +104,9 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   
   let lastIndex = market.closes.length - 1
   let close = market.closes[lastIndex]
-  let outsideCapitalBTC = bankroll.outsideCapitalBTC || 0
-  let outsideCapitalUSD = bankroll.outsideCapitalUSD || 0
-  let riskPerTradePercent = bankroll.riskPerTradePercent
-  let profitFactor = bankroll.profitFactor
-  let stopMarketFactor = bankroll.stopMarketFactor
-  let stopLossLookBack = bankroll.stopLossLookBack
-  let scaleInFactor = bankroll.scaleInFactor
-  let scaleInLength = bankroll.scaleInLength
+  let {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,
+    stopMarketFactor,stopLossLookBack,scaleInFactor,scaleInLength,minOrderSizeBTC} = bankroll
+
   let leverageMargin = walletBalance*0.000000008
   let entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
@@ -163,6 +158,13 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
 
+  var scaleInSize = Math.round(positionSizeUSD/scaleInLength)
+  var minScaleInSize = minOrderSizeBTC * entryPrice
+  if (scaleInSize < minScaleInSize) {
+    scaleInLength = Math.floor(positionSizeUSD/minScaleInSize)
+    scaleInSize = Math.round(positionSizeUSD/scaleInLength)
+  }
+
   var scaleInDistance = lossDistance * scaleInFactor
   if (scaleInDistance && Math.abs(scaleInDistance) < 2) {
     scaleInDistance = scaleInDistance > 0 ? 2 : -2
@@ -171,17 +173,13 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   if (Math.abs(scaleInStep) == Infinity) {
     scaleInStep = 0
   }
-  var scaleInSize = Math.round(positionSizeUSD/scaleInLength)
+  
   var scaleInOrders = []
   for (var i = 0; i < scaleInLength; i++) {
     scaleInOrders.push({
       size:scaleInSize,
       price:Math.round((entryPrice+scaleInStep*i)*2)/2
     })
-  }
-
-  if (shoes.test && scaleInOrders[0].size < 50) {
-    goodStopDistance = false
   }
 
   return {
