@@ -788,15 +788,13 @@ async function orderLimitBulk(ord) { try {
     }
   })
   
-  if (response) {
+  if (response && response.status == 200) {
     response.data = undefined
     response.statusText = undefined
-    if (response.status == 200) {
-      handleOrder(response.obj)
-    }
     logger.info('orderLimitBulk',response)
-    return response
+    handleOrder(response.obj)
   }
+  return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderLimit(cid,price,size,execInst) { try {
@@ -835,15 +833,13 @@ async function orderLimit(cid,price,size,execInst) { try {
     }
   })
   
-  if (response) {
+  if (response && response.status == 200) {
     response.data = undefined
     response.statusText = undefined    
-    if (response.status == 200) {
-      handleOrder([response.obj])
-    }
     logger.info('orderLimit',response)
-    return response
+    handleOrder([response.obj])
   }
+  return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderStopMarketRetry(price,size) { try {
@@ -883,15 +879,13 @@ async function orderStopMarket(price) { try {
     }
   })
 
-  if (response) {
+  if (response && response.status == 200) {
     response.data = undefined
     response.statusText = undefined
-    if (response.status == 200) {
-      handleOrder([response.obj])
-    }
     logger.info('orderStopMarket',response)
-    return response
+    handleOrder([response.obj])
   }
+  return response
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function orderStopLimit(price,size) { try {
@@ -917,15 +911,13 @@ async function orderStopLimit(price,size) { try {
     }
   })
 
-  if (response) {
+  if (response && response.status == 200) {
     response.data = undefined
     response.statusText = undefined
-    if (response.status == 200) {
-      handleOrder([response.obj])
-    }
     logger.info('orderStopLimit',response)
-    return response
+    handleOrder([response.obj])
   }
+  return response
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function findNewLimitOrder({price:p,size:s},e) {
