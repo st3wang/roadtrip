@@ -152,7 +152,10 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
   positionSizeBTC = riskAmountBTC / -lossDistancePercent
-  positionSizeUSD = Math.round(positionSizeBTC * entryPrice)
+  if (positionSizeBTC < minOrderSizeBTC) {
+    positionSizeBTC = minOrderSizeBTC
+  }
+  positionSizeUSD = Math.ceil(positionSizeBTC * entryPrice)
   leverage = Math.max(Math.ceil(Math.abs(positionSizeBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
