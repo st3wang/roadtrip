@@ -241,7 +241,7 @@
             var endDate = (exitTrade && (exitTrade.type.indexOf('FILLED') != -1)) ? exitTrade.date : (new Date(date.getTime() + (date.getTimezoneOffset()-1)*60000))
             let color = trade.type.indexOf('SHORT') != -1 ? '#CC47ED' : '#008fff'
             let stopMarketColor = trade.type.indexOf('SHORT') != -1 ? 'pink' : 'lightskyblue'
-            let halfTarget = (trade.takeProfit+trade.price)/2
+            let halfTarget = (trade.price*2-trade.stopLoss)
             trendlines.push({ color: color, start: { date: startDate, value: trade.price }, end: { date: endDate, value: trade.price } })
             trendlines.push({ color: color, start: { date: startDate, value: trade.stopLoss }, end: { date: endDate, value: trade.stopLoss } })
             trendlines.push({ color: color, start: { date: startDate, value: trade.takeProfit }, end: { date: endDate, value: trade.takeProfit } })

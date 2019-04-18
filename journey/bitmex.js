@@ -35,9 +35,14 @@ function orderString({ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,ex
 }
 
 function orderStringBulk(orders) {
-  return orders.reduce((a,c) => {
-    return a + '\n' + orderString(c)
-  },'')
+  if (orders.reduce) {
+    return orders.reduce((a,c) => {
+      return a + '\n' + orderString(c)
+    },'')
+  }
+  else {
+    return orderString(orders)
+  }
 }
 
 const logger = winston.createLogger({
