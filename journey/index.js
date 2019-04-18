@@ -1,7 +1,14 @@
 const log = require('./log')
+
+const fs = require('fs')
+const readFileOptions = {encoding:'utf-8', flag:'r'}
+const writeFileOptions = {encoding:'utf-8', flag:'w'}
+
 const winston = require('winston')
 const path = require('path')
 global.logDir = path.resolve(__dirname, 'log')
+
+const entrySignalFilePath = global.logDir + '/entry_signal.json'
 
 // const l = require('./logger')
 const bitmex = require('./bitmex')
@@ -251,20 +258,16 @@ function exitFunding({positionSize,fundingTimestamp,fundingRate,signal}) {
   // return exit
 }
 
-function exitTargetTrigger({positionSize,bid,ask,signal}) {
-  var {takeProfitTrigger,takeProfit} = signal
+function exitTargetTrigger({positionSize,lastPrice,signal}) {
+  var {takeProfitTrigger,takeProfit,takeHalfProfit} = signal
   var exit
-  if (positionSize > 0) {
-    if (ask >= takeProfitTrigger) {
-      // logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
-      exit = {type:'Limit',price:Math.max(takeProfit,ask),execInst:'ParticipateDoNotInitiate,ReduceOnly',reason:'targettrigger'}
-    }
-  } 
-  else if (positionSize < 0) {
-    if (bid <= takeProfitTrigger) {
-      // logger.debug('exitTargetTrigger',positionSize,bid,ask,signal)
-      exit = {type:'Limit',price:Math.min(takeProfit,bid),execInst:'ParticipateDoNotInitiate,ReduceOnly',reason:'targettrigger'}
-    }
+  if ((positionSize > 0 && lastPrice >= takeProfitTrigger) || 
+    (positionSize < 0 && lastPrice <= takeProfitTrigger)) {
+    exit = {reason:'targettrigger',
+      ords:[
+        {price:takeProfit, size:-positionSize/2},
+        {price:takeHalfProfit, size:-positionSize/2},
+      ]}
   }
   return exit
 }
@@ -358,65 +361,78 @@ async function checkEntry(params) { try {
   
   var {signal} = params
   var cancel, enter
-  let existingEntryOrder = bitmex.findNewLimitOrders(signal.scaleInOrders,'ParticipateDoNotInitiate')  
-  if (existingEntryOrder && (cancel = cancelOrder(params))) {
+  let newEntryOrders = bitmex.findOrders(/New/,signal.entryOrders)  
+  if (newEntryOrders.length == signal.entryOrders && (cancel = cancelOrder(params))) {
     logger.warn('CANCEL',cancel)
     await bitmex.cancelAll()
-    existingEntryOrder = null
+    newEntryOrders = []
   }
-  if (!existingEntryOrder && (enter = await enterSignal(params))) {
-    if (bitmex.findNewOrFilledOrder(enter)) {
+  if (newEntryOrders.length != signal.entryOrders.length && (enter = await enterSignal(params))) {
+    let {entryOrders,stopLossOrders,takeProfitOrders} = getEntryExitOrders(enter.signal)
+    var existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders)
+    if (existingEntryOrders.length > 0) {
       logger.info('ENTRY ORDER EXISTS')
     }
     else {
       logger.info('ENTER',enter)
-      let orderSent = await bitmex.orderEnter(enter.signal)
+      let orderSent = await bitmex.order(entryOrders.concat(stopLossOrders),true)
       if (orderSent) {
-        entrySignal = enter.signal
-        entrySignalTable.info('entry',entrySignal)
-        log.writeEntrySignal(entrySignal) // current trade
+        entrySignalTable.info('entry',enter.signal)
+        fs.writeFileSync(entrySignalFilePath,JSON.stringify(enter.signal,null,2),writeFileOptions)
+        // log.writeEntrySignal(entrySignal) // current trade
         log.writeOrderSignal(setup.bankroll,entrySignal) // trade
+        entrySignal = enter.signal
+        entrySignal.entryOrders = entryOrders
+        entrySignal.stopLossOrders = stopLossOrders
+        entrySignal.takeProfitOrders = takeProfitOrders
       }
     }
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkExit(params) { try {
-  let {positionSize,bid,ask} = params
+  var {positionSize,bid,ask,signal} = params
   if (positionSize == 0) return
 
-  var exitStopMarket = exitStopMarketTrigger(params)
-  if (exitStopMarket) {
-    let existingOrder = bitmex.findNewOrFilledOrder(exitStopMarket)
-    if (!existingOrder) {
-      logger.info('STOPMARKET', exitStopMarket)
-      await bitmex.orderStopMarketRetry(exitStopMarket.price,exitStopMarket.size)
-    }
+  var {entryOrders,takeProfitOrders} = signal
+  var [takeProfitOrder,takeHalfProfitOrder] = takeProfitOrders
+
+  var orders = []
+  var exitOrderQty = -bitmex.getCumQty(entryOrders)
+  var halfExitOrderQty = exitOrderQty/2
+
+  var takeProfitCumQty = bitmex.getCumQty([takeProfitOrder])
+  takeProfitOrder.orderQty = Math.round(halfExitOrderQty) - takeProfitCumQty
+  if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
+
+  var takeHalfProfitCumQty = bitmex.getCumQty([takeHalfProfitOrder])
+  takeHalfProfitOrder.orderQty = exitOrderQty - takeProfitOrder.orderQty - takeHalfProfitCumQty
+  if (takeHalfProfitOrder.orderQty != 0) orders.push(takeHalfProfitOrder)
+
+  let existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
+  if (existingTakeProfitOrders.length != orders.length) {
+    await bitmex.order(orders)
   }
 
-  var exitStopLimit = exitStopTrigger(params)
-  if (exitStopLimit) {
-    let existingOrder = bitmex.findNewOrFilledOrder(exitStopLimit)
-    if (!existingOrder) {
-      logger.info('STOPLIMIT', exitStopLimit)
-      await bitmex.orderStopLimit(exitStopLimit.price,exitStopLimit.size)
-    }
-  }
-
-  var exit = exitTooLong(params) || exitFunding(params) || exitTargetTrigger(params)
+  var exit = exitTooLong(params) || exitFunding(params)
   if (exit) {
-    exit.price = exit.price || (positionSize < 0 ? bid : ask)
-    exit.size = -params.positionSize
-    exit.type = exit.type || 'Limit'
-    exit.execInst = exit.execInst || 'ParticipateDoNotInitiate,ReduceOnly'
-    let existingOrder = bitmex.findNewOrFilledOrder(exit)
-    if (existingOrder) {
+    let exitOrders = [{
+      price: (positionSize < 0 ? bid : ask),
+      side: (positionSize < 0 ? 'Buy' : 'Sell'),
+      orderQty: -positionSize,
+      type: 'Limit',
+      execInst: 'Close,ParticipateDoNotInitiate'
+    }]
+    exit.exitOrders = exitOrders
+
+    let existingExitOrders = bitmex.findOrders(exitOrders)
+    if (existingExitOrders.length == 1) {
       // logger.debug('EXIT EXISTING ORDER',exit)
-      return existingOrder
+      return existingExitOrders
     }
 
     logger.info('EXIT', exit)
-    return await bitmex.orderExit('',exit.price,exit.size)
+    return await bitmex.order(exitOrders,true)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -430,6 +446,7 @@ async function checkPosition(params) { try {
   }
   checking = true
   lastCheckPositionTime = new Date().getTime()
+
   if (!(await checkExit(params))) {
     await checkEntry(params)
   }
@@ -519,12 +536,61 @@ function createInterval(candleDelay) {
   },startsIn)
 }
 
+function getEntryExitOrders({positionSizeUSD,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
+  var exitSide = positionSizeUSD > 0 ? 'Sell' : 'Buy'
+
+  var entryOrders = scaleInOrders.map(o => {
+    return {
+      price: o.price,
+      orderQty: o.size,
+      ordType: 'Limit',
+      execInst: 'ParticipateDoNotInitiate'
+    }
+  })
+
+  var stopLossOrders = [{
+    stopPx: stopMarket,
+    side: exitSide,
+    ordType: 'Stop',
+    execInst: 'Close,LastPrice'
+  },{
+    price: stopLoss,
+    stopPx: stopLoss+(-positionSizeUSD/Math.abs(positionSizeUSD)*0.5),
+    side: exitSide,
+    ordType: 'StopLimit',
+    execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
+  }]
+
+  var takeProfitOrders = [{
+    price: takeProfit,
+    orderQty: positionSizeUSD/2,
+    side: exitSide,
+    ordType: 'Limit',
+    execInst: 'ParticipateDoNotInitiate,ReduceOnly'
+  },{
+    price: takeHalfProfit,
+    orderQty: positionSizeUSD/2,
+    side: exitSide,
+    ordType: 'Limit',
+    execInst: 'ParticipateDoNotInitiate,ReduceOnly'
+  }]
+
+  return {entryOrders:entryOrders,stopLossOrders:stopLossOrders,takeProfitOrders:takeProfitOrders}
+}
+
 async function start() { try {
   // var rsi1 = await strategy.getRsi([4000,4001,4002,4003,4004,4005,4006,4010,4011,4010],2)
   // var rsi2 = await strategy.getRsi([4000,4001,4002,4003,4004,4005,4006,4010,4011,4009],2)
   // debugger
   await log.init()
-  entrySignal = log.readEntrySignal()
+  var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)
+  entrySignal = JSON.parse(entrySignalString)
+  
+  var {entryOrders,stopLossOrders,takeProfitOrders} = getEntryExitOrders(entrySignal)
+  entrySignal.entryOrders = entryOrders
+  entrySignal.stopLossOrders = stopLossOrders
+  entrySignal.takeProfitOrders = takeProfitOrders
+
   await bitmex.init(checkPositionCallback)
   await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
 

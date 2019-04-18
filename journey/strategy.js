@@ -104,7 +104,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   
   let lastIndex = market.closes.length - 1
   let close = market.closes[lastIndex]
-  let {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,
+  let {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,halfProfitFactor,
     stopMarketFactor,stopLossLookBack,scaleInFactor,scaleInLength,minOrderSizeBTC} = bankroll
 
   let leverageMargin = walletBalance*0.000000008
@@ -140,9 +140,11 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   stopMarket = entryPrice + stopMarketDistance
   profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
   takeProfit = entryPrice + profitDistance
+  halfProfitDistance = Math.floor(-lossDistance*halfProfitFactor*2)/2
+  takeHalfProfit = entryPrice + halfProfitDistance
 
   stopLossTrigger = entryPrice + (lossDistance/2)
-  takeProfitTrigger = entryPrice + (profitDistance/4)
+  takeProfitTrigger = entryPrice + (profitDistance/8)
   stopMarketTrigger = entryPrice + (stopMarketDistance/4)
   lossDistancePercent = lossDistance/entryPrice
 
@@ -152,6 +154,9 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
   positionSizeBTC = riskAmountBTC / -lossDistancePercent
+  if (shoes.test) {
+    positionSizeBTC = 0.02
+  }
   if (positionSizeBTC < minOrderSizeBTC) {
     positionSizeBTC = minOrderSizeBTC
   }
@@ -184,6 +189,10 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
       price:Math.round((entryPrice+scaleInStep*i)*2)/2
     })
   }
+  
+  if (shoes.test ) {
+    if (scaleInOrders.length <= 1) goodStopDistance = false
+  }
 
   return {
     timestamp: timestamp,
@@ -194,8 +203,10 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     lossDistance: lossDistance,
     lossDistancePercent: lossDistance/entryPrice,
     profitDistance: profitDistance,
+    halfProfitDistance: halfProfitDistance,
     stopLoss: stopLoss,
     takeProfit: takeProfit,
+    takeHalfProfit: takeHalfProfit,
     stopMarket: stopMarket,
     stopLossTrigger: stopLossTrigger,
     takeProfitTrigger: takeProfitTrigger,

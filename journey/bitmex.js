@@ -54,17 +54,11 @@ const logger = winston.createLogger({
           let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
-            case 'orderStopMarket':
-            case 'orderStopMarketRetry':
-            case 'orderStopLimit':
-            case 'orderLimit': {
-              line += (splat[0].obj ? orderString(splat[0].obj) : ('splat[0].obj is null ' + JSON.stringify(splat[0])))
-            } break
-            case 'orderLimitBulk':
-            case 'orderLimitRetry':
+            case 'orderNewBulk':
+            case 'orderAmendBulk':
+            case 'orderBulkRetry':
             case 'orderQueue':
-            case 'orderEnter':
-            case 'orderExit': {
+            case 'order': {
               line += (splat[0].obj ? orderStringBulk(splat[0].obj) : ('splat[0].obj is null ' + JSON.stringify(splat[0])))
             } break
             case 'cancelAll': {
@@ -74,10 +68,8 @@ const logger = winston.createLogger({
             case 'pruneOrders': {
               line += (splat[0] ? orderString(splat[0]) : 'splat[0] is null')
             } break
-            case 'orderLimitBulk error':
-            case 'orderLimit error':
-            case 'orderStopLimit error':
-            case 'orderStopMarket error': {
+            case 'orderNewBulk error':
+            case 'orderAmendBulk error': {
               let {status,obj} = splat[0]
               line += status + ' ' + obj.error.message + ' ' + JSON.stringify(splat[1])
             } break
@@ -150,14 +142,6 @@ async function connect() { try {
   ws.on('close', () => console.log('Connection closed.'));
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
 
-  var newOrders = await getNewOrders()
-  if (newOrders.length == 0) {
-    // Order stream will not work without an open order.
-    // It's okay to leave this dummy stop market around.
-    // It will get canceled later.
-    console.log('Adding dummy stop market')
-    await orderStopMarket(1,-1)
-  }
   await wsAddStream('margin',handleMargin)
   await wsAddStream('order',handleOrder)
   await wsAddStream('position',handlePosition)
@@ -581,7 +565,7 @@ async function getOrders(startTime) { try {
   let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
     startTime: new Date(startTime).toISOString(),
     // filter: '{"ordType":"Limit"}',
-    columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
+    columns: 'price,orderQty,ordStatus,side,stopPx,ordType,execInst,cumQty'
   })
   let orders = JSON.parse(response.data)
   orders = orders.filter(order => {
@@ -597,9 +581,12 @@ async function getCurrentCandle() {
 async function cancelAll() { try {
   // logger.info('Cancelling All Orders')
   let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
-  response.data = undefined
-  response.statusText = undefined
-  logger.info('cancelAll',response)
+  if (response && response.status == 200) {
+    response.data = undefined
+    response.statusText = undefined
+    logger.info('cancelAll',response)
+    handleOrder(response.obj)
+  }
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function updateLeverage(leverage) { try {
@@ -608,50 +595,34 @@ async function updateLeverage(leverage) { try {
   console.log('Updated Leverage')
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function orderEnterStep(signal) { try {
-
-} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
-
-async function orderEnter(signal) { try {
-  if (!signal.entryPrice || !signal.positionSizeUSD) {
+async function order(orders,cancelAllBeforeOrder) { try {
+  if (!orders || orders.length == 0) {
     return
   }
 
-  // let response = await orderQueue({
-  //   cid:signal.timestamp+'ENTER',
-  //   price:signal.entryPrice,
-  //   size:signal.positionSizeUSD,
-  //   execInst:''
-  // })
+  var valid = orders.reduce((a,c) => {
+    return a && (c.price || c.stopPx)
+  },true)
+  if (!valid) {
+    return
+  }
 
   let response = await orderQueue({
-    ords: signal.scaleInOrders,
-    execInst:''
+    orders:orders,
+    cancelAllBeforeOrder:cancelAllBeforeOrder
   })
   
-  logger.info('orderEnter',response)
+  logger.info('order',response)
 
   switch (response.obj.ordStatus) {
     case 'Canceled':
     case 'Overloaded':
     case 'Duplicate':
-      return false
+      return
   }
 
-  // await orderStopMarketRetry(signal.stopLoss,-signal.positionSizeUSD)
-  // handle response
-  return true
+  return response.obj
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
-
-async function orderExit(timestamp,price,size) { try {
-  if (!price || !size) {
-    return
-  }
-
-  var response = await orderQueue({ords:[{price:price,size:size}],execInst:EXECINST_REDUCEONLY})
-  logger.info('orderExit', response)
-  return response
-} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function wait(ms) {
   return new Promise((resolve,reject) => {
@@ -671,9 +642,10 @@ function popOrderQueue(ord) {
 async function orderQueue(ord) { try {
   logger.info('orderQueue -->',ord)
   var foundPendingQueue = orderQueueArray.find(o => {
-    if (o.ords.length != ord.ords.length || o.execInst != ord.execInst || o.obsoleted) return false
-    for (var i = 0; i < ord.ords.length; i++) {
-      if (o.ords[i].price != ord.ords[i].price || o.ords[i].size != ord.ords[i].size) {
+    if (o.orders.length != ord.orders.length || o.obsoleted) return false
+    for (var i = 0; i < o.orders.length; i++) {
+      let oi = o.orders[i], ordsi = ord.orders[i]
+      if (oi.price != ordsi.price || oi.orderQty != ordsi.orderQty || oi.execInst != ordsi.execInst) {
         return false
       }
     }
@@ -700,7 +672,7 @@ async function orderQueue(ord) { try {
     return ({obj:{ordStatus:'Obsoleted'}})
   }
 
-  pendingLimitOrderRetry = orderLimitRetry(ord)
+  pendingLimitOrderRetry = orderBulkRetry(ord)
   pendingLimitOrderRetry.ord = ord
   var response = await pendingLimitOrderRetry
   pendingLimitOrderRetry = null
@@ -709,19 +681,19 @@ async function orderQueue(ord) { try {
   return response
 } catch(e) {logger.error(e.stack||(e));debugger} }
 
-async function orderLimitRetry(ord) { try {
-  if (!ord.execInst || ord.execInst.length == 0) {
+async function orderBulkRetry(ord) { try {
+  if (ord.cancelAllBeforeOrder) {
     // new entry
     await cancelAll()
   }
-  // var {cid,price,size,execInst} = ord
+  
   var retry = false,
       response, 
       count = 0,
-      waitTime = 4,
-      canceledCount = 0
+      waitTime = 4
+      // canceledCount = 0
   do {
-    response = await orderLimitBulk(ord) 
+    response = await orderBulk(ord.orders) 
     count++
     waitTime *= 2
     // if cancelled retry with new quote 
@@ -731,7 +703,7 @@ async function orderLimitRetry(ord) { try {
         retry = true
       } break
       case 'Canceled': {
-        logger.warn('orderLimitRetry Canceled')
+        logger.warn('orderBulkRetry Canceled')
         retry = false
       } break
       // This cause entry price to be closer to stop loss and it may exceed the stop loss
@@ -754,28 +726,46 @@ async function orderLimitRetry(ord) { try {
     }
   } while(retry && count < 7 && !ord.obsoleted && await wait(waitTime))
   if (ord.obsoleted) {
-    logger.info('orderLimitRetry obsoleted',ord)
+    logger.info('orderBulkRetry obsoleted',ord)
   }
-  logger.info('orderLimitRetry', response)
+  logger.info('orderBulkRetry', response)
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function orderLimitBulk(ord) { try {
-  var {ords,execInst} = ord
-  var orders = ords.map(o => {
-    return {
-      ordType:'Limit',symbol:'XBTUSD',
-      execInst: 'ParticipateDoNotInitiate'+(execInst||''),
-      price: o.price,
-      orderQty: o.size,
-    }
+async function orderBulk(orders) { try {
+  orders.forEach(o => {
+    o.symbol = 'XBTUSD'
   })
 
+  // Test amend on take profit orders
+  if (orders[0].ordType == 'Limit' && orders[0].execInst == 'ParticipateDoNotInitiate,ReduceOnly') {
+    let ordersToAmend = findOrdersToAmend(orders)
+    if (ordersToAmend.length == 0) {
+      return await orderNewBulk(orders)
+    }
+    else if (ordersToAmend.length == orders.length) {
+      return await orderAmendBulk(ordersToAmend)
+    }
+    else {
+      let ordersToNew = orders.filter(o => {
+        return !ordersToAmend.find(a => {return (o == a)})
+      })
+      await orderAmendBulk(ordersToAmend)
+      return await orderNewBulk(ordersToNew)
+    }
+  }
+  else {
+    return await orderNewBulk(orders)
+  }
+
+} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+async function orderNewBulk(orders) { try {
   let response = await client.Order.Order_newBulk({orders:JSON.stringify(orders)})
   .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
-    logger.error('orderLimitBulk error',e,orders)
+    logger.error('orderNewBulk error',e,orders)
     if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
       return ({obj:{ordStatus:'Overloaded'}})
     }
@@ -787,211 +777,117 @@ async function orderLimitBulk(ord) { try {
       return e
     }
   })
-  
+
   if (response && response.status == 200) {
     response.data = undefined
     response.statusText = undefined
-    logger.info('orderLimitBulk',response)
+    logger.info('orderNewBulk',response)
     handleOrder(response.obj)
   }
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function orderLimit(cid,price,size,execInst) { try {
-  if (size > 0) {
-    if (price > lastInstrument.bidPrice) {
-      logger.warn('orderLimit price',price,'is more than last bidPrice',lastInstrument.bidPrice)
-      price = lastInstrument.bidPrice
-    }
-  }
-  else {
-    if (price < lastInstrument.askPrice) {
-      logger.warn('orderLimit price',price,'is less than last askPrice',lastInstrument.askPrice)
-      price = lastInstrument.askPrice
-    }
-  }
-
-  let response 
-  response = await client.Order.Order_new({ordType:'Limit',symbol:'XBTUSD',
-    // clOrdID: cid,
-    price:price,
-    orderQty:size,
-    execInst:'ParticipateDoNotInitiate'+(execInst||'')
-  }).catch(function(e) {
+async function orderAmendBulk(orders) { try {
+  let response = await client.Order.Order_amendBulk({orders:JSON.stringify(orders)})
+  .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
-    logger.error('orderLimit error',e,{cid:cid,price:price,size:size,execInst:execInst})
+    logger.error('orderAmendBulk error',e,orders)
     if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
       return ({obj:{ordStatus:'Overloaded'}})
     }
     else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
       return ({obj:{ordStatus:'Duplicate'}})
     }
+    else if (e.obj.error.message.indexOf('open sell orders exceed current position')) {
+      return e
+    }
     else {
       debugger
       return e
     }
   })
+
+  if (response && response.status == 200) {
+    response.data = undefined
+    response.statusText = undefined
+    logger.info('orderAmendBulk',response)
+    handleOrder(response.obj)
+  }
+  return response
+} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
+function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,side:sd}) {  
+  sd = sd || (q > 0 ? 'Buy' : 'Sell')
+  q = Math.abs(q)
   
-  if (response && response.status == 200) {
-    response.data = undefined
-    response.statusText = undefined    
-    logger.info('orderLimit',response)
-    handleOrder([response.obj])
-  }
-  return response
-} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
-
-async function orderStopMarketRetry(price,size) { try {
-  retryOn = 'Canceled,Overloaded'
-  let response, 
-      count = 0,
-      waitTime = 4
-  do {
-    response = await orderStopMarket(price,size)
-    count++
-    waitTime *= 2
-    // if cancelled retry with new quote 
-    // this means the quote move to a better price before the order reaches bitmex server
-  } while((retryOn.indexOf(response.obj.ordStatus) >= 0) && count < 3 && await wait(waitTime))
-  logger.info('orderStopMarketRetry', response)
-  return response
-} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
-
-async function orderStopMarket(price) { try {
-  var side = lastPosition.currentQty > 0 ? 'Sell' : 'Buy'
-  let response = await client.Order.Order_new({ordType:'Stop',symbol:'XBTUSD',execInst:'Close,LastPrice',
-    side:side,
-    stopPx:price 
-  }).catch(function(e) {
-    e.data = undefined
-    e.statusText = undefined
-    logger.error('orderStopMarket error',e,{price:price,side:side})
-    if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
-      return {obj:{ordStatus:'Overloaded'}}
-    }
-    else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
-      return {obj:{ordStatus:'Duplicate'}}
-    }
-    else {
-      debugger
-      return e
-    }
+  var orders = lastOrders.filter(({price,execInst,ordType,ordStatus,side}) => {
+    return (price == p && side == sd && ordType == t && execInst == e && ordStatus.search(status) >=0)
   })
+  if (orders.length == 0) return
 
-  if (response && response.status == 200) {
-    response.data = undefined
-    response.statusText = undefined
-    logger.info('orderStopMarket',response)
-    handleOrder([response.obj])
-  }
-  return response
-} catch(e) {logger.error(e.stack||e);debugger} }
-
-async function orderStopLimit(price,size) { try {
-  var triggerOffset = size/Math.abs(size)
-  var stopPx = price+triggerOffset
-  let response = await client.Order.Order_new({ordType:'StopLimit',symbol:'XBTUSD',execInst:'LastPrice,ParticipateDoNotInitiate,ReduceOnly',
-    orderQty:size,
-    stopPx:stopPx,
-    price:price
-  }).catch(function(e) {
-    e.data = undefined
-    e.statusText = undefined
-    logger.error('orderStopLimit error',e,{stopPx:stopPx,price:price,size:size})
-    if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
-      return {obj:{ordStatus:'Overloaded'}}
-    }
-    else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
-      return {obj:{ordStatus:'Duplicate'}}
-    }
-    else {
-      debugger
-      return e
-    }
-  })
-
-  if (response && response.status == 200) {
-    response.data = undefined
-    response.statusText = undefined
-    logger.info('orderStopLimit',response)
-    handleOrder([response.obj])
-  }
-  return response
-} catch(e) {logger.error(e.stack||e);debugger} }
-
-function findNewLimitOrder({price:p,size:s},e) {
-  s = Math.abs(s)
-  return lastOrders.find((order) => {
-    let {ordStatus,ordType,price,orderQty,execInst} = order
-    return (price == p && orderQty == s && execInst == e && ordType == 'Limit' && ordStatus == 'New')
-  })
-}
-
-// function findNewLimitOrder(p,s,e) {
-//   s = Math.abs(s)
-//   return lastOrders.find((order) => {
-//     let {ordStatus,ordType,price,orderQty,execInst,timestamp} = order
-//     if (ordType == 'Limit') {
-//       switch (ordStatus) {
-//         case 'New': {
-//           return (price == p && orderQty == s && execInst == e)
-//         }
-//         case 'Filled': {
-//           if (execInst == e && price > (p*0.999) && price < (p*1.001) && orderQty > (s*0.98) && orderQty < (s*1.02)) {
-//             let ordTime = new Date(timestamp).getTime
-//             let now = new Date().getTime()
-//             logger.warn('findNewLimitOrder found filled',order)
-//             return (now - ordTime < 10000)
-//           }
-//         }
-//       }
-//     }
-//   })
-// }
-
-function findNewLimitOrders(ords,execInst) {
-  if (!ords) return
-  return ords.reduce((a,c) => {
-    return a && findNewLimitOrder(c,execInst)
-  }, {})
-}
-
-function findNewOrFilledOrder({type:t,price:p,size:s,side:sd,execInst:e}) {
-  sd = sd || (s > 0 ? 'Buy' : 'Sell')
-  s = Math.abs(s)
-  return lastOrders.find((order) => {
-    let {ordStatus,ordType,side,price,stopPx,orderQty,execInst,timestamp,cumQty} = order
-    price = price || stopPx
-    if (ordType == t) {
-      switch (ordStatus) {
-        case 'New': {
-          return (price == p && side == sd && orderQty >= (s*0.98) && orderQty <= (s*1.02) && execInst == e)
-        }
-        case 'PartiallyFilled': {
-          let qty = orderQty
-          if (e == 'ParticipateDoNotInitiate,ReduceOnly') {
-            console.warn('findNewOrFilledOrder ParticipateDoNotInitiate,ReduceOnly qty -= cumQty')
-            qty -= cumQty
-          }
-          if (execInst == e && side == sd && price > (p*0.999) && price < (p*1.001) && qty >= (s*0.98) && qty <= (s*1.02)) {
-            let ordTime = new Date(timestamp).getTime()
-            let now = new Date().getTime()
-            // logger.warn('findNewOrFilledOrder found filled',order)
-            return (now - ordTime < 10000)
-          }
-        }
-        case 'Filled': {
-          if (execInst == e && side == sd && price > (p*0.999) && price < (p*1.001) && orderQty >= (s*0.98) && orderQty <= (s*1.02)) {
-            let ordTime = new Date(timestamp).getTime()
-            let now = new Date().getTime()
-            // logger.warn('findNewOrFilledOrder found filled',order)
-            return (now - ordTime < 10000)
-          }
-        }
+  switch(t) {
+    case 'Limit':
+      if (e == 'ParticipateDoNotInitiate') {
+        return orders.find(({orderQty}) => {
+          // Entry orderQty may not be exact, depending on the margin. We can ignore similar entry orders with similar orderQty.
+          return (orderQty >= (q*0.98) && orderQty <= (q*1.02))
+        })
       }
+      else {
+        return orders.find(({orderQty}) => {
+          // Exit orderQty has to be exact
+          return (orderQty == q)
+        })
+      }
+    case 'Stop':
+    case 'StopLimit':
+      return orders.find(({stopPx}) => {
+        // Use stopPx for stop orders
+        return (stopPx == spx)
+      })
+  }
+}
+
+function findOrders(status,ords) {
+  if (!ords) return []
+  var foundOrders = []
+  ords.forEach(o => {
+    let found = findOrder(status,o)
+    if (found) {
+      foundOrders.push(found)
     }
   })
+  return foundOrders
+}
+
+function findOrdersToAmend(orders) {
+  var {ordType:t,execInst:e,side:sd} = orders[0]
+  var ordersToAmend = []
+
+  var openOrders = lastOrders.filter(({ordStatus,ordType,execInst,side}) => {
+    return (ordStatus == 'New' && ordType == t && execInst == e && side == sd)
+  })
+
+  orders.forEach(o => {
+    var orderToAmend = openOrders.find(a => {
+      return (a.price == o.price)
+    })
+    if (orderToAmend) {
+      o.orderID = orderToAmend.orderID
+      ordersToAmend.push(o)
+    }
+  })
+
+  return ordersToAmend
+}
+
+function getCumQty(ords) {
+  if (!ords) return
+  var existingEntryOrders = findOrders(/Fill/,ords)
+  return existingEntryOrders.reduce((a,c) => {
+    return a + c.cumQty
+  },0)
 }
 
 async function initMarket() { try {
@@ -1010,13 +906,35 @@ async function initMarket() { try {
   console.log('Initialized market')
 } catch(e) {logger.error(e.stack||e);debugger} }
 
+async function initOrders() { try {
+  console.log('Initializing orders')
+  var orders = await getOrders()
+  await handleOrder(orders)
+
+  var newOrders = await getNewOrders()
+  if (newOrders.length == 0) {
+    // Order stream will not work without an open order.
+    // It's okay to leave this dummy stop market around.
+    // It will get canceled later.
+    console.log('Adding dummy stop market')
+    await orderBulk([{
+      stopPx: 1,
+      side: 'Sell',
+      ordType: 'Stop',
+      execInst: 'Close,LastPrice'
+    }])
+  }
+} catch(e) {logger.error(e.stack||e);debugger} }
+
 async function init(checkPositionCb) { try {
   checkPositionCallback = checkPositionCb
   client = await authorize()
+  // inspect(client.apis)
   await initMarket()
+  await initOrders()
   await updateLeverage(0) // cross margin
 
-  // inspect(client.apis)
+
   // await getTradeHistory()
 
   await connect()
@@ -1043,15 +961,16 @@ module.exports = {
   getCurrentCandle: getCurrentCandle,
   getNextFunding: getNextFunding,
 
-  findNewLimitOrders: findNewLimitOrders,
-  findNewOrFilledOrder: findNewOrFilledOrder,
+  // findNewLimitOrders: findNewLimitOrders,
+  // findNewOrFilledOrder: findNewOrFilledOrder,
+  // findNewOrFilledOrders: findNewOrFilledOrders,
+  findOrders: findOrders,
+  getCumQty: getCumQty,
+
   getCandleTimeOffset: getCandleTimeOffset,
 
   checkPositionParams: checkPositionParams,
 
-  orderEnter: orderEnter,
-  orderStopMarketRetry: orderStopMarketRetry,
-  orderStopLimit: orderStopLimit,
-  orderExit: orderExit,
+  order: order,
   cancelAll: cancelAll
 }
