@@ -98,8 +98,6 @@ const logger = winston.createLogger({
               let {positionSizeUSD,entryPrice} = splat[0].signal
               line =  (positionSizeUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+positionSizeUSD+' '+entryPrice
             } break
-            case 'STOPMARKET':
-            case 'STOPLIMIT':
             case 'EXIT': {
               let {size,price} = splat[0]
               line = (size>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+size+' '+price
@@ -258,20 +256,6 @@ function exitFunding({positionSize,fundingTimestamp,fundingRate,signal}) {
   // return exit
 }
 
-function exitTargetTrigger({positionSize,lastPrice,signal}) {
-  var {takeProfitTrigger,takeProfit,takeHalfProfit} = signal
-  var exit
-  if ((positionSize > 0 && lastPrice >= takeProfitTrigger) || 
-    (positionSize < 0 && lastPrice <= takeProfitTrigger)) {
-    exit = {reason:'targettrigger',
-      ords:[
-        {price:takeProfit, size:-positionSize/2},
-        {price:takeHalfProfit, size:-positionSize/2},
-      ]}
-  }
-  return exit
-}
-
 function exitTarget({positionSize,bid,ask,signal}) {
   var {takeProfit} = signal
   if (positionSize > 0) {
@@ -279,22 +263,6 @@ function exitTarget({positionSize,bid,ask,signal}) {
   } 
   else if (positionSize < 0) {
     if (bid <= takeProfit) return {price:Math.min(takeProfit,bid),reason:'target'}
-  }
-}
-
-function exitStopTrigger({positionSize,lastPrice,signal}) {
-  var {stopLossTrigger,stopLoss} = signal
-  if ((positionSize > 0 && lastPrice <= stopLossTrigger) || (positionSize < 0 && lastPrice >= stopLossTrigger)) {
-    // logger.warn('exitStopTrigger',positionSize,lastPrice,signal)
-    return {type:'StopLimit',price:stopLoss,size:-positionSize,execInst:'LastPrice,ParticipateDoNotInitiate,ReduceOnly',reason:'stoptrigger'}
-  }
-}
-
-function exitStopMarketTrigger({positionSize,lastPrice,signal}) {
-  var {stopMarketTrigger,stopMarket} = signal
-  if ((positionSize > 0 && lastPrice <= stopMarketTrigger) || (positionSize < 0 && lastPrice >= stopMarketTrigger)) {
-    // logger.warn('exitStopMarketTrigger',positionSize,lastPrice,signal)
-    return {type:'Stop',price:stopMarket,size:null,side:positionSize>0?'Sell':'Buy',execInst:'Close,LastPrice',reason:'stopmarkettrigger'}
   }
 }
 
