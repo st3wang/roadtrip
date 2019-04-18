@@ -401,12 +401,20 @@ async function checkExit(params) { try {
   var exitOrderQty = -bitmex.getCumQty(entryOrders)
   var halfExitOrderQty = exitOrderQty/2
 
-  var takeProfitCumQty = bitmex.getCumQty([takeProfitOrder])
-  takeProfitOrder.orderQty = Math.round(halfExitOrderQty) - takeProfitCumQty
-  if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
+  // total takeProfit orderQty
+  takeProfitOrder.orderQty = Math.round(halfExitOrderQty)
+  takeHalfProfitOrder.orderQty = exitOrderQty - takeProfitOrder.orderQty
 
+  // find orders based on the total qty
+  var takeProfitCumQty = bitmex.getCumQty([takeProfitOrder])
   var takeHalfProfitCumQty = bitmex.getCumQty([takeHalfProfitOrder])
-  takeHalfProfitOrder.orderQty = exitOrderQty - takeProfitOrder.orderQty - takeHalfProfitCumQty
+
+  // subtract filled qty
+  takeProfitOrder.orderQty -= takeProfitCumQty
+  takeHalfProfitOrder.orderQty -= takeHalfProfitCumQty
+
+  // submit orders if there is any remaining qty
+  if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
   if (takeHalfProfitOrder.orderQty != 0) orders.push(takeHalfProfitOrder)
 
   let existingTakeProfitOrders = bitmex.findOrders(/New/,orders)

@@ -154,9 +154,9 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
   positionSizeBTC = riskAmountBTC / -lossDistancePercent
-  if (shoes.test) {
-    positionSizeBTC = 0.02
-  }
+  // if (shoes.test) {
+  //   positionSizeBTC = 0.02
+  // }
   if (positionSizeBTC < minOrderSizeBTC) {
     positionSizeBTC = minOrderSizeBTC
   }

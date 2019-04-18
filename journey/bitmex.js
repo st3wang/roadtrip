@@ -891,7 +891,7 @@ function getCumQty(ords) {
   if (!ords) return
   var existingEntryOrders = findOrders(/Fill/,ords)
   return existingEntryOrders.reduce((a,c) => {
-    return a + c.cumQty
+    return a + (c.cumQty*(c.side=='Buy'?1:-1))
   },0)
 }
 
