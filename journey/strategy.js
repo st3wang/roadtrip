@@ -115,10 +115,10 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   let quote = bitmex.getQuote()
 
   // Test
-  if (shoes.test ) {
-    if (signalCondition == 'S') signalCondition = 'SHORT'
-    else if (signalCondition == 'L' || signalCondition == '-') signalCondition = 'LONG'
-  }
+  // if (shoes.test ) {
+  //   if (signalCondition == 'S') signalCondition = 'SHORT'
+  //   else if (signalCondition == 'L' || signalCondition == '-') signalCondition = 'LONG'
+  // }
 
   switch(signalCondition) {
     case 'SHORT':
@@ -154,9 +154,6 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
   positionSizeBTC = riskAmountBTC / -lossDistancePercent
-  // if (shoes.test) {
-  //   positionSizeBTC = 0.02
-  // }
   if (positionSizeBTC < minOrderSizeBTC) {
     positionSizeBTC = minOrderSizeBTC
   }
@@ -190,9 +187,9 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     })
   }
   
-  if (shoes.test ) {
-    if (scaleInOrders.length <= 1) goodStopDistance = false
-  }
+  // if (shoes.test ) {
+  //   if (scaleInOrders.length <= 1) goodStopDistance = false
+  // }
 
   return {
     timestamp: timestamp,

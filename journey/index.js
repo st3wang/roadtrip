@@ -99,7 +99,7 @@ const logger = winston.createLogger({
               line =  (positionSizeUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+positionSizeUSD+' '+entryPrice
             } break
             case 'EXIT': {
-              let {size,price} = splat[0]
+              let {size,price} = splat[0].exitOrders[0]
               line = (size>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+size+' '+price
             }
             default: {
