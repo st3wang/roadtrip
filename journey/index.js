@@ -512,19 +512,37 @@ function createInterval(candleDelay) {
   },startsIn)
 }
 
-function getEntryExitOrders({positionSizeUSD,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
-  var exitSide = positionSizeUSD > 0 ? 'Sell' : 'Buy'
+function getEntryExitOrders({positionSizeUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
+  var entrySide, exitSide
+  if (positionSizeUSD > 0) {
+    entrySide = 'Buy'
+    exitSide = 'Sell'
+  }
+  else {
+    entrySide = 'Sell'
+    exitSide = 'Buy'
+  }
 
-  var entryOrders = []
+  var entryOrders
   if (scaleInOrders) {
     entryOrders = scaleInOrders.map(o => {
       return {
         price: o.price,
+        side: entrySide,
         orderQty: o.size,
         ordType: 'Limit',
         execInst: 'ParticipateDoNotInitiate'
       }
     })
+  }
+  else {
+    entryOrders = [{
+      price: entryPrice,
+      side: entrySide,
+      orderQty: positionSizeUSD,
+      ordType: 'Limit',
+      execInst: 'ParticipateDoNotInitiate'
+    }]
   }
 
   var stopLossOrders = [{
