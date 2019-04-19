@@ -100,25 +100,25 @@ function highestBody(market,length) {
 
 async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var timestamp = new Date().toISOString()
-  let signalCondition = signal.condition
+  var signalCondition = signal.condition
   
-  let lastIndex = market.closes.length - 1
-  let close = market.closes[lastIndex]
-  let {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,halfProfitFactor,
+  var lastIndex = market.closes.length - 1
+  var close = market.closes[lastIndex]
+  var {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,halfProfitFactor,
     stopMarketFactor,stopLossLookBack,scaleInFactor,scaleInLength,minOrderSizeBTC} = bankroll
 
-  let leverageMargin = walletBalance*0.000000008
-  let entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
+  var leverageMargin = walletBalance*0.000000008
+  var entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
 
-  let quote = bitmex.getQuote()
+  var quote = bitmex.getQuote()
 
   // Test
-  // if (shoes.test ) {
-  //   if (signalCondition == 'S') signalCondition = 'SHORT'
-  //   else if (signalCondition == 'L' || signalCondition == '-') signalCondition = 'LONG'
-  // }
+  if (shoes.test ) {
+    if (signalCondition == 'S') signalCondition = 'SHORT'
+    else if (signalCondition == 'L' || signalCondition == '-') signalCondition = 'LONG'
+  }
 
   switch(signalCondition) {
     case 'SHORT':
@@ -133,6 +133,11 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
       entryPrice = Math.min(quote.bidPrice||Infinity,close) // use bidPrice or close to be a maker
       entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       break;
+    default:
+      return {
+        timestamp: timestamp,
+        type: '-'
+      }
   }
 
   lossDistance = stopLoss - entryPrice
@@ -148,26 +153,30 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   stopMarketTrigger = entryPrice + (stopMarketDistance/4)
   lossDistancePercent = lossDistance/entryPrice
 
-  let capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + walletBalance/100000000
-  let capitalUSD = capitalBTC * entryPrice
-
+  var capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + walletBalance/100000000
+  var capitalUSD = capitalBTC * entryPrice
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
   positionSizeBTC = riskAmountBTC / -lossDistancePercent
-  if (positionSizeBTC < minOrderSizeBTC) {
-    positionSizeBTC = minOrderSizeBTC
+  var absPositionSizeBTC = Math.abs(positionSizeBTC)
+  if (absPositionSizeBTC < minOrderSizeBTC) {
+    positionSizeBTC = minOrderSizeBTC*(positionSizeBTC/absPositionSizeBTC)
   }
   positionSizeUSD = Math.ceil(positionSizeBTC * entryPrice)
+  var absPositionSizeUSD = Math.abs(positionSizeUSD)
   leverage = Math.max(Math.ceil(Math.abs(positionSizeBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
 
   var scaleInSize = Math.round(positionSizeUSD/scaleInLength)
-  var minScaleInSize = minOrderSizeBTC * entryPrice
-  if (scaleInSize < minScaleInSize) {
-    scaleInLength = Math.floor(positionSizeUSD/minScaleInSize)
-    scaleInSize = Math.round(positionSizeUSD/scaleInLength)
+  var absScaleInsize = Math.abs(scaleInSize)
+  var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
+  if (absScaleInsize < minOrderSizeUSD) {
+    scaleInLength = Math.round(absPositionSizeUSD/minOrderSizeUSD)
+    scaleInSize = minOrderSizeUSD*scaleInSize/absScaleInsize
+    positionSizeUSD = scaleInSize*scaleInLength
+    positionSizeBTC = positionSizeUSD/entryPrice
   }
 
   var scaleInDistance = lossDistance * scaleInFactor

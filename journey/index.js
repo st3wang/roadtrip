@@ -524,7 +524,7 @@ function getEntryExitOrders({positionSizeUSD,entryPrice,stopLoss,stopMarket,take
   }
 
   var entryOrders
-  if (scaleInOrders) {
+  if (scaleInOrders && scaleInOrders.length > 0) {
     entryOrders = scaleInOrders.map(o => {
       return {
         price: o.price,
