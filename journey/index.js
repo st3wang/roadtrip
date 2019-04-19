@@ -515,14 +515,17 @@ function createInterval(candleDelay) {
 function getEntryExitOrders({positionSizeUSD,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
   var exitSide = positionSizeUSD > 0 ? 'Sell' : 'Buy'
 
-  var entryOrders = scaleInOrders.map(o => {
-    return {
-      price: o.price,
-      orderQty: o.size,
-      ordType: 'Limit',
-      execInst: 'ParticipateDoNotInitiate'
-    }
-  })
+  var entryOrders = []
+  if (scaleInOrders) {
+    entryOrders = scaleInOrders.map(o => {
+      return {
+        price: o.price,
+        orderQty: o.size,
+        ordType: 'Limit',
+        execInst: 'ParticipateDoNotInitiate'
+      }
+    })
+  }
 
   var stopLossOrders = [{
     stopPx: stopMarket,
