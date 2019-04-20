@@ -115,6 +115,7 @@ function heartbeat() {
 }
 
 async function wsAddStream(sym, table, handler) { try {
+  console.log('wsAddStream',sym,table)
   ws.addStream(sym, table, handler)
   await new Promise((resolve,reject) => {
     var checkValueInterval = setInterval(_ => {
@@ -139,7 +140,7 @@ async function connect() { try {
     apiKeySecret: account.secret,
     maxTableLen:100
   })
-  ws.on('error', logger.error);
+  ws.on('error', (e) => logger.error(e));
   ws.on('open', () => console.log('Connection opened.'));
   ws.on('close', () => console.log('Connection closed.'));
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
@@ -154,7 +155,6 @@ async function connect() { try {
   else {
     await wsAddStream(symbol.replace('USD','XBT'),'instrument',handleCoinPairInstrument)
   }
-
 
   heartbeat()
 } catch(e) {logger.error(e.stack||e);debugger} }
