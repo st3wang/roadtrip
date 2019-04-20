@@ -15,8 +15,8 @@ if (setup.candle.interval >= 5) {
 }
 
 var ws
-var lastInstrument = {}, lastPosition = {}, lastOrders = [], lastCoinPairInstrument = {}
-var lastBid, lastAsk, lastQty, lastCoinPairRate
+var lastInstrument = {}, lastPosition = {}, lastOrders = [], lastXBTUSDInstrument = {}
+var lastBid, lastAsk, lastQty, lastRates = {}
 
 var currentCandle, currentCandleTimeOffset
 
@@ -153,7 +153,7 @@ async function connect() { try {
     lastCoinPairRate = 1
   }
   else {
-    await wsAddStream(symbol.replace('USD','XBT'),'instrument',handleCoinPairInstrument)
+    await wsAddStream('XBTUSD','instrument',handleXBTUSDInstrument)
   }
 
   heartbeat()
@@ -233,6 +233,7 @@ function handlePosition(data) {
 
 async function handleInstrument(data) { try {
   lastInstrument = data[0]
+  lastRates[lastInstrument.symbol] = lastInstrument.lastPrice
   
   var bid = lastInstrument.bidPrice
   var ask = lastInstrument.askPrice
@@ -253,9 +254,9 @@ async function handleInstrument(data) { try {
   lastAsk = ask
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function handleCoinPairInstrument(data) {
+async function handleXBTUSDInstrument(data) {
   lastCoinPairInstrument = data[0]
-  lastCoinPairRate = lastCoinPairInstrument.lastPrice
+  lastRates[lastCoinPairInstrument.symbol] = lastCoinPairInstrument.lastPrice
 }
 
 async function appendCandleLastPrice() {
@@ -358,7 +359,8 @@ function getPosition() {
 function getQuote() {
   return {
     bidPrice: lastInstrument.bidPrice,
-    askPrice: lastInstrument.askPrice
+    askPrice: lastInstrument.askPrice,
+    lastPrice: lastInstrument.lastPrice
   }
 }
 
@@ -898,8 +900,8 @@ function getCumQty(ords) {
   },0)
 }
 
-function getCoinPairRate() {
-  return lastCoinPairRate
+function getRate(symbol) {
+  return lastRates[symbol]
 }
 
 async function initMarket() { try {
@@ -971,7 +973,7 @@ module.exports = {
   getFundingHistory: getFundingHistory, 
   getCurrentCandle: getCurrentCandle,
   getNextFunding: getNextFunding,
-  getCoinPairRate: getCoinPairRate,
+  getRate: getRate,
 
   // findNewLimitOrders: findNewLimitOrders,
   // findNewOrFilledOrder: findNewOrFilledOrder,
