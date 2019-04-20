@@ -6,9 +6,7 @@ const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
 const winston = require('winston')
 const path = require('path')
-global.logDir = path.resolve(__dirname, 'log')
 
-const entrySignalFilePath = global.logDir + '/entry_signal.json'
 
 // const l = require('./logger')
 const bitmex = require('./bitmex')
@@ -19,8 +17,11 @@ const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
+global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 global.bitmex = bitmex
 global.log = log
+
+const entrySignalFilePath = global.logDir + '/entry_signal.json'
 
 var lastCheckPositionTime = new Date().getTime()
 
@@ -90,13 +91,13 @@ const logger = winston.createLogger({
                 line += ' '+conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
               }
               if (orderSignal) {
-                let {type,entryPrice=NaN,positionSizeUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
-                line += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+positionSizeUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
+                let {type,entryPrice=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
+                line += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
               }
             } break
             case 'ENTER': {
-              let {positionSizeUSD,entryPrice} = splat[0].signal
-              line =  (positionSizeUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+positionSizeUSD+' '+entryPrice
+              let {orderQtyUSD,entryPrice} = splat[0].signal
+              line =  (orderQtyUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+orderQtyUSD+' '+entryPrice
             } break
             case 'EXIT': {
               let {size,price} = splat[0].exitOrders[0]
@@ -282,7 +283,7 @@ function cancelOrder(params) {
   if (positionSize != 0) return
 
   let cancelParams = Object.assign({},params)
-  cancelParams.positionSize = signal.positionSizeUSD
+  cancelParams.positionSize = signal.orderQtyUSD
   return (exitTooLong(cancelParams) || exitFunding(cancelParams) || exitTarget(cancelParams) || exitStop(cancelParams))
 }
 
@@ -305,10 +306,10 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   }
 
   if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG') && 
-    orderSignal.entryPrice && orderSignal.positionSizeUSD) {
+    orderSignal.entryPrice && orderSignal.orderQtyUSD) {
     if (isFundingWindow(fundingTimestamp) &&
-      ((orderSignal.positionSizeUSD > 0 && fundingRate > 0) || 
-      (orderSignal.positionSizeUSD < 0 && fundingRate < 0))) {
+      ((orderSignal.orderQtyUSD > 0 && fundingRate > 0) || 
+      (orderSignal.orderQtyUSD < 0 && fundingRate < 0))) {
         logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
     }
     else {
@@ -512,9 +513,9 @@ function createInterval(candleDelay) {
   },startsIn)
 }
 
-function getEntryExitOrders({positionSizeUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
+function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
   var entrySide, exitSide
-  if (positionSizeUSD > 0) {
+  if (orderQtyUSD > 0) {
     entrySide = 'Buy'
     exitSide = 'Sell'
   }
@@ -539,7 +540,7 @@ function getEntryExitOrders({positionSizeUSD,entryPrice,stopLoss,stopMarket,take
     entryOrders = [{
       price: entryPrice,
       side: entrySide,
-      orderQty: positionSizeUSD,
+      orderQty: orderQtyUSD,
       ordType: 'Limit',
       execInst: 'ParticipateDoNotInitiate'
     }]
@@ -552,7 +553,7 @@ function getEntryExitOrders({positionSizeUSD,entryPrice,stopLoss,stopMarket,take
     execInst: 'Close,LastPrice'
   },{
     price: stopLoss,
-    stopPx: stopLoss+(-positionSizeUSD/Math.abs(positionSizeUSD)*0.5),
+    stopPx: stopLoss+(-orderQtyUSD/Math.abs(orderQtyUSD)*0.5),
     side: exitSide,
     ordType: 'StopLimit',
     execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
@@ -560,13 +561,13 @@ function getEntryExitOrders({positionSizeUSD,entryPrice,stopLoss,stopMarket,take
 
   var takeProfitOrders = [{
     price: takeProfit,
-    orderQty: positionSizeUSD/2,
+    orderQty: orderQtyUSD/2,
     side: exitSide,
     ordType: 'Limit',
     execInst: 'ParticipateDoNotInitiate,ReduceOnly'
   },{
     price: takeHalfProfit,
-    orderQty: positionSizeUSD/2,
+    orderQty: orderQtyUSD/2,
     side: exitSide,
     ordType: 'Limit',
     execInst: 'ParticipateDoNotInitiate,ReduceOnly'

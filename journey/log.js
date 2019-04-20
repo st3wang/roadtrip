@@ -31,7 +31,7 @@ function writeOrderSignal(bankroll,signal) {
   entrySignalsCache = null
   var entryData = [signal.timestamp,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
     signal.type,signal.entryPrice,signal.stopLoss,signal.takeProfit,signal.stopMarket,signal.lossDistancePercent,signal.lossDistance,signal.profitDistance,
-    signal.riskAmountBTC,signal.riskAmountUSD,signal.positionSizeBTC,signal.positionSizeUSD,signal.leverage]
+    signal.riskAmountBTC,signal.riskAmountUSD,signal.qtyBTC,signal.orderQtyUSD,signal.leverage]
   var entryCSV = entryData.toString()
   console.log(entryCSV)
   fs.appendFile(signalsfile, entryCSV+'\n', e => {
@@ -65,7 +65,7 @@ function writeInterval(rsiSignal,market,bankroll,position,margin,signal,orderSen
     entrySignalsCache = null
     var entryData = [isoString,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
       signal.type,signal.entryPrice,signal.stopLoss,signal.takeProfit,signal.stopMarket,signal.lossDistancePercent,signal.lossDistance,signal.profitDistance,
-      signal.riskAmountBTC,signal.riskAmountUSD,signal.positionSizeBTC,signal.positionSizeUSD,signal.leverage]
+      signal.riskAmountBTC,signal.riskAmountUSD,signal.qtyBTC,signal.orderQtyUSD,signal.leverage]
     var entryCSV = entryData.toString()
     console.log(entryCSV)
     fs.appendFile(signalsfile, entryCSV+'\n', e => {

@@ -4,6 +4,8 @@ const talibExecute = util.promisify(talib.execute)
 const bitmex = require('./bitmex')
 const shoes = require('./shoes')
 
+var roundPriceFactor
+
 async function getRsi(data,length) {
   var result = await talibExecute({
     name: "RSI",
@@ -98,6 +100,10 @@ function highestBody(market,length) {
   // return Math.max(highestOpen,highestClose)
 }
 
+function roundPrice(p) {
+  return Math.round(p*roundPriceFactor)/roundPriceFactor
+}
+
 async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var timestamp = new Date().toISOString()
   var signalCondition = signal.condition
@@ -110,9 +116,14 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var leverageMargin = walletBalance*0.000000008
   var entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
-    riskAmountUSD, riskAmountBTC, positionSizeUSD, positionSizeBTC, leverage
+    riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
 
   var quote = bitmex.getQuote()
+  var coinPairRate = bitmex.getCoinPairRate()
+
+  roundPriceFactor = 1/bankroll.roundPrice
+  walletBalance /= coinPairRate
+  minOrderSizeBTC /= coinPairRate
 
   // Test
   if (shoes.test ) {
@@ -122,30 +133,30 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
 
   switch(signalCondition) {
     case 'SHORT':
-      stopLoss = highestBody(market,stopLossLookBack)
-      stopLoss = Math.round(stopLoss*2)/2
+      stopLoss = roundPrice(highestBody(market,stopLossLookBack))
       entryPrice = Math.max(quote.askPrice||0,close) // use askPrice or close to be a maker
       entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
       break;
     case 'LONG':
-      stopLoss = lowestBody(market,stopLossLookBack)
-      stopLoss = Math.round(stopLoss*2)/2
+      stopLoss = roundPrice(lowestBody(market,stopLossLookBack))
       entryPrice = Math.min(quote.bidPrice||Infinity,close) // use bidPrice or close to be a maker
       entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       break;
-    default:
-      return {
-        timestamp: timestamp,
-        type: '-'
-      }
   }
 
   lossDistance = stopLoss - entryPrice
-  stopMarketDistance = Math.round(lossDistance*stopMarketFactor*2)/2 // round to 0.5
+  if (!lossDistance || !walletBalance) {
+    return {
+      timestamp: timestamp,
+      type: '-'
+    }
+  }
+
+  stopMarketDistance = roundPrice(lossDistance*stopMarketFactor)
   stopMarket = entryPrice + stopMarketDistance
-  profitDistance = Math.round(-lossDistance*profitFactor*2)/2 // round to 0.5
+  profitDistance = roundPrice(-lossDistance*profitFactor)
   takeProfit = entryPrice + profitDistance
-  halfProfitDistance = Math.floor(-lossDistance*halfProfitFactor*2)/2
+  halfProfitDistance = roundPrice(-lossDistance*halfProfitFactor)
   takeHalfProfit = entryPrice + halfProfitDistance
 
   stopLossTrigger = entryPrice + (lossDistance/2)
@@ -157,26 +168,26 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var capitalUSD = capitalBTC * entryPrice
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
-  positionSizeBTC = riskAmountBTC / -lossDistancePercent
-  var absPositionSizeBTC = Math.abs(positionSizeBTC)
-  if (absPositionSizeBTC < minOrderSizeBTC) {
-    positionSizeBTC = minOrderSizeBTC*(positionSizeBTC/absPositionSizeBTC)
+  qtyBTC = riskAmountBTC / -lossDistancePercent
+  var absQtyBTC = Math.abs(qtyBTC)
+  if (absQtyBTC < minOrderSizeBTC) {
+    qtyBTC = minOrderSizeBTC*(qtyBTC/absQtyBTC)
   }
-  positionSizeUSD = Math.ceil(positionSizeBTC * entryPrice)
-  var absPositionSizeUSD = Math.abs(positionSizeUSD)
-  leverage = Math.max(Math.ceil(Math.abs(positionSizeBTC / leverageMargin)*100)/100,1)
+  orderQtyUSD = Math.ceil(qtyBTC * entryPrice)
+  var absOrderQtyUSD = Math.abs(orderQtyUSD)
+  leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
 
-  var scaleInSize = Math.round(positionSizeUSD/scaleInLength)
+  var scaleInSize = Math.round(orderQtyUSD/scaleInLength)
   var absScaleInsize = Math.abs(scaleInSize)
   var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
   if (absScaleInsize < minOrderSizeUSD) {
-    scaleInLength = Math.round(absPositionSizeUSD/minOrderSizeUSD)
+    scaleInLength = Math.round(absOrderQtyUSD/minOrderSizeUSD)
     scaleInSize = minOrderSizeUSD*scaleInSize/absScaleInsize
-    positionSizeUSD = scaleInSize*scaleInLength
-    positionSizeBTC = positionSizeUSD/entryPrice
+    orderQtyUSD = scaleInSize*scaleInLength
+    qtyBTC = orderQtyUSD/entryPrice
   }
 
   var scaleInDistance = lossDistance * scaleInFactor
@@ -192,7 +203,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   for (var i = 0; i < scaleInLength; i++) {
     scaleInOrders.push({
       size:scaleInSize,
-      price:Math.round((entryPrice+scaleInStep*i)*2)/2
+      price:roundPrice(entryPrice+scaleInStep*i)
     })
   }
   
@@ -219,8 +230,8 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     stopMarketTrigger: stopMarketTrigger,
     riskAmountBTC: riskAmountBTC,
     riskAmountUSD: riskAmountUSD,
-    positionSizeBTC: positionSizeBTC,
-    positionSizeUSD: positionSizeUSD,
+    qtyBTC: qtyBTC,
+    orderQtyUSD: orderQtyUSD,
     leverage: leverage,
     scaleInOrders: scaleInOrders
   }

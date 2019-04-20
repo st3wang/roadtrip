@@ -1,14 +1,11 @@
 const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
 const SwaggerClient = require("swagger-client")
-const shoes = require('./shoes')
+const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 const winston = require('winston')
-const setup = shoes.setup
+const shoes = require('./shoes')
+const {symbol,account,setup} = shoes
 const oneCandleMS = setup.candle.interval*60000
 const candleLengthMS = setup.candle.interval*setup.candle.length*60000
-
-const BitMEXRealtimeAPI = require('bitmex-realtime-api')
-
-const EXECINST_REDUCEONLY = ',ReduceOnly'
 
 var client, checkPositionCallback, checkPositionParams = {}
 var marketCache, marketWithCurrentCandleCache
@@ -18,8 +15,8 @@ if (setup.candle.interval >= 5) {
 }
 
 var ws
-var lastInstrument = {}, lastPosition = {}, lastOrders = []
-var lastBid, lastAsk, lastQty
+var lastInstrument = {}, lastPosition = {}, lastOrders = [], lastCoinPairInstrument = {}
+var lastBid, lastAsk, lastQty, lastCoinPairRate
 
 var currentCandle, currentCandleTimeOffset
 
@@ -117,8 +114,8 @@ function heartbeat() {
   },60000)
 }
 
-async function wsAddStream(table, handler) { try {
-  ws.addStream('XBTUSD', table, handler)
+async function wsAddStream(sym, table, handler) { try {
+  ws.addStream(sym, table, handler)
   await new Promise((resolve,reject) => {
     var checkValueInterval = setInterval(_ => {
       if (ws._data && ws._data[table]) {
@@ -137,9 +134,9 @@ async function wsAddStream(table, handler) { try {
 
 async function connect() { try {
   ws = new BitMEXRealtimeAPI({
-    testnet: shoes.bitmex.test,
-    apiKeyID: shoes.bitmex.key,
-    apiKeySecret: shoes.bitmex.secret,
+    testnet: shoes.test,
+    apiKeyID: account.key,
+    apiKeySecret: account.secret,
     maxTableLen:100
   })
   ws.on('error', logger.error);
@@ -147,10 +144,17 @@ async function connect() { try {
   ws.on('close', () => console.log('Connection closed.'));
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
 
-  await wsAddStream('margin',handleMargin)
-  await wsAddStream('order',handleOrder)
-  await wsAddStream('position',handlePosition)
-  await wsAddStream('instrument',handleInstrument)
+  await wsAddStream(symbol,'wallet',handleWallet)
+  await wsAddStream(symbol,'order',handleOrder)
+  await wsAddStream(symbol,'position',handlePosition)
+  await wsAddStream(symbol,'instrument',handleInstrument)
+  if (symbol == 'XBTUSD') {
+    lastCoinPairRate = 1
+  }
+  else {
+    await wsAddStream(symbol.replace('USD','XBT'),'instrument',handleCoinPairInstrument)
+  }
+
 
   heartbeat()
 } catch(e) {logger.error(e.stack||e);debugger} }
@@ -178,11 +182,12 @@ async function pruneOrders(orders) { try {
   return prunedCanceledOrder
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function handleMargin(data) { try {
-  lastMargin = data[0]
-  checkPositionParams.availableMargin = lastMargin.availableMargin
-  checkPositionParams.marginBalance = lastMargin.marginBalance
-  checkPositionParams.walletBalance = lastMargin.walletBalance
+async function handleWallet(data) { try {
+  lastWallet = data[0]
+  checkPositionParams.walletBalance = lastWallet.amount
+  // checkPositionParams.availableMargin = lastMargin.availableMargin
+  // checkPositionParams.marginBalance = lastMargin.marginBalance
+  // checkPositionParams.walletBalance = lastMargin.walletBalance
   // console.log(checkPositionParams.availableMargin, checkPositionParams.marginBalance, checkPositionParams.walletBalance)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -247,6 +252,11 @@ async function handleInstrument(data) { try {
   lastBid = bid
   lastAsk = ask
 } catch(e) {logger.error(e.stack||e);debugger} }
+
+async function handleCoinPairInstrument(data) {
+  lastCoinPairInstrument = data[0]
+  lastCoinPairRate = lastCoinPairInstrument.lastPrice
+}
 
 async function appendCandleLastPrice() {
   var candleTimeOffset = getCandleTimeOffset()
@@ -355,10 +365,10 @@ function getQuote() {
 async function authorize() { try {
   console.log('Authorizing')
   let swaggerClient = await new SwaggerClient({
-    url: shoes.bitmex.swagger,
+    url: shoes.swagger,
     usePromise: true
   })
-  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(shoes.bitmex.key, shoes.bitmex.secret));
+  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(account.key, account.secret));
   console.log('Authorized')
   return swaggerClient
 } catch(e) {logger.error(e.stack||e);debugger} }
@@ -429,7 +439,7 @@ async function getCurrentTradeBucketed(interval) { try {
   let now = new Date().getTime()
   let candleTimeOffset = now % (interval*60000)
   let startTime = new Date(now - candleTimeOffset + 60000).toISOString()
-  let response = await client.Trade.Trade_getBucketed({symbol:'XBTUSD', binSize:'1m', 
+  let response = await client.Trade.Trade_getBucketed({symbol:symbol, binSize:'1m', 
     startTime:startTime
   })
   var buckets = JSON.parse(response.data.toString());
@@ -454,7 +464,7 @@ async function getTradeBucketed(interval,length) { try {
   }
   let pages = getPageTimes(interval,length,binSize)
   getTradeBucketedRequesting = Promise.all(pages.map(async (page,i) => {
-    let response = await client.Trade.Trade_getBucketed({symbol: 'XBTUSD', binSize: binSize+'m', 
+    let response = await client.Trade.Trade_getBucketed({symbol: symbol, binSize: binSize+'m', 
       startTime:page.startTime,endTime:page.endTime})
     page.buckets = JSON.parse(response.data.toString());
   }))
@@ -521,18 +531,11 @@ async function getMarketWithCurrentCandle() { try {
   return marketWithCurrentCandleCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getMargin() { try {
-  return lastMargin
-  // var response = await client.User.User_getMargin() 
-  // var margin = JSON.parse(response.data.toString())
-  // return margin
-} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
-
 async function getTradeHistory(startTime) { try {
   startTime = startTime || (new Date().getTime() - (candleLengthMS))
-  let response = await client.Execution.Execution_getTradeHistory({symbol: 'XBTUSD',
-  startTime: new Date(startTime).toISOString(),
-  columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
+  let response = await client.Execution.Execution_getTradeHistory({symbol: symbol,
+    startTime: new Date(startTime).toISOString(),
+    columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
   })
   let data = JSON.parse(response.data)
   data.forEach(d => {
@@ -543,8 +546,8 @@ async function getTradeHistory(startTime) { try {
 
 async function getFundingHistory(startTime) { try {
   startTime = startTime || (new Date().getTime() - (candleLengthMS))
-  let response = await client.Funding.Funding_get({symbol: 'XBTUSD',
-  startTime: new Date(startTime).toISOString()
+  let response = await client.Funding.Funding_get({symbol: symbol,
+    startTime: new Date(startTime).toISOString()
   })
   let data = JSON.parse(response.data)
   // data.forEach(d => {
@@ -556,7 +559,7 @@ async function getFundingHistory(startTime) { try {
 
 async function getNewOrders(startTime) { try {
   startTime = startTime || (new Date().getTime() - (candleLengthMS))
-  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
+  let response = await client.Order.Order_getOrders({symbol: symbol,
     startTime: new Date(startTime).toISOString(),
     filter: '{"ordStatus":"New"}',
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
@@ -567,7 +570,7 @@ async function getNewOrders(startTime) { try {
 
 async function getOrders(startTime) { try {
   startTime = startTime || (new Date().getTime() - (candleLengthMS))
-  let response = await client.Order.Order_getOrders({symbol: 'XBTUSD',
+  let response = await client.Order.Order_getOrders({symbol: symbol,
     startTime: new Date(startTime).toISOString(),
     // filter: '{"ordType":"Limit"}',
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType,execInst,cumQty'
@@ -585,7 +588,7 @@ async function getCurrentCandle() {
 
 async function cancelAll() { try {
   // logger.info('Cancelling All Orders')
-  let response = await client.Order.Order_cancelAll({symbol:'XBTUSD'})
+  let response = await client.Order.Order_cancelAll({symbol:symbol})
   if (response && response.status == 200) {
     response.data = undefined
     response.statusText = undefined
@@ -596,7 +599,7 @@ async function cancelAll() { try {
 
 async function updateLeverage(leverage) { try {
   console.log('Updating Leverage',leverage)
-  let response = await client.Position.Position_updateLeverage({symbol:'XBTUSD',leverage:leverage})
+  let response = await client.Position.Position_updateLeverage({symbol:symbol,leverage:leverage})
   console.log('Updated Leverage')
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
@@ -739,7 +742,7 @@ async function orderBulkRetry(ord) { try {
 
 async function orderBulk(orders) { try {
   orders.forEach(o => {
-    o.symbol = 'XBTUSD'
+    o.symbol = symbol
   })
 
   // Test amend on take profit orders
@@ -871,7 +874,7 @@ function findOrdersToAmend(orders) {
   var ordersToAmend = []
 
   var openOrders = lastOrders.filter(({ordStatus,ordType,execInst,side}) => {
-    return (ordStatus == 'New' && ordType == t && execInst == e && side == sd)
+    return (ordStatus.search(/New|PartiallyFilled/) && ordType == t && execInst == e && side == sd)
   })
 
   orders.forEach(o => {
@@ -893,6 +896,10 @@ function getCumQty(ords) {
   return existingEntryOrders.reduce((a,c) => {
     return a + (c.cumQty*(c.side=='Buy'?1:-1))
   },0)
+}
+
+function getCoinPairRate() {
+  return lastCoinPairRate
 }
 
 async function initMarket() { try {
@@ -957,7 +964,6 @@ module.exports = {
   getMarketWithCurrentCandle: getMarketWithCurrentCandle,
   getPosition: getPosition,
   getInstrument: getInstrument,
-  getMargin: getMargin,
   getQuote: getQuote,
 
   getOrders: getOrders,
@@ -965,6 +971,7 @@ module.exports = {
   getFundingHistory: getFundingHistory, 
   getCurrentCandle: getCurrentCandle,
   getNextFunding: getNextFunding,
+  getCoinPairRate: getCoinPairRate,
 
   // findNewLimitOrders: findNewLimitOrders,
   // findNewOrFilledOrder: findNewOrFilledOrder,
