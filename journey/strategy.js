@@ -119,7 +119,8 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
 
   var quote = bitmex.getQuote()
-  var coinPairRate = bitmex.getCoinPairRate()
+  var XBTUSDRate = bitmex.getRate('XBTUSD')
+  var coinPairRate = quote.lastPrice/XBTUSDRate
 
   roundPriceFactor = 1/bankroll.roundPrice
   walletBalance /= coinPairRate
