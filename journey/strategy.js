@@ -145,7 +145,8 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
       break;
   }
 
-  lossDistance = stopLoss - entryPrice
+  entryPrice = roundPrice(entryPrice)
+  lossDistance = roundPrice(stopLoss - entryPrice)
   if (!lossDistance || !walletBalance) {
     return {
       timestamp: timestamp,
