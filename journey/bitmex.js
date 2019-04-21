@@ -774,6 +774,7 @@ async function orderBulk(orders) { try {
   if (response && response.status == 200) {
     handleOrder(response.obj)
   }
+  return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderNewBulk(orders) { try {

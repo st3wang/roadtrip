@@ -101,7 +101,7 @@ function highestBody(market,length) {
 }
 
 function roundPrice(p) {
-  return Math.round(p*roundPriceFactor)/roundPriceFactor
+  return +((Math.round(p*roundPriceFactor)/roundPriceFactor).toFixed(2))
 }
 
 async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
@@ -155,11 +155,11 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   }
 
   stopMarketDistance = roundPrice(lossDistance*stopMarketFactor)
-  stopMarket = entryPrice + stopMarketDistance
+  stopMarket = roundPrice(entryPrice + stopMarketDistance)
   profitDistance = roundPrice(-lossDistance*profitFactor)
-  takeProfit = entryPrice + profitDistance
+  takeProfit = roundPrice(entryPrice + profitDistance)
   halfProfitDistance = roundPrice(-lossDistance*halfProfitFactor)
-  takeHalfProfit = entryPrice + halfProfitDistance
+  takeHalfProfit = roundPrice(entryPrice + halfProfitDistance)
 
   stopLossTrigger = entryPrice + (lossDistance/2)
   takeProfitTrigger = entryPrice + (profitDistance/8)
