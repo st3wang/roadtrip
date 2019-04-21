@@ -111,7 +111,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var lastIndex = market.closes.length - 1
   var close = market.closes[lastIndex]
   var {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,halfProfitFactor,
-    stopMarketFactor,stopLossLookBack,scaleInFactor,scaleInLength,minOrderSizeBTC} = bankroll
+    stopMarketFactor,stopLossLookBack,scaleInFactor,scaleInLength,minOrderSizeBTC,tick} = bankroll
 
   var leverageMargin = walletBalance*0.000000008
   var entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
@@ -122,7 +122,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var XBTUSDRate = bitmex.getRate('XBTUSD')
   var coinPairRate = quote.lastPrice/XBTUSDRate
 
-  roundPriceFactor = 1/bankroll.roundPrice
+  roundPriceFactor = 1/tick
   walletBalance /= coinPairRate
   minOrderSizeBTC /= coinPairRate
 
@@ -154,11 +154,11 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     }
   }
 
-  stopMarketDistance = roundPrice(lossDistance*stopMarketFactor)
+  stopMarketDistance = roundPrice(lossDistance * stopMarketFactor)
   stopMarket = roundPrice(entryPrice + stopMarketDistance)
-  profitDistance = roundPrice(-lossDistance*profitFactor)
+  profitDistance = roundPrice(-lossDistance * profitFactor)
   takeProfit = roundPrice(entryPrice + profitDistance)
-  halfProfitDistance = roundPrice(-lossDistance*halfProfitFactor)
+  halfProfitDistance = roundPrice(-lossDistance * halfProfitFactor)
   takeHalfProfit = roundPrice(entryPrice + halfProfitDistance)
 
   stopLossTrigger = entryPrice + (lossDistance/2)
@@ -193,10 +193,11 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   }
 
   var scaleInDistance = lossDistance * scaleInFactor
-  if (scaleInDistance && Math.abs(scaleInDistance) < 2) {
-    scaleInDistance = scaleInDistance > 0 ? 2 : -2
+  var minScaleInDistance = tick * (scaleInLength - 1)
+  if (scaleInDistance && Math.abs(scaleInDistance) < minScaleInDistance) {
+    scaleInDistance = scaleInDistance > 0 ? minScaleInDistance : -minScaleInDistance
   }
-  var scaleInStep = scaleInDistance/(scaleInLength-1)
+  var scaleInStep = scaleInDistance / (scaleInLength - 1)
   if (Math.abs(scaleInStep) == Infinity) {
     scaleInStep = 0
   }
