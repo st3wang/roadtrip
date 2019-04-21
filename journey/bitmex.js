@@ -747,27 +747,33 @@ async function orderBulk(orders) { try {
     o.symbol = symbol
   })
 
+  var response
+
   // Test amend on take profit orders
   if (orders[0].ordType == 'Limit' && orders[0].execInst == 'ParticipateDoNotInitiate,ReduceOnly') {
     let ordersToAmend = findOrdersToAmend(orders)
     if (ordersToAmend.length == 0) {
-      return await orderNewBulk(orders)
+      response = await orderNewBulk(orders)
     }
     else if (ordersToAmend.length == orders.length) {
-      return await orderAmendBulk(ordersToAmend)
+      response = await orderAmendBulk(ordersToAmend)
     }
     else {
       let ordersToNew = orders.filter(o => {
         return !ordersToAmend.find(a => {return (o == a)})
       })
-      await orderAmendBulk(ordersToAmend)
-      return await orderNewBulk(ordersToNew)
+      let amendResponse = await orderAmendBulk(ordersToAmend)
+      response = await orderNewBulk(ordersToNew)
+      response.obj = response.obj.concat(amendResponse.obj)
     }
   }
   else {
-    return await orderNewBulk(orders)
+    response = await orderNewBulk(orders)
   }
 
+  if (response && response.status == 200) {
+    handleOrder(response.obj)
+  }
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderNewBulk(orders) { try {
@@ -793,7 +799,6 @@ async function orderNewBulk(orders) { try {
     response.data = undefined
     response.statusText = undefined
     logger.info('orderNewBulk',response)
-    handleOrder(response.obj)
   }
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
@@ -824,7 +829,6 @@ async function orderAmendBulk(orders) { try {
     response.data = undefined
     response.statusText = undefined
     logger.info('orderAmendBulk',response)
-    handleOrder(response.obj)
   }
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
