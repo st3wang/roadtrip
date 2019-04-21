@@ -883,7 +883,7 @@ function findOrdersToAmend(orders) {
   var ordersToAmend = []
 
   var openOrders = lastOrders.filter(({ordStatus,ordType,execInst,side}) => {
-    return (ordStatus.search(/New|PartiallyFilled/) && ordType == t && execInst == e && side == sd)
+    return (ordStatus.search(/New|PartiallyFilled/) >= 0 && ordType == t && execInst == e && side == sd)
   })
 
   orders.forEach(o => {
