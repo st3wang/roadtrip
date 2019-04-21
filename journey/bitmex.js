@@ -193,14 +193,19 @@ async function handleWallet(data) { try {
 
 async function handleOrder(orders) { try {
   orders.forEach(o => {
-    let lastOrderIndex = lastOrders.findIndex(lo => {
-      return (lo.orderID == o.orderID)
-    })
-    if (lastOrderIndex >= 0) {
-      lastOrders[lastOrderIndex] = o
+    if (o.orderID) {
+      let lastOrderIndex = lastOrders.findIndex(lo => {
+        return (lo.orderID == o.orderID)
+      })
+      if (lastOrderIndex >= 0) {
+        lastOrders[lastOrderIndex] = o
+      }
+      else {
+        lastOrders.push(o)
+      }
     }
     else {
-      lastOrders.push(o)
+      logger.error('handleOrder invalid order',o)
     }
   })
 
