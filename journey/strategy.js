@@ -175,7 +175,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   if (absQtyBTC < minOrderSizeBTC) {
     qtyBTC = minOrderSizeBTC*(qtyBTC/absQtyBTC)
   }
-  orderQtyUSD = Math.ceil(qtyBTC * entryPrice)
+  orderQtyUSD = Math.round(qtyBTC * entryPrice)
   var absOrderQtyUSD = Math.abs(orderQtyUSD)
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
@@ -187,7 +187,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
   if (absScaleInsize < minOrderSizeUSD) {
     scaleInLength = Math.round(absOrderQtyUSD/minOrderSizeUSD)
-    scaleInSize = minOrderSizeUSD*scaleInSize/absScaleInsize
+    scaleInSize = minOrderSizeUSD * scaleInSize / absScaleInsize
     orderQtyUSD = scaleInSize*scaleInLength
     qtyBTC = orderQtyUSD/entryPrice
   }

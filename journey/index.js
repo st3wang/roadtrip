@@ -7,17 +7,17 @@ const writeFileOptions = {encoding:'utf-8', flag:'w'}
 const winston = require('winston')
 const path = require('path')
 
+const shoes = require('./shoes')
+global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 
 // const l = require('./logger')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
 const server = require('./server')
-const shoes = require('./shoes')
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
-global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 global.bitmex = bitmex
 global.log = log
 
