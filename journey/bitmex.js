@@ -858,7 +858,11 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
   if (orders.length == 0) return
 
   switch(t) {
-    case 'Limit':
+    case 'Limit':          
+      if (status.source == 'Fill') {
+        // For finding cumQty
+        return orders
+      }
       switch(e) {
         case 'ParticipateDoNotInitiate':{
           // Entry orderQty may not be exact, depending on the margin. We can ignore similar entry orders with similar orderQty.
@@ -867,8 +871,10 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
           })
         }
         case 'Close,ParticipateDoNotInitiate':
+          // Target Stop Limit
           return true
         default:{
+          // Exit Target 
           return orders.find(({orderQty}) => {
             // Exit orderQty has to be exact
             return (orderQty == q)
@@ -924,7 +930,9 @@ function getCumQty(ords) {
   if (!ords) return
   var existingEntryOrders = findOrders(/Fill/,ords)
   return existingEntryOrders.reduce((a,c) => {
-    return a + (c.cumQty*(c.side=='Buy'?1:-1))
+    return c.reduce((aa,cc) => {
+      return aa + (cc.cumQty*(cc.side=='Buy'?1:-1))
+    },a)
   },0)
 }
 
