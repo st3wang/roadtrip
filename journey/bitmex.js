@@ -594,8 +594,7 @@ async function getCurrentCandle() {
 }
 
 async function cancelAll() { try {
-  // logger.info('Cancelling All Orders')
-  let response = await client.Order.Order_cancelAll({symbol:symbol})
+  var response = await client.Order.Order_cancelAll({symbol:symbol})
   if (response && response.status == 200) {
     response.data = undefined
     response.statusText = undefined
@@ -604,9 +603,24 @@ async function cancelAll() { try {
   }
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
+async function cancelOrders(orders) { try {
+  var orderID = orders.map(o => {
+    return o.orderID
+  })
+  var response = await client.Order.Order_cancel({symbol:symbol,
+    orderID: orderID
+  })
+  if (response && response.status == 200) {
+    response.data = undefined
+    response.statusText = undefined
+    logger.info('cancelOrder',response)
+    handleOrder(response.obj)
+  }
+} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
 async function updateLeverage(leverage) { try {
   console.log('Updating Leverage',leverage)
-  let response = await client.Position.Position_updateLeverage({symbol:symbol,leverage:leverage})
+  var response = await client.Position.Position_updateLeverage({symbol:symbol,leverage:leverage})
   console.log('Updated Leverage')
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
@@ -1022,5 +1036,6 @@ module.exports = {
   checkPositionParams: checkPositionParams,
 
   order: order,
-  cancelAll: cancelAll
+  cancelAll: cancelAll,
+  cancelOrders: cancelOrders
 }

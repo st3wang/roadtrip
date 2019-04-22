@@ -331,9 +331,9 @@ async function checkEntry(params) { try {
   var {signal} = params
   var cancel, enter
   let newEntryOrders = bitmex.findOrders(/New/,signal.entryOrders)  
-  if (newEntryOrders.length == signal.entryOrders.length && (cancel = cancelOrder(params))) {
+  if (newEntryOrders.length > 0 && (cancel = cancelOrder(params))) {
     logger.warn('CANCEL',cancel)
-    await bitmex.cancelAll()
+    await bitmex.cancelOrders(newEntryOrders)
     newEntryOrders = []
   }
   if (newEntryOrders.length != signal.entryOrders.length && (enter = await enterSignal(params))) {
