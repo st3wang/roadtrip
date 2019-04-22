@@ -365,7 +365,28 @@ async function checkExit(params) { try {
 
   var {entryPrice,entryOrders,takeProfitOrders} = signal
 
-  if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
+  var exit = exitTooLong(params) || exitFunding(params)
+  if (exit) {
+    let exitOrders = [{
+      price: (positionSize < 0 ? bid : ask),
+      side: (positionSize < 0 ? 'Buy' : 'Sell'),
+      // orderQty: -positionSize,
+      ordType: 'Limit',
+      execInst: 'Close,ParticipateDoNotInitiate'
+    }]
+    exit.exitOrders = exitOrders
+
+    var existingExitOrders = bitmex.findOrders(/New/,exitOrders)
+    if (existingExitOrders.length == 1) {
+      // logger.debug('EXIT EXISTING ORDER',exit)
+      return existingExitOrders
+    }
+
+    logger.info('EXIT', exit)
+    var response = await bitmex.order(exitOrders,true)
+    return response
+  }
+  else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
     let [takeProfitOrder,takeHalfProfitOrder] = takeProfitOrders
   
     let orders = []
@@ -392,28 +413,6 @@ async function checkExit(params) { try {
     if (existingTakeProfitOrders.length != orders.length) {
       await bitmex.order(orders)
     }
-  }
-
-  var exit = exitTooLong(params) || exitFunding(params)
-  if (exit) {
-    let exitOrders = [{
-      price: (positionSize < 0 ? bid : ask),
-      side: (positionSize < 0 ? 'Buy' : 'Sell'),
-      // orderQty: -positionSize,
-      ordType: 'Limit',
-      execInst: 'Close,ParticipateDoNotInitiate'
-    }]
-    exit.exitOrders = exitOrders
-
-    var existingExitOrders = bitmex.findOrders(/New/,exitOrders)
-    if (existingExitOrders.length == 1) {
-      // logger.debug('EXIT EXISTING ORDER',exit)
-      return existingExitOrders
-    }
-
-    logger.info('EXIT', exit)
-    var response = await bitmex.order(exitOrders,true)
-    return response
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
