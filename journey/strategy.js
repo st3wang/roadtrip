@@ -177,6 +177,13 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   }
   orderQtyUSD = Math.round(qtyBTC * entryPrice)
   var absOrderQtyUSD = Math.abs(orderQtyUSD)
+  var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
+  if (absOrderQtyUSD < minOrderSizeUSD*2) {
+    orderQtyUSD = minOrderSizeUSD*2
+    absOrderQtyUSD = Math.abs(orderQtyUSD)
+    qtyBTC = orderQtyUSD / entryPrice
+    absQtyBTC = Math.abs(qtyBTC)
+  }
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
@@ -184,7 +191,6 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
 
   var scaleInSize = Math.round(orderQtyUSD/scaleInLength)
   var absScaleInsize = Math.abs(scaleInSize)
-  var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
   if (absScaleInsize < minOrderSizeUSD) {
     scaleInLength = Math.round(absOrderQtyUSD/minOrderSizeUSD)
     scaleInSize = minOrderSizeUSD * scaleInSize / absScaleInsize

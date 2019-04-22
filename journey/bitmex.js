@@ -628,15 +628,7 @@ async function order(orders,cancelAllBeforeOrder) { try {
   })
   
   logger.info('order',response)
-
-  switch (response.obj.ordStatus) {
-    case 'Canceled':
-    case 'Overloaded':
-    case 'Duplicate':
-      return
-  }
-
-  return response.obj
+  return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function wait(ms) {
@@ -711,16 +703,20 @@ async function orderBulkRetry(ord) { try {
     response = await orderBulk(ord.orders) 
     count++
     waitTime *= 2
+    if (response.status == 503 && ord.cancelAllBeforeOrder) {
+      // retry overloaded status only with the entry order
+      retry = true
+    }
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
-    switch (response.obj.ordStatus) {
-      case 'Overloaded': {
-        retry = true
-      } break
-      case 'Canceled': {
-        logger.warn('orderBulkRetry Canceled')
-        retry = false
-      } break
+    // switch (response.obj.ordStatus) {
+    //   case 'Overloaded': {
+    //     retry = true
+    //   } break
+    //   case 'Canceled': {
+    //     logger.warn('orderBulkRetry Canceled')
+    //     retry = false
+    //   } break
       // This cause entry price to be closer to stop loss and it may exceed the stop loss
       // It's better to check with the signal 
       // case 'Canceled': {
@@ -736,9 +732,9 @@ async function orderBulkRetry(ord) { try {
       //     }
       //   }
       // } break
-      default:
-        retry = false
-    }
+    //   default:
+    //     retry = false
+    // }
   } while(retry && count < 7 && !ord.obsoleted && await wait(waitTime))
   if (ord.obsoleted) {
     logger.info('orderBulkRetry obsoleted',ord)
@@ -767,9 +763,15 @@ async function orderBulk(orders) { try {
       let ordersToNew = orders.filter(o => {
         return !ordersToAmend.find(a => {return (o == a)})
       })
-      let amendResponse = await orderAmendBulk(ordersToAmend)
-      response = await orderNewBulk(ordersToNew)
-      response.obj = response.obj.concat(amendResponse.obj)
+      response = await orderAmendBulk(ordersToAmend)
+      let newResponse = await orderNewBulk(ordersToNew)
+      if (response.status == 200 && newResponse.status == 200 && 
+        Array.isArray(response.obj) && Array.isArray(newResponse.obj)) {
+        response.obj = response.obj.concat(newResponse.obj)
+      }
+      else if (newResponse.status == 200) {
+        response = newResponse
+      }
     }
   }
   else {
@@ -783,17 +785,24 @@ async function orderBulk(orders) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderNewBulk(orders) { try {
-  let response = await client.Order.Order_newBulk({orders:JSON.stringify(orders)})
+  var orderTooSmall = orders.find(o => {
+    let absQtyBTC = Math.abs(o.orderQty/getRate('XBTUSD'))
+    return absQtyBTC < setup.bankroll.minOrderSizeBTC
+  })
+  if (orderTooSmall) {
+    return ({status:400})
+  }
+  var response = await client.Order.Order_newBulk({orders:JSON.stringify(orders)})
   .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
     console.error('orderNewBulk error',e)
     logger.error('orderNewBulk error',e,orders)
     if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
-      return ({obj:{ordStatus:'Overloaded'}})
+      return e
     }
     else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
-      return ({obj:{ordStatus:'Duplicate'}})
+      return e
     }
     else {
       debugger
@@ -817,10 +826,10 @@ async function orderAmendBulk(orders) { try {
     console.error('orderAmendBulk error',e)
     logger.error('orderAmendBulk error',e,orders)
     if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
-      return ({obj:{ordStatus:'Overloaded'}})
+      return e
     }
     else if (e.obj.error.message.indexOf('Duplicate') >= 0) {
-      return ({obj:{ordStatus:'Duplicate'}})
+      return e
     }
     else if (e.obj.error.message.indexOf('open sell orders exceed current position')) {
       return e
@@ -850,17 +859,21 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
 
   switch(t) {
     case 'Limit':
-      if (e == 'ParticipateDoNotInitiate') {
-        return orders.find(({orderQty}) => {
+      switch(e) {
+        case 'ParticipateDoNotInitiate':{
           // Entry orderQty may not be exact, depending on the margin. We can ignore similar entry orders with similar orderQty.
-          return (orderQty >= (q*0.98) && orderQty <= (q*1.02))
-        })
-      }
-      else {
-        return orders.find(({orderQty}) => {
-          // Exit orderQty has to be exact
-          return (orderQty == q)
-        })
+          return orders.find(({orderQty}) => {
+            return (orderQty >= (q*0.98) && orderQty <= (q*1.02))
+          })
+        }
+        case 'Close,ParticipateDoNotInitiate':
+          return true
+        default:{
+          return orders.find(({orderQty}) => {
+            // Exit orderQty has to be exact
+            return (orderQty == q)
+          })
+        }
       }
     case 'Stop':
     case 'StopLimit':
@@ -897,6 +910,9 @@ function findOrdersToAmend(orders) {
     })
     if (orderToAmend) {
       o.orderID = orderToAmend.orderID
+      if (o.ordStatus == 'PartiallyFilled') {
+        o.orderQty += orderToAmend.cumQty
+      }
       ordersToAmend.push(o)
     }
   })

@@ -184,12 +184,12 @@ async function getOrderSignalWithCurrentCandle(walletBalance) {
 
   if (rsiSignal.condition == 'LONG') { 
     conservativeCloses = market.closes.slice(1)
-    conservativeCloses.push(lastPrice-0.5)
+    conservativeCloses.push(lastPrice-setup.bankroll.tick)
     conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi)
   }
   else if (rsiSignal.condition == 'SHORT') {
     conservativeCloses = market.closes.slice(1)
-    conservativeCloses.push(lastPrice+0.5)
+    conservativeCloses.push(lastPrice+setup.bankroll.tick)
     conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi)
   }
 
@@ -344,8 +344,8 @@ async function checkEntry(params) { try {
     }
     else {
       logger.info('ENTER',enter)
-      let orderSent = await bitmex.order(entryOrders.concat(stopLossOrders),true)
-      if (orderSent) {
+      let response = await bitmex.order(entryOrders.concat(stopLossOrders),true)
+      if (response.status == 200) {
         entrySignalTable.info('entry',enter.signal)
         fs.writeFileSync(entrySignalFilePath,JSON.stringify(enter.signal,null,2),writeFileOptions)
         // log.writeEntrySignal(entrySignal) // current trade
@@ -396,20 +396,21 @@ async function checkExit(params) { try {
     let exitOrders = [{
       price: (positionSize < 0 ? bid : ask),
       side: (positionSize < 0 ? 'Buy' : 'Sell'),
-      orderQty: -positionSize,
-      type: 'Limit',
+      // orderQty: -positionSize,
+      ordType: 'Limit',
       execInst: 'Close,ParticipateDoNotInitiate'
     }]
     exit.exitOrders = exitOrders
 
-    let existingExitOrders = bitmex.findOrders(exitOrders)
+    var existingExitOrders = bitmex.findOrders(/New/,exitOrders)
     if (existingExitOrders.length == 1) {
       // logger.debug('EXIT EXISTING ORDER',exit)
       return existingExitOrders
     }
 
     logger.info('EXIT', exit)
-    return await bitmex.order(exitOrders,true)
+    var response = await bitmex.order(exitOrders,true)
+    return response
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -546,6 +547,7 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
     }]
   }
 
+  var stopPriceOffset = (-orderQtyUSD/Math.abs(orderQtyUSD)*setup.bankroll.tick)
   var stopLossOrders = [{
     stopPx: stopMarket,
     side: exitSide,
@@ -553,7 +555,13 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
     execInst: 'Close,LastPrice'
   },{
     price: stopLoss,
-    stopPx: stopLoss+(-orderQtyUSD/Math.abs(orderQtyUSD)*0.5),
+    stopPx: stopLoss+stopPriceOffset,
+    side: exitSide,
+    ordType: 'StopLimit',
+    execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
+  },{
+    price: takeProfit+stopPriceOffset,
+    stopPx: takeProfit+stopPriceOffset*2,
     side: exitSide,
     ordType: 'StopLimit',
     execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
