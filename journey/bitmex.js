@@ -941,12 +941,14 @@ function findOrdersToAmend(orders) {
   return ordersToAmend
 }
 
-function getCumQty(ords) {
+function getCumQty(ords,since) {
   if (!ords) return
   var existingEntryOrders = findOrders(/Fill/,ords)
+  var sinceTime = new Date(since).getTime()
   return existingEntryOrders.reduce((a,c) => {
     return c.reduce((aa,cc) => {
-      return aa + (cc.cumQty*(cc.side=='Buy'?1:-1))
+      var orderTime = new Date(cc.timestamp).getTime()
+      return (orderTime < sinceTime ? aa : aa + (cc.cumQty*(cc.side=='Buy'?1:-1)))
     },a)
   },0)
 }

@@ -388,7 +388,7 @@ async function checkExit(params) { try {
     let [takeProfitOrder,takeHalfProfitOrder] = takeProfitOrders
   
     let orders = []
-    let exitOrderQty = -bitmex.getCumQty(entryOrders)
+    let exitOrderQty = -bitmex.getCumQty(entryOrders,signal.timestamp)
     let halfExitOrderQty = exitOrderQty/2
   
     // total takeProfit orderQty
@@ -396,8 +396,8 @@ async function checkExit(params) { try {
     takeHalfProfitOrder.orderQty = exitOrderQty - takeProfitOrder.orderQty
   
     // find orders based on the total qty
-    let takeProfitCumQty = bitmex.getCumQty([takeProfitOrder])
-    let takeHalfProfitCumQty = bitmex.getCumQty([takeHalfProfitOrder])
+    let takeProfitCumQty = bitmex.getCumQty([takeProfitOrder],signal.timestamp)
+    let takeHalfProfitCumQty = bitmex.getCumQty([takeHalfProfitOrder],signal.timestamp)
   
     // subtract filled qty
     takeProfitOrder.orderQty -= takeProfitCumQty
