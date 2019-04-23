@@ -1,5 +1,3 @@
-const log = require('./log')
-
 const fs = require('fs')
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
@@ -19,9 +17,9 @@ const oneCandleMS = setup.candle.interval*60000
 const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
 global.bitmex = bitmex
-global.log = log
 
 const entrySignalFilePath = global.logDir + '/entry_signal.json'
+const entrySignalTableFilePath = global.logDir + '/entry_signal_table.log'
 
 var lastCheckPositionTime = new Date().getTime()
 
@@ -138,7 +136,7 @@ const logger = winston.createLogger({
 
 const entrySignalTable = winston.createLogger({
   transports: [
-    new winston.transports.File({filename:'entry_signal_table.log',
+    new winston.transports.File({filename:entrySignalTableFilePath,
       format: winston.format.combine(
         isoTimestamp(),
         winston.format.json()
@@ -349,7 +347,7 @@ async function checkEntry(params) { try {
         entrySignalTable.info('entry',enter.signal)
         fs.writeFileSync(entrySignalFilePath,JSON.stringify(enter.signal,null,2),writeFileOptions)
         // log.writeEntrySignal(entrySignal) // current trade
-        log.writeOrderSignal(setup.bankroll,entrySignal) // trade
+        // log.writeOrderSignal(setup.bankroll,entrySignal) // trade
         entrySignal = enter.signal
         entrySignal.entryOrders = entryOrders
         entrySignal.closeOrders = closeOrders
@@ -466,13 +464,31 @@ function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
     (order.price||order.stopPx)+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
 }
 
+async function findEntrySignal({timestamp,price,orderQty,side}) {
+  // signals.forEach(signal => {
+  //   let signalTime = new Date(signal[0]).getTime()
+  //   let signalPrice = parseFloat(signal[5])
+  //   if (time >= signalTime && time <= (signalTime+2*60*60000) && signalPrice <= price+2 && signalPrice >= price-2 && signal[15] == ''+sizeUSD) {
+  //     found = {
+  //       timestamp: signal[0],
+  //       price: price,
+  //       size: sizeUSD,
+  //       stopLoss: signal[6],
+  //       takeProfit: signal[7],
+  //       stopMarket: signal[8]
+  //     }
+  //   }
+  // })
+  // return found
+}
+
 async function getTradeCsv() { try {
   var yesterday = new Date().getTime() - (candleLengthMS)
   var orders = await bitmex.getOrders(yesterday)
   var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
   for (var i = 0; i < orders.length; i++) {
     var entryOrder = orders[i]
-    var signal = log.findEntrySignal(entryOrder.timestamp,entryOrder.price,entryOrder.orderQty*(entryOrder.side=='Buy'?1:-1))
+    var signal = findEntrySignal(entryOrder)
     var stopLoss = 0
     var takeProfit = 0 
     var stopMarket = 0 
@@ -590,7 +606,7 @@ async function start() { try {
   // var rsi1 = await strategy.getRsi([4000,4001,4002,4003,4004,4005,4006,4010,4011,4010],2)
   // var rsi2 = await strategy.getRsi([4000,4001,4002,4003,4004,4005,4006,4010,4011,4009],2)
   // debugger
-  await log.init()
+  // await log.init()
   var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)
   entrySignal = JSON.parse(entrySignalString)
   
