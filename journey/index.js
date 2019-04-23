@@ -149,7 +149,7 @@ const entrySignalTable = winston.createLogger({
 
 var entrySignal
 
-logger.info('setup', setup)
+logger.info('shoes', shoes)
 
 var fundingWindowTime = setup.candle.fundingWindow*setup.candle.interval*60000
 
@@ -329,7 +329,7 @@ async function checkEntry(params) { try {
   var {positionSize,signal} = params
   var cancel, enter
   let newEntryOrders = bitmex.findOrders(/New/,signal.entryOrders)  
-  
+
   if (newEntryOrders.length > 0 && (cancel = cancelOrder(params))) {
     logger.warn('CANCEL',cancel)
     await bitmex.cancelOrders(newEntryOrders)
