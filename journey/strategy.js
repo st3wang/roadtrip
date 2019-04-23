@@ -128,8 +128,8 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
 
   // Test
   if (shoes.test ) {
-    if (signalCondition == 'S') signalCondition = 'SHORT'
-    else if (signalCondition == 'L' || signalCondition == '-') signalCondition = 'LONG'
+    if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
+    else if (signalCondition == 'L') signalCondition = 'LONG'
   }
 
   switch(signalCondition) {
@@ -154,6 +154,8 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     }
   }
 
+  var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
+
   stopMarketDistance = roundPrice(lossDistance * stopMarketFactor)
   stopMarket = roundPrice(entryPrice + stopMarketDistance)
   profitDistance = roundPrice(-lossDistance * profitFactor)
@@ -173,29 +175,28 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   qtyBTC = riskAmountBTC / -lossDistancePercent
   var absQtyBTC = Math.abs(qtyBTC)
   if (absQtyBTC < minOrderSizeBTC) {
-    qtyBTC = minOrderSizeBTC*(qtyBTC/absQtyBTC)
+    qtyBTC = minOrderSizeBTC*side
   }
   orderQtyUSD = Math.round(qtyBTC * entryPrice)
   var absOrderQtyUSD = Math.abs(orderQtyUSD)
   var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
   if (absOrderQtyUSD < minOrderSizeUSD*2) {
-    orderQtyUSD = minOrderSizeUSD*2
+    orderQtyUSD = minOrderSizeUSD*2*side
     absOrderQtyUSD = Math.abs(orderQtyUSD)
     qtyBTC = orderQtyUSD / entryPrice
-    absQtyBTC = Math.abs(qtyBTC)
   }
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
 
-  var scaleInSize = Math.round(orderQtyUSD/scaleInLength)
+  var scaleInSize = Math.round(orderQtyUSD / scaleInLength)
   var absScaleInsize = Math.abs(scaleInSize)
   if (absScaleInsize < minOrderSizeUSD) {
-    scaleInLength = Math.round(absOrderQtyUSD/minOrderSizeUSD)
-    scaleInSize = minOrderSizeUSD * scaleInSize / absScaleInsize
-    orderQtyUSD = scaleInSize*scaleInLength
-    qtyBTC = orderQtyUSD/entryPrice
+    scaleInLength = Math.round(absOrderQtyUSD / minOrderSizeUSD)
+    scaleInSize = minOrderSizeUSD * side
+    orderQtyUSD = scaleInSize * scaleInLength
+    qtyBTC = orderQtyUSD / entryPrice
   }
 
   var scaleInDistance = lossDistance * scaleInFactor
