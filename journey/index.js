@@ -326,17 +326,17 @@ async function checkPositionCallback(params) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
-  if (params.positionSize != 0) return
-  
-  var {signal} = params
+  var {positionSize,signal} = params
   var cancel, enter
   let newEntryOrders = bitmex.findOrders(/New/,signal.entryOrders)  
+  
   if (newEntryOrders.length > 0 && (cancel = cancelOrder(params))) {
     logger.warn('CANCEL',cancel)
     await bitmex.cancelOrders(newEntryOrders)
     newEntryOrders = []
   }
-  if (newEntryOrders.length != signal.entryOrders.length && (enter = await enterSignal(params))) {
+
+  if (positionSize == 0 && newEntryOrders.length != signal.entryOrders.length && (enter = await enterSignal(params))) {
     let {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(enter.signal)
     var existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders)
     if (existingEntryOrders.length > 0) {
@@ -427,9 +427,9 @@ async function checkPosition(params) { try {
   checking = true
   lastCheckPositionTime = new Date().getTime()
 
-  if (!(await checkExit(params))) {
-    await checkEntry(params)
-  }
+  await checkExit(params)
+  await checkEntry(params)
+
   if (recheckWhenDone) {
     setTimeout(next,50)
     recheckWhenDone = false
