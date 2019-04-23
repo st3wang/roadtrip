@@ -337,14 +337,14 @@ async function checkEntry(params) { try {
     newEntryOrders = []
   }
   if (newEntryOrders.length != signal.entryOrders.length && (enter = await enterSignal(params))) {
-    let {entryOrders,stopLossOrders,takeProfitOrders} = getEntryExitOrders(enter.signal)
+    let {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(enter.signal)
     var existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders)
     if (existingEntryOrders.length > 0) {
       logger.info('ENTRY ORDER EXISTS')
     }
     else {
       logger.info('ENTER',enter)
-      let response = await bitmex.order(entryOrders.concat(stopLossOrders),true)
+      let response = await bitmex.order(entryOrders.concat(closeOrders),true)
       if (response.status == 200) {
         entrySignalTable.info('entry',enter.signal)
         fs.writeFileSync(entrySignalFilePath,JSON.stringify(enter.signal,null,2),writeFileOptions)
@@ -352,7 +352,7 @@ async function checkEntry(params) { try {
         log.writeOrderSignal(setup.bankroll,entrySignal) // trade
         entrySignal = enter.signal
         entrySignal.entryOrders = entryOrders
-        entrySignal.stopLossOrders = stopLossOrders
+        entrySignal.closeOrders = closeOrders
         entrySignal.takeProfitOrders = takeProfitOrders
       }
     }
@@ -363,7 +363,7 @@ async function checkExit(params) { try {
   var {positionSize,bid,ask,lastPrice,signal} = params
   if (positionSize == 0 || !lastPrice) return
 
-  var {entryPrice,entryOrders,takeProfitOrders} = signal
+  var {entryPrice,entryOrders,takeProfitOrders,closeOrders} = signal
 
   var exit = exitTooLong(params) || exitFunding(params)
   if (exit) {
@@ -549,23 +549,23 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
     }]
   }
 
-  var stopPriceOffset = (-orderQtyUSD/Math.abs(orderQtyUSD)*setup.bankroll.tick)
-  var stopLossOrders = [{
+  var exitPriceOffset = (-orderQtyUSD/Math.abs(orderQtyUSD)*setup.bankroll.tick)
+  var closeOrders = [{
     stopPx: stopMarket,
     side: exitSide,
     ordType: 'Stop',
     execInst: 'Close,LastPrice'
   },{
     price: stopLoss,
-    stopPx: stopLoss+stopPriceOffset,
+    stopPx: stopLoss + exitPriceOffset,
     side: exitSide,
     ordType: 'StopLimit',
     execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
   },{
-    price: takeProfit+stopPriceOffset,
-    stopPx: takeProfit+stopPriceOffset*2,
+    price: takeProfit + exitPriceOffset,
+    stopPx: takeProfit + exitPriceOffset * 2,
     side: exitSide,
-    ordType: 'StopLimit',
+    ordType: 'LimitIfTouched',
     execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
   }]
 
@@ -583,7 +583,7 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
     execInst: 'ParticipateDoNotInitiate,ReduceOnly'
   }]
 
-  return {entryOrders:entryOrders,stopLossOrders:stopLossOrders,takeProfitOrders:takeProfitOrders}
+  return {entryOrders:entryOrders,closeOrders:closeOrders,takeProfitOrders:takeProfitOrders}
 }
 
 async function start() { try {
@@ -594,9 +594,9 @@ async function start() { try {
   var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)
   entrySignal = JSON.parse(entrySignalString)
   
-  var {entryOrders,stopLossOrders,takeProfitOrders} = getEntryExitOrders(entrySignal)
+  var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal)
   entrySignal.entryOrders = entryOrders
-  entrySignal.stopLossOrders = stopLossOrders
+  entrySignal.closeOrders = closeOrders
   entrySignal.takeProfitOrders = takeProfitOrders
 
   await bitmex.init(checkPositionCallback)

@@ -895,6 +895,7 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
           })
         }
       }
+    case 'LimitIfTouched':
     case 'Stop':
     case 'StopLimit':
       return orders.find(({stopPx}) => {
