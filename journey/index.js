@@ -1,4 +1,6 @@
 const fs = require('fs')
+const fsR = require('fs-reverse')
+const { Writable } = require('stream');
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
@@ -444,15 +446,16 @@ async function next() { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getMarketCsv() { try {
+async function getMarketJson() { try {
   var market = await bitmex.getMarketWithCurrentCandle()
-  var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
-  var csv = 'Date,Open,High,Low,Close,Rsi\n'
-  market.candles.forEach((candle,i) => {
-    csv += //new Date(candle.time).toUTCString()
-    candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+','+rsis[i]+'\n'
-  })
-  return csv
+  return JSON.stringify(market)
+  // var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
+  // var csv = 'Date,Open,High,Low,Close,Rsi\n'
+  // market.candles.forEach((candle,i) => {
+  //   csv += //new Date(candle.time).toUTCString()
+  //   candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+','+rsis[i]+'\n'
+  // })
+  // return csv
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
@@ -481,6 +484,55 @@ async function findEntrySignal({timestamp,price,orderQty,side}) {
   // })
   // return found
 }
+
+async function getTradeSignals(sinceTime) { try {
+  return new Promise((resolve,reject) => {
+    var signals = []
+    var stream = fsR(entrySignalTableFilePath, {})
+    const outStream = new Writable({
+      write(chunk, encoding, callback) {
+        let str = chunk.toString()
+        if (str && str.length > 0) {
+          let signal = JSON.parse(str)
+          let signalTime = new Date(signal.timestamp).getTime()
+          if (signalTime >= sinceTime) {
+            var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(signal)
+            signal.entryOrders = entryOrders
+            signal.closeOrders = closeOrders
+            signal.takeProfitOrders = takeProfitOrders
+            signals.unshift(signal)
+          }
+          else {
+            stream.destroy()
+            resolve(signals)
+          }
+        }
+        callback()
+      }
+    })
+    stream.pipe(outStream);
+  })
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function getTradeJson() { try {
+  var sinceTime = new Date().getTime() - (candleLengthMS)
+  var [orders,signals] = await Promise.all([
+    bitmex.getOrders(sinceTime),
+    getTradeSignals(sinceTime)
+  ])
+  var trades = []
+  signals.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders}) => {
+    trades.push({
+      timestamp, capitalBTC, type, orderQtyUSD, entryPrice, stopLoss, stopMarket, takeProfit, takeHalfProfit,
+      entryOrders: bitmex.findOrders(/.+/,entryOrders,orders),
+      closeOrders: bitmex.findOrders(/.+/,closeOrders,orders),
+      takeProfitOrders: bitmex.findOrders(/.+/,takeProfitOrders,orders),
+    })
+  })
+  // debugger
+  
+  return JSON.stringify(trades)
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getTradeCsv() { try {
   var yesterday = new Date().getTime() - (candleLengthMS)
@@ -616,8 +668,12 @@ async function start() { try {
   entrySignal.takeProfitOrders = takeProfitOrders
 
   await bitmex.init(checkPositionCallback)
-  await server.init(getMarketCsv,getTradeCsv,getFundingCsv)
+  // var trade = await getTradeJson()
+  // debugger
+  await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
+
+/*
   next()
   // createInterval(-5000*2**6)
   // createInterval(-5000*2**5)
@@ -634,6 +690,7 @@ async function start() { try {
   // createInterval(5000*2**4)
   // createInterval(5000*2**5)
   // createInterval(5000*2**6)
+  */
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 start()

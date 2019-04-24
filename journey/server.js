@@ -26,12 +26,20 @@ function responseWithData(response,contentType,data) {
   response.end()
 }
 
-async function init(getMarketCsv,getTradeCsv,getFundingCsv) {
+async function init(getMarketJson,getTradeJson,getFundingCsv) {
   http.createServer(async (request, response) => {
     let path = url.parse(request.url).pathname
     switch(path) {
       case '/':
         responseWithFile(response,'text/html','www/index.html')
+        break;
+      case '/market.json':
+        var marketJson = await getMarketJson()
+        responseWithData(response,'text/json',marketJson)
+        break;
+      case '/trade.json':
+        var tradeJson = await getTradeJson()
+        responseWithData(response,'text/json',tradeJson)
         break;
       case '/market.csv':
         var marketCsv = await getMarketCsv()
