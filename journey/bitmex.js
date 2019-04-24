@@ -872,10 +872,16 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
   if (orders.length == 0) return
 
   switch(t) {
-    case 'Limit':          
+    case 'Limit':
       if (status.source == 'Fill') {
         // For finding cumQty
         return orders.filter(({price}) => {
+          return (price == p)
+        })
+      }
+      else if (status.source == '.+') {
+        // For UI
+        return orders.find(({price}) => {
           return (price == p)
         })
       }
