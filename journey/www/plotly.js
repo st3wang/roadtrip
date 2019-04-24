@@ -56,16 +56,21 @@ async function init() {
   var annotations = []
   var shapes = []
 
-  trade.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders}) => {
+  trade.orders.forEach(o => {
+    annotations.push(getAnnotation(o,'#888'))
+  })
+
+  trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders}) => {
 //     var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
     var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders)
     var endTime = allOrders.reduce((a,c) => {
-      return (new Date(c).getTime > new Date(a).getTime()) ? c : a
+      return (new Date(c.timestamp).getTime() > new Date(a).getTime()) ? c.timestamp : a
     },timestamp)
     if (endTime == timestamp) {
-      endTime = new Date(new Date(timestamp).getTime() + 600000).toISOString()
+      var endTime = new Date(new Date(timestamp).getTime() + 600000).toISOString()
     }
     var arrowColor
+    console.log('endTime',endTime)
     if (type == 'LONG') {
       shapes.push(getShape(timestamp,endTime,entryPrice,takeProfit))
       shapes.push(getShape(timestamp,endTime,entryPrice,stopLoss))

@@ -531,7 +531,7 @@ async function getTradeJson() { try {
   })
   // debugger
   
-  return JSON.stringify(trades)
+  return JSON.stringify({trades:trades,orders:orders})
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getTradeCsv() { try {
