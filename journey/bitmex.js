@@ -862,12 +862,12 @@ async function orderAmendBulk(orders) { try {
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,side:sd}) {  
+function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,side:sd},haystacks) {  
   sd = sd || (q > 0 ? 'Buy' : 'Sell')
   q = Math.abs(q)
   
-  var orders = lastOrders.filter(({price,execInst,ordType,ordStatus,side}) => {
-    return (price == p && side == sd && ordType == t && execInst == e && ordStatus.search(status) >=0)
+  var orders = haystacks.filter(({price,stopPx,execInst,ordType,ordStatus,side}) => {
+    return (side == sd && ordType == t && execInst == e && ordStatus.search(status) >=0)
   })
   if (orders.length == 0) return
 
@@ -875,13 +875,15 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
     case 'Limit':          
       if (status.source == 'Fill') {
         // For finding cumQty
-        return orders
+        return orders.filter(({price}) => {
+          return (price == p)
+        })
       }
       switch(e) {
         case 'ParticipateDoNotInitiate':{
           // Entry orderQty may not be exact, depending on the margin. We can ignore similar entry orders with similar orderQty.
-          return orders.find(({orderQty}) => {
-            return (orderQty >= (q*0.98) && orderQty <= (q*1.02))
+          return orders.find(({price, orderQty}) => {
+            return (price == p && orderQty >= (q*0.98) && orderQty <= (q*1.02))
           })
         }
         case 'Close,ParticipateDoNotInitiate':
@@ -889,9 +891,9 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
           return true
         default:{
           // Exit Target 
-          return orders.find(({orderQty}) => {
+          return orders.find(({price, orderQty}) => {
             // Exit orderQty has to be exact
-            return (orderQty == q)
+            return (price == p && orderQty == q)
           })
         }
       }
@@ -905,11 +907,12 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
   }
 }
 
-function findOrders(status,ords) {
-  if (!ords) return []
+function findOrders(status,needles,haystacks) {
+  if (!needles) return []
+  haystacks = haystacks || lastOrders
   var foundOrders = []
-  ords.forEach(o => {
-    let found = findOrder(status,o)
+  needles.forEach(needle => {
+    let found = findOrder(status,needle,haystacks)
     if (found) {
       foundOrders.push(found)
     }
@@ -1001,10 +1004,10 @@ async function init(checkPositionCb) { try {
   await initOrders()
   await updateLeverage(0) // cross margin
 
+  await connect()
 
   // await getTradeHistory()
 
-  await connect()
 
   // await getOrderBook()
 
