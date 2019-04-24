@@ -524,12 +524,20 @@ async function getTradeJson() { try {
     return o.stopPx != 1
   })
   var trades = []
-  signals.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders}) => {
+  signals.ords = signals.map(({timestamp},i) => {
+    var startTime = new Date(timestamp).getTime()
+    var endTime = (signals[i+1] ? new Date(signals[i+1].timestamp) : new Date()).getTime()
+    return orders.filter(({ts}) => {
+      let t = new Date(ts).getTime()
+      return (t >= startTime && t <= endTime)
+    })
+  })
+  signals.forEach(({ords,timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders},i) => {
     trades.push({
       timestamp, capitalBTC, type, orderQtyUSD, entryPrice, stopLoss, stopMarket, takeProfit, takeHalfProfit,
-      entryOrders: bitmex.findOrders(/.+/,entryOrders,orders),
-      closeOrders: bitmex.findOrders(/.+/,closeOrders,orders),
-      takeProfitOrders: bitmex.findOrders(/.+/,takeProfitOrders,orders),
+      entryOrders: bitmex.findOrders(/.+/,entryOrders,ords),
+      closeOrders: bitmex.findOrders(/.+/,closeOrders,ords),
+      takeProfitOrders: bitmex.findOrders(/.+/,takeProfitOrders,ords),
     })
   })
   // debugger
