@@ -578,8 +578,8 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
     ordType: 'StopLimit',
     execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
   },{
-    price: takeProfit + exitPriceOffset,
-    stopPx: takeProfit + exitPriceOffset * 2,
+    price: takeProfit - exitPriceOffset,
+    stopPx: takeProfit - exitPriceOffset * 2,
     side: exitSide,
     ordType: 'LimitIfTouched',
     execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
