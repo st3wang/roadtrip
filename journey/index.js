@@ -521,7 +521,7 @@ async function getTradeJson() { try {
     getTradeSignals(sinceTime)
   ])
   orders = orders.filter(o => {
-    return o.price != 1
+    return o.stopPx != 1
   })
   var trades = []
   signals.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders}) => {
