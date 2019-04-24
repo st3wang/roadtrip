@@ -810,7 +810,6 @@ async function orderNewBulk(orders) { try {
   .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
-    console.error('orderNewBulk error',e)
     logger.error('orderNewBulk error',e,orders)
     if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
       return e
