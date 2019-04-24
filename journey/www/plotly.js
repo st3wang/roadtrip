@@ -60,7 +60,7 @@ async function init() {
 //     var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
     var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders)
     var endTime = allOrders.reduce((a,c) => {
-      return (new Date(c).getTime > new Date(a).getTime()) ? c : a
+      return (new Date(c.timestamp).getTime() > new Date(a).getTime()) ? c.timestamp : a
     },timestamp)
     if (endTime == timestamp) {
       endTime = new Date(new Date(timestamp).getTime() + 600000).toISOString()
