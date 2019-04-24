@@ -62,7 +62,7 @@ async function init() {
 
   trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders,otherOrders}) => {
 //     var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
-    var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders)
+    var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders).concat(otherOrders)
     var endTime = allOrders.reduce((a,c) => {
       return (new Date(c.timestamp).getTime() > new Date(a).getTime()) ? c.timestamp : a
     },timestamp)
