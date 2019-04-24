@@ -60,7 +60,7 @@ async function init() {
     annotations.push(getAnnotation(o,'#888'))
   })
 
-  trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders}) => {
+  trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders,otherOrders}) => {
 //     var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
     var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders)
     var endTime = allOrders.reduce((a,c) => {
@@ -88,6 +88,9 @@ async function init() {
       annotations.push(getAnnotation(o,arrowColor))
     })
     takeProfitOrders.forEach((o) => {
+      annotations.push(getAnnotation(o,arrowColor))
+    })
+    otherOrders.forEach((o) => {
       annotations.push(getAnnotation(o,arrowColor))
     })
   })

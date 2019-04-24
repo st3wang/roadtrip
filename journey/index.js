@@ -534,12 +534,17 @@ async function getTradeJson() { try {
     })
   })
   signals.forEach(({ords,timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders},i) => {
-    trades.push({
+    let trade = {
       timestamp, capitalBTC, type, orderQtyUSD, entryPrice, stopLoss, stopMarket, takeProfit, takeHalfProfit,
       entryOrders: bitmex.findOrders(/.+/,entryOrders,ords),
       closeOrders: bitmex.findOrders(/.+/,closeOrders,ords),
       takeProfitOrders: bitmex.findOrders(/.+/,takeProfitOrders,ords),
+    }
+    let foundOrders = trade.entryOrders.concat(trade.closeOrders).concat(trade.takeProfitOrders)
+    trade.otherOrders = ords.filter((e) => {
+      return foundOrders.indexOf(e) < 0
     })
+    trades.push(trade)
   })
   // debugger
   
