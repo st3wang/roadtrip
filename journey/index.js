@@ -520,6 +520,9 @@ async function getTradeJson() { try {
     bitmex.getOrders(sinceTime),
     getTradeSignals(sinceTime)
   ])
+  orders = orders.filter(o => {
+    return o.price != 1
+  })
   var trades = []
   signals.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders}) => {
     trades.push({
