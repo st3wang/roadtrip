@@ -524,11 +524,12 @@ async function getTradeJson() { try {
     return o.stopPx != 1
   })
   var trades = []
-  signals.ords = signals.map(({timestamp},i) => {
-    var startTime = new Date(timestamp).getTime()
-    var endTime = (signals[i+1] ? new Date(signals[i+1].timestamp) : new Date()).getTime()
-    return orders.filter(({ts}) => {
-      let t = new Date(ts).getTime()
+  signals.forEach((signal,i) => {
+    let {timestamp} = signal
+    let startTime = new Date(timestamp).getTime()
+    let endTime = (signals[i+1] ? new Date(signals[i+1].timestamp) : new Date()).getTime()
+    signal.ords = orders.filter(({timestamp}) => {
+      let t = new Date(timestamp).getTime()
       return (t >= startTime && t <= endTime)
     })
   })
