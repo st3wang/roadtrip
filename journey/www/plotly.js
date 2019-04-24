@@ -15,15 +15,15 @@ function getShape(startTime,endTime,startPrice,endPrice) {
   }
 }
 
-function getAnnotation({timestamp,price,stopPx,ordStatus},arrowColor) {
+function getAnnotation({timestamp,price,stopPx,ordStatus,orderQty},arrowColor) {
   return {
     x: timestamp,
     y: (price||stopPx),
-    ax: -30,
+    ax: -40,
     ay: -0,
     xref: 'x',
     yref: 'y',
-    text: ''+(price||stopPx),
+    text: (orderQty||'')+'x'+(price||stopPx),
     font: {color: arrowColor},
     showarrow: true,
     arrowwidth: 5,
@@ -57,7 +57,7 @@ async function init() {
   var shapes = []
 
   trade.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders}) => {
-    var endTime = new Date(new Date(timestamp).getTime() + 360000).toISOString()
+    var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
     var arrowColor
     if (type == 'LONG') {
       shapes.push(getShape(timestamp,endTime,entryPrice,takeProfit))
@@ -73,6 +73,9 @@ async function init() {
       annotations.push(getAnnotation(o,arrowColor))
     })
     closeOrders.forEach((o) => {
+      annotations.push(getAnnotation(o,arrowColor))
+    })
+    takeProfitOrders.forEach((o) => {
       annotations.push(getAnnotation(o,arrowColor))
     })
   })
