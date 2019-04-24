@@ -15,7 +15,7 @@ if (setup.candle.interval >= 5) {
 }
 
 var ws
-var lastInstrument = {}, lastPosition = {}, lastOrders = [], lastXBTUSDInstrument = {}
+var lastMargin = {}, lastInstrument = {}, lastPosition = {}, lastOrders = [], lastXBTUSDInstrument = {}
 var lastBid, lastAsk, lastQty, lastRates = {}
 
 var currentCandle, currentCandleTimeOffset
@@ -145,7 +145,7 @@ async function connect() { try {
   ws.on('close', () => console.log('Connection closed.'));
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
 
-  await wsAddStream(symbol,'wallet',handleWallet)
+  await wsAddStream(symbol,'margin',handleMargin)
   await wsAddStream(symbol,'order',handleOrder)
   await wsAddStream(symbol,'position',handlePosition)
   await wsAddStream(symbol,'instrument',handleInstrument)
@@ -182,12 +182,12 @@ async function pruneOrders(orders) { try {
   return prunedCanceledOrder
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function handleWallet(data) { try {
-  lastWallet = data[0]
-  checkPositionParams.walletBalance = lastWallet.amount
+async function handleMargin(data) { try {
+  lastMargin = data[0]
+  // checkPositionParams.walletBalance = lastWallet.amount
   // checkPositionParams.availableMargin = lastMargin.availableMargin
   // checkPositionParams.marginBalance = lastMargin.marginBalance
-  // checkPositionParams.walletBalance = lastMargin.walletBalance
+  checkPositionParams.walletBalance = lastMargin.walletBalance
   // console.log(checkPositionParams.availableMargin, checkPositionParams.marginBalance, checkPositionParams.walletBalance)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
