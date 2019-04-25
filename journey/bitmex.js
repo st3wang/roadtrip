@@ -583,9 +583,9 @@ async function getOrders(startTime) { try {
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType,execInst,cumQty'
   })
   let orders = JSON.parse(response.data)
-  orders = orders.filter(order => {
-    return (order.ordStatus != 'Canceled' && order.ordType != 'Funding')
-  })
+  // orders = orders.filter(order => {
+  //   return (order.ordStatus != 'Canceled' && order.ordType != 'Funding')
+  // })
   return orders
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
