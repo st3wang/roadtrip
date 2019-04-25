@@ -19,14 +19,15 @@ function getAnnotation({timestamp,price,stopPx,ordStatus,orderQty},arrowColor) {
   return {
     x: timestamp,
     y: (price||stopPx),
-    ax: -40,
+    ax: -12,
     ay: -0,
     xref: 'x',
     yref: 'y',
+    xanchor: 'right',
     text: (orderQty||'')+'x'+(price||stopPx),
     font: {color: arrowColor},
     showarrow: true,
-    arrowwidth: 5,
+    arrowwidth: 4,
     arrowsize: 0.5,
     arrowcolor: arrowColor,
     opacity: ordStatus == 'Filled' ? 1 : 0.5
@@ -41,6 +42,7 @@ async function init() {
     type: 'candlestick',
     xaxis: 'x',
     yaxis: 'y',
+    hoverinfo: 'x',
     increasing: {line: {color:'#53B987', width:1}, fillcolor:'#53B987'},
     decreasing: {line: {color:'#EB4D5C', width:1}, fillcolor:'#EB4D5C'},
     x: market.candles.map(c => {return c.time}),
@@ -107,6 +109,7 @@ async function init() {
       l: 60
     },
     font: {
+      size: 8,
       color: '#888'
     },
     showlegend: false,
@@ -115,7 +118,6 @@ async function init() {
       rangeslider: {visible: false},
       title: 'Date',
       type: 'date',
-
       gridcolor: '#333',
       spikemode: 'across+marker',
       spikecolor: '#888',
@@ -126,7 +128,6 @@ async function init() {
     yaxis: {
       autorange: true,
       type: 'linear',
-
       gridcolor: '#333',
       spikemode: 'across+marker',
       spikecolor: '#888',
