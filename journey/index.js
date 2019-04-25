@@ -530,7 +530,7 @@ async function getTradeJson() { try {
     let endTime = (signals[i+1] ? new Date(signals[i+1].timestamp) : new Date()).getTime()
     signal.ords = orders.filter(({timestamp}) => {
       let t = new Date(timestamp).getTime()
-      return (t >= startTime && t <= endTime)
+      return (t >= startTime && t < endTime)
     })
   })
   signals.forEach(({ords,timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders},i) => {
