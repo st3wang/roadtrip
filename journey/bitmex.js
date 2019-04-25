@@ -580,7 +580,7 @@ async function getOrders(startTime) { try {
   let response = await client.Order.Order_getOrders({symbol: symbol,
     startTime: new Date(startTime).toISOString(),
     // filter: '{"ordType":"Limit"}',
-    columns: 'price,orderQty,ordStatus,side,stopPx,ordType,execInst,cumQty'
+    columns: 'price,orderQty,ordStatus,side,stopPx,ordType,execInst,cumQty,transactTime'
   })
   let orders = JSON.parse(response.data)
   // orders = orders.filter(order => {

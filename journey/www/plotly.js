@@ -15,9 +15,10 @@ function getShape(startTime,endTime,startPrice,endPrice) {
   }
 }
 
-function getAnnotation({timestamp,price,stopPx,ordStatus,orderQty},arrowColor) {
+function getAnnotation({timestamp,transactTime,price,stopPx,ordStatus,orderQty},arrowColor) {
+  console.log(timestamp,transactTime)
   return {
-    x: timestamp,
+    x: transactTime,
     y: (price||stopPx),
     ax: -12,
     ay: -0,
