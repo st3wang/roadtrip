@@ -10,7 +10,7 @@ const path = require('path')
 const shoes = require('./shoes')
 global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 
-// const l = require('./logger')
+// const bitmexdata = require('./bitmexdata')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
 const server = require('./server')
@@ -23,8 +23,6 @@ global.bitmex = bitmex
 const entrySignalFilePath = global.logDir + '/entry_signal.json'
 const entrySignalTableFilePath = global.logDir + '/entry_signal_table.log'
 
-var lastCheckPositionTime = new Date().getTime()
-
 const colorizer = winston.format.colorize()
 
 const isoTimestamp = winston.format((info, opts) => {
@@ -32,6 +30,11 @@ const isoTimestamp = winston.format((info, opts) => {
   return info;
 })
 
+function getTimeNow() {
+  return new Date().getTime()
+}
+
+var lastCheckPositionTime = getTimeNow()
 
 function conditionColor(condition) {
   return (condition == 'LONG' ? '\x1b[36m' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
@@ -69,7 +72,7 @@ const logger = winston.createLogger({
                 lastPriceString = lastPrice.toFixed(1)
               }
               lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34;1m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
-              let now = new Date().getTime()
+              let now = getTimeNow()
               let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / oneCandleMS)
               candlesInTrade = (candlesInTrade >= setup.candle.inTradeMax || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
               let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/oneCandleMS)
@@ -156,7 +159,7 @@ var fundingWindowTime = setup.candle.fundingWindow*setup.candle.interval*60000
 function isFundingWindow(fundingTimestamp) {
   var fundingTime = new Date(fundingTimestamp).getTime()
   var checkFundingPositionTime = fundingTime - fundingWindowTime //1800000
-  var now = new Date().getTime()
+  var now = getTimeNow()
   return (now > checkFundingPositionTime)
 }
 
@@ -165,7 +168,7 @@ var cutOffTimeForLargeTrade = 59*60000
 
 function isInPositionForTooLong(signal) {
   if (signal) {
-    var time = new Date().getTime()
+    var time = getTimeNow()
     var entryTime = new Date(signal.timestamp).getTime()
     var delta = time-entryTime
     return (delta > cutOffTimeForAll)
@@ -232,14 +235,6 @@ function exitTooLong({positionSize,signal}) {
   if (positionSize != 0 && isInPositionForTooLong(signal)) {
     return {reason:'toolong'}
   }
-  // var exit
-  // if (positionSize > 0) {
-  //   if (isInPositionForTooLong(signal)) exit = {price:ask,reason:'toolong'}
-  // }
-  // else if (positionSize < 0) {
-  //   if (isInPositionForTooLong(signal)) exit = {price:bid,reason:'toolong'}
-  // }
-  // return exit
 }
 
 function exitFunding({positionSize,fundingTimestamp,fundingRate,signal}) {
@@ -247,14 +242,6 @@ function exitFunding({positionSize,fundingTimestamp,fundingRate,signal}) {
   if (fee.isLarge && isFundingWindow(fundingTimestamp)) {
     return {reason:'funding',pay:fee.pay,risk:signal.riskAmountUSD}
   }
-
-  // if (positionSize > 0 && fundingRate > 0) {
-  //   if (isFundingWindow(fundingTimestamp)) exit = {price:ask,reason:'funding'}
-  // } 
-  // else if (positionSize < 0 && fundingRate < 0) {
-  //   if (isFundingWindow(fundingTimestamp)) exit = {price:bid,reason:'funding'}
-  // }
-  // return exit
 }
 
 function exitTarget({positionSize,bid,ask,signal}) {
@@ -348,8 +335,6 @@ async function checkEntry(params) { try {
       if (response.status == 200) {
         entrySignalTable.info('entry',enter.signal)
         fs.writeFileSync(entrySignalFilePath,JSON.stringify(enter.signal,null,2),writeFileOptions)
-        // log.writeEntrySignal(entrySignal) // current trade
-        // log.writeOrderSignal(setup.bankroll,entrySignal) // trade
         entrySignal = enter.signal
         entrySignal.entryOrders = entryOrders
         entrySignal.closeOrders = closeOrders
@@ -370,7 +355,6 @@ async function checkExit(params) { try {
     let exitOrders = [{
       price: (positionSize < 0 ? bid : ask),
       side: (positionSize < 0 ? 'Buy' : 'Sell'),
-      // orderQty: -positionSize,
       ordType: 'Limit',
       execInst: 'Close,ParticipateDoNotInitiate'
     }]
@@ -425,7 +409,7 @@ async function checkPosition(params) { try {
     return
   }
   checking = true
-  lastCheckPositionTime = new Date().getTime()
+  lastCheckPositionTime = getTimeNow()
 
   await checkExit(params)
   await checkEntry(params)
@@ -438,7 +422,7 @@ async function checkPosition(params) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function next() { try {
-  var now = new Date().getTime()
+  var now = getTimeNow()
   if (now-lastCheckPositionTime > 2500) {
     bitmex.checkPositionParams.caller = 'interval'
     bitmex.checkPositionParams.signal = entrySignal
@@ -465,24 +449,6 @@ function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
   return order.timestamp+','+
     execution+'-'+side+'-'+status+','+
     (order.price||order.stopPx)+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
-}
-
-async function findEntrySignal({timestamp,price,orderQty,side}) {
-  // signals.forEach(signal => {
-  //   let signalTime = new Date(signal[0]).getTime()
-  //   let signalPrice = parseFloat(signal[5])
-  //   if (time >= signalTime && time <= (signalTime+2*60*60000) && signalPrice <= price+2 && signalPrice >= price-2 && signal[15] == ''+sizeUSD) {
-  //     found = {
-  //       timestamp: signal[0],
-  //       price: price,
-  //       size: sizeUSD,
-  //       stopLoss: signal[6],
-  //       takeProfit: signal[7],
-  //       stopMarket: signal[8]
-  //     }
-  //   }
-  // })
-  // return found
 }
 
 async function getTradeSignals(sinceTime) { try {
@@ -515,7 +481,7 @@ async function getTradeSignals(sinceTime) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getTradeJson() { try {
-  var sinceTime = new Date().getTime() - (candleLengthMS)
+  var sinceTime = getTimeNow() - (candleLengthMS)
   var [orders,signals] = await Promise.all([
     bitmex.getOrders(sinceTime),
     getTradeSignals(sinceTime)
@@ -547,36 +513,8 @@ async function getTradeJson() { try {
     })
     trades.push(trade)
   })
-  // debugger
   
   return JSON.stringify({trades:trades,orders:orders})
-} catch(e) {logger.error(e.stack||e);debugger} }
-
-async function getTradeCsv() { try {
-  var yesterday = new Date().getTime() - (candleLengthMS)
-  var orders = await bitmex.getOrders(yesterday)
-  var csv = 'Date,Type,Price,Quantity,StopLoss,TakeProfit,StopMarket\n'
-  for (var i = 0; i < orders.length; i++) {
-    var entryOrder = orders[i]
-    var signal = findEntrySignal(entryOrder)
-    var stopLoss = 0
-    var takeProfit = 0 
-    var stopMarket = 0 
-    if (signal) {
-      stopLoss = signal.stopLoss
-      takeProfit = signal.takeProfit
-      stopMarket = signal.stopMarket
-    }
-    csv += getOrderCsv(entryOrder,'ENTER',stopLoss,takeProfit,stopMarket)
-
-    var exitOrder = orders[i+1]
-    while (exitOrder && exitOrder.orderQty === entryOrder.orderQty && exitOrder.side !== entryOrder.side) {
-      csv += getOrderCsv(exitOrder,'EXIT',stopLoss,takeProfit,stopMarket)
-      i++
-      exitOrder = orders[i+1]
-    }
-  }
-  return csv
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getFundingCsv() { try {
@@ -590,7 +528,7 @@ async function getFundingCsv() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function createInterval(candleDelay) {
-  var now = new Date().getTime()
+  var now = getTimeNow()
   var interval = setup.candle.interval*60000
   var startsIn = ((interval*2)-now%(interval) + candleDelay) % interval
   var startsInSec = startsIn % 60000
@@ -673,10 +611,6 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
 }
 
 async function start() { try {
-  // var rsi1 = await strategy.getRsi([4000,4001,4002,4003,4004,4005,4006,4010,4011,4010],2)
-  // var rsi2 = await strategy.getRsi([4000,4001,4002,4003,4004,4005,4006,4010,4011,4009],2)
-  // debugger
-  // await log.init()
   var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)
   entrySignal = JSON.parse(entrySignalString)
   
@@ -686,12 +620,8 @@ async function start() { try {
   entrySignal.takeProfitOrders = takeProfitOrders
 
   await bitmex.init(checkPositionCallback)
-  // var trade = await getTradeJson()
-  // debugger
   await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
-
-/*
   next()
   // createInterval(-5000*2**6)
   // createInterval(-5000*2**5)
@@ -708,7 +638,6 @@ async function start() { try {
   // createInterval(5000*2**4)
   // createInterval(5000*2**5)
   // createInterval(5000*2**6)
-  */
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 start()

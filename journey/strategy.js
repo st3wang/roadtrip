@@ -6,6 +6,10 @@ const shoes = require('./shoes')
 
 var roundPriceFactor
 
+function getTimeNow() {
+  return new Date().getTime()
+}
+
 async function getRsi(data,length) {
   var result = await talibExecute({
     name: "RSI",
@@ -105,7 +109,7 @@ function roundPrice(p) {
 }
 
 async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
-  var timestamp = new Date().toISOString()
+  var timestamp = new Date(getTimeNow()).toISOString()
   var signalCondition = signal.condition
   
   var lastIndex = market.closes.length - 1

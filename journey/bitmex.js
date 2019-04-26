@@ -22,6 +22,10 @@ var currentCandle, currentCandleTimeOffset
 
 const colorizer = winston.format.colorize();
 
+function getTimeNow() {
+  return new Date().getTime()
+}
+
 const isoTimestamp = winston.format((info, opts) => {
   info.timestamp = new Date().toISOString()
   return info;
@@ -161,7 +165,7 @@ async function connect() { try {
 
 async function pruneOrders(orders) { try {
   var found, pruned
-  var yesterday = new Date().getTime() - 14400000
+  var yesterday = getTimeNow() - 14400000
   var prunedCanceledOrder = false
   do {
     found = orders.findIndex(order => {
@@ -276,11 +280,11 @@ async function appendCandleLastPrice() {
 }
 
 function getCandleTimeOffset() {
-  return ((new Date().getTime()) % oneCandleMS)
+  return ((getTimeNow()) % oneCandleMS)
 }
 
 function startNextCandle() {
-  var now = new Date().getTime()
+  var now = getTimeNow()
   var candleTimeOffset = now % oneCandleMS
   var currentCandleTime = now - candleTimeOffset
   var currentCandleISOString = new Date(currentCandleTime).toISOString()
@@ -390,8 +394,7 @@ function inspect(client) {
 }
 
 function getPageTimes(interval,length,binSize) {
-  var current = new Date()
-  var currentMS = current.getTime()
+  var currentMS = getTimeNow()
   var offset = (length * interval * 60000) + (currentMS % (interval * 60000))
   var bitMexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
   offset -= bitMexOffset
@@ -443,7 +446,7 @@ function toCandle(group) {
 
 async function getCurrentTradeBucketed(interval) { try {
   interval = interval || 15
-  let now = new Date().getTime()
+  let now = getTimeNow()
   let candleTimeOffset = now % (interval*60000)
   let startTime = new Date(now - candleTimeOffset + 60000).toISOString()
   let response = await client.Trade.Trade_getBucketed({symbol:symbol, binSize:'1m', 
@@ -539,7 +542,7 @@ async function getMarketWithCurrentCandle() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getTradeHistory(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (candleLengthMS))
+  startTime = startTime || (getTimeNow() - (candleLengthMS))
   let response = await client.Execution.Execution_getTradeHistory({symbol: symbol,
     startTime: new Date(startTime).toISOString(),
     columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
@@ -552,7 +555,7 @@ async function getTradeHistory(startTime) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getFundingHistory(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (candleLengthMS))
+  startTime = startTime || (getTimeNow() - (candleLengthMS))
   let response = await client.Funding.Funding_get({symbol: symbol,
     startTime: new Date(startTime).toISOString()
   })
@@ -565,7 +568,7 @@ async function getFundingHistory(startTime) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getNewOrders(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (candleLengthMS))
+  startTime = startTime || (getTimeNow() - (candleLengthMS))
   let response = await client.Order.Order_getOrders({symbol: symbol,
     startTime: new Date(startTime).toISOString(),
     filter: '{"ordStatus":"New"}',
@@ -576,7 +579,7 @@ async function getNewOrders(startTime) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getOrders(startTime) { try {
-  startTime = startTime || (new Date().getTime() - (candleLengthMS))
+  startTime = startTime || (getTimeNow() - (candleLengthMS))
   let response = await client.Order.Order_getOrders({symbol: symbol,
     startTime: new Date(startTime).toISOString(),
     // filter: '{"ordType":"Limit"}',
