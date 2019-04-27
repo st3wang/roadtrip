@@ -7,6 +7,9 @@ const {symbol,account,setup} = shoes
 const oneCandleMS = setup.candle.interval*60000
 const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
+var mock
+if (shoes.mock) mock = require('./mock.js')
+
 var client, checkPositionCallback, checkPositionParams = {}
 var marketCache, marketWithCurrentCandleCache
 var binSize = 1
@@ -1006,6 +1009,10 @@ async function initOrders() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init(checkPositionCb) { try {
+  if (mock) {
+    getTimeNow = mock.getTimeNow
+  }
+
   checkPositionCallback = checkPositionCb
   client = await authorize()
   // inspect(client.apis)

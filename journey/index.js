@@ -10,6 +10,9 @@ const path = require('path')
 const shoes = require('./shoes')
 global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 
+var mock
+if (shoes.mock) mock = require('./mock.js')
+
 // const bitmexdata = require('./bitmexdata')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
@@ -610,7 +613,11 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
   return {entryOrders:entryOrders,closeOrders:closeOrders,takeProfitOrders:takeProfitOrders}
 }
 
-async function start() { try {
+async function init() { try {
+  if (mock) {
+    getTimeNow = mock.getTimeNow
+  }
+
   var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)
   entrySignal = JSON.parse(entrySignalString)
   
@@ -640,4 +647,4 @@ async function start() { try {
   // createInterval(5000*2**6)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-start()
+init()
