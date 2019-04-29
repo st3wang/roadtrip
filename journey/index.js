@@ -616,6 +616,8 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
 async function init() { try {
   if (mock) {
     getTimeNow = mock.getTimeNow
+    next = mock.next
+    createInterval = mock.createInterval
   }
 
   var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)

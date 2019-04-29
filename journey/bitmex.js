@@ -810,7 +810,7 @@ async function orderNewBulk(orders) { try {
     return absQtyBTC < setup.bankroll.minOrderSizeBTC
   })
   if (orderTooSmall) {
-    return ({status:400})
+    return ({status:400,message:'orderTooSmall'})
   }
   var response = await client.Order.Order_newBulk({orders:JSON.stringify(orders)})
   .catch(function(e) {
@@ -1011,6 +1011,11 @@ async function initOrders() { try {
 async function init(checkPositionCb) { try {
   if (mock) {
     getTimeNow = mock.getTimeNow
+    authorize = mock.authorize
+    initMarket = mock.initMarket
+    initOrders = mock.initOrders
+    updateLeverage = mock.updateLeverage
+    connect = mock.connect
   }
 
   checkPositionCallback = checkPositionCb
@@ -1019,17 +1024,7 @@ async function init(checkPositionCb) { try {
   await initMarket()
   await initOrders()
   await updateLeverage(0) // cross margin
-
   await connect()
-
-  // await getTradeHistory()
-
-
-  // await getOrderBook()
-
-  // await getFundingHistory(yesterday)
-  // await getInstrument()
-  // await getOrders(yesterday)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 module.exports = {
