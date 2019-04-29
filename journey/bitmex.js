@@ -898,9 +898,6 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
             return (price == p && orderQty >= (q*0.98) && orderQty <= (q*1.02))
           })
         }
-        case 'Close,ParticipateDoNotInitiate':
-          // Target Stop Limit
-          return true
         default:{
           // Exit Target 
           return orders.find(({price, orderQty}) => {
