@@ -13,7 +13,6 @@ global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 var mock
 if (shoes.mock) mock = require('./mock.js')
 
-// const bitmexdata = require('./bitmexdata')
 const bitmex = require('./bitmex')
 const strategy = require('./strategy')
 const server = require('./server')

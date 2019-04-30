@@ -156,10 +156,7 @@ async function connect() { try {
   await wsAddStream(symbol,'order',handleOrder)
   await wsAddStream(symbol,'position',handlePosition)
   await wsAddStream(symbol,'instrument',handleInstrument)
-  if (symbol == 'XBTUSD') {
-    lastCoinPairRate = 1
-  }
-  else {
+  if (symbol != 'XBTUSD') {
     await wsAddStream('XBTUSD','instrument',handleXBTUSDInstrument)
   }
 
@@ -1009,10 +1006,13 @@ async function init(checkPositionCb) { try {
   if (mock) {
     getTimeNow = mock.getTimeNow
     authorize = mock.authorize
-    initMarket = mock.initMarket
+    getTradeBucketed = mock.getTradeBucketed
+    getCurrentTradeBucketed = mock.getCurrentTradeBucketed
     initOrders = mock.initOrders
     updateLeverage = mock.updateLeverage
     connect = mock.connect
+    cancelAll = mock.cancelAll
+    orderNewBulk = mock.orderNewBulk
   }
 
   checkPositionCallback = checkPositionCb
@@ -1021,7 +1021,7 @@ async function init(checkPositionCb) { try {
   await initMarket()
   await initOrders()
   await updateLeverage(0) // cross margin
-  await connect()
+  await connect(handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 module.exports = {
