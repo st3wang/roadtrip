@@ -161,10 +161,14 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
 
   stopMarketDistance = roundPrice(lossDistance * stopMarketFactor)
-  stopMarket = roundPrice(entryPrice + stopMarketDistance)
   profitDistance = roundPrice(-lossDistance * profitFactor)
-  takeProfit = roundPrice(entryPrice + profitDistance)
   halfProfitDistance = roundPrice(-lossDistance * halfProfitFactor)
+  if (profitDistance == halfProfitDistance) {
+    profitDistance += tick*side
+  }
+
+  stopMarket = roundPrice(entryPrice + stopMarketDistance)
+  takeProfit = roundPrice(entryPrice + profitDistance)
   takeHalfProfit = roundPrice(entryPrice + halfProfitDistance)
 
   stopLossTrigger = entryPrice + (lossDistance/2)
