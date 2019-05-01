@@ -898,7 +898,9 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
         case 'Close,ParticipateDoNotInitiate': {
           // Close toolong or funding
           // The close orderQty was sent as null. Bitmex server filled it as available position qty.
-          return orders[0]
+          return orders.find(({price}) => {
+            return (price == p)
+          })
         }
         default:{
           // Exit Target 
