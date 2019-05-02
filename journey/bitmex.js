@@ -801,12 +801,19 @@ async function orderBulk(orders) { try {
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function orderNewBulk(orders) { try {
-  var orderTooSmall = orders.find(o => {
-    let absQtyBTC = Math.abs(o.orderQty/getRate('XBTUSD'))
-    return absQtyBTC < setup.bankroll.minOrderSizeBTC
+function getOrderQtyBTC(order) {
+  return Math.abs(order.orderQty/getRate('XBTUSD'))
+}
+
+function ordersTooSmall(orders){
+  return orders.filter(o => {
+    return getOrderQtyBTC(o) < setup.bankroll.minOrderSizeBTC
   })
-  if (orderTooSmall) {
+}
+
+async function orderNewBulk(orders) { try {
+  var tooSmall = ordersTooSmall(orders)
+  if (tooSmall.length > 0) {
     return ({status:400,message:'orderTooSmall'})
   }
   var response = await client.Order.Order_newBulk({orders:JSON.stringify(orders)})
@@ -1054,6 +1061,7 @@ module.exports = {
   // findNewOrFilledOrders: findNewOrFilledOrders,
   findOrders: findOrders,
   getCumQty: getCumQty,
+  ordersTooSmall: ordersTooSmall,
 
   getCandleTimeOffset: getCandleTimeOffset,
 
