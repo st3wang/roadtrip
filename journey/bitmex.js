@@ -30,7 +30,7 @@ function getTimeNow() {
 }
 
 const isoTimestamp = winston.format((info, opts) => {
-  info.timestamp = new Date().toISOString()
+  info.timestamp = new Date(getTimeNow()).toISOString()
   return info;
 });
 
@@ -1010,18 +1010,6 @@ async function initOrders() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init(checkPositionCb) { try {
-  if (mock) {
-    getTimeNow = mock.getTimeNow
-    authorize = mock.authorize
-    getTradeBucketed = mock.getTradeBucketed
-    getCurrentTradeBucketed = mock.getCurrentTradeBucketed
-    initOrders = mock.initOrders
-    updateLeverage = mock.updateLeverage
-    connect = mock.connect
-    cancelAll = mock.cancelAll
-    orderNewBulk = mock.orderNewBulk
-  }
-
   checkPositionCallback = checkPositionCb
   client = await authorize()
   // inspect(client.apis)
@@ -1030,6 +1018,21 @@ async function init(checkPositionCb) { try {
   await updateLeverage(0) // cross margin
   await connect(handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument)
 } catch(e) {logger.error(e.stack||e);debugger} }
+
+if (mock) {
+  getTimeNow = mock.getTimeNow
+  authorize = mock.authorize
+  getTradeBucketed = mock.getTradeBucketed
+  getCurrentTradeBucketed = mock.getCurrentTradeBucketed
+  initOrders = mock.initOrders
+  updateLeverage = mock.updateLeverage
+  connect = mock.connect
+  cancelAll = mock.cancelAll
+  orderNewBulk = mock.orderNewBulk
+  orderAmendBulk = mock.orderAmendBulk
+  cancelOrders = mock.cancelOrders
+  getOrders = mock.getOrders
+}
 
 module.exports = {
   init: init,

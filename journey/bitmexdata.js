@@ -236,11 +236,17 @@ async function readTradeDay(time,symbol) {
     var trades = []
     fs.createReadStream(readPath).pipe(csvParse())
       .on('data', ([timestamp,side,size,price]) => {
-        trades.push({
-          time: parseInt(timestamp),
-          side: side,
-          price: parseInt(price)
-        })
+        timestamp = +timestamp
+        price = +price
+        let {time:lastTime=0,price:lastPrice=0} = trades[trades.length-1] || {}
+        let diff = timestamp - lastTime
+        if (diff > 5000 || price != lastPrice) {
+          trades.push({
+            time: timestamp,
+            side: side,
+            price: price
+          })
+        }
       })
       .on('error', e => reject(e))
       .on('end', () => resolve(trades));

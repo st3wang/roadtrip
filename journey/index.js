@@ -28,7 +28,7 @@ const entrySignalTableFilePath = global.logDir + '/entry_signal_table.log'
 const colorizer = winston.format.colorize()
 
 const isoTimestamp = winston.format((info, opts) => {
-  info.timestamp = new Date().toISOString()
+  info.timestamp = new Date(getTimeNow()).toISOString()
   return info;
 })
 
@@ -478,7 +478,13 @@ async function getTradeSignals(sinceTime) { try {
         callback()
       }
     })
-    stream.pipe(outStream);
+    stream.pipe(outStream)
+    stream.on('finish', () => {
+      resolve(signals)
+    })
+    stream.on('end', () => {
+      resolve(signals)
+    })
   })
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -581,13 +587,15 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
     side: exitSide,
     ordType: 'Stop',
     execInst: 'Close,LastPrice'
-  },{
-    price: stopLoss,
-    stopPx: stopLoss + exitPriceOffset,
-    side: exitSide,
-    ordType: 'StopLimit',
-    execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
-  },{
+  },
+  // {
+  //   price: stopLoss,
+  //   stopPx: stopLoss + exitPriceOffset,
+  //   side: exitSide,
+  //   ordType: 'StopLimit',
+  //   execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
+  // },
+  {
     price: takeProfit - exitPriceOffset * 2,
     stopPx: takeProfit - exitPriceOffset,
     side: exitSide,
@@ -627,6 +635,7 @@ async function init() { try {
   entrySignal.closeOrders = closeOrders
   entrySignal.takeProfitOrders = takeProfitOrders
 
+  await strategy.init()
   await bitmex.init(checkPositionCallback)
   await server.init(getMarketJson,getTradeJson,getFundingCsv)
 

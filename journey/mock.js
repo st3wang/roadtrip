@@ -1,11 +1,16 @@
-const shoes = require('./shoes')
 const bitmexdata = require('./bitmexdata')
+const uuid = require('uuid');
+const fs = require('fs')
+
+const shoes = require('./shoes')
+const {symbol,account,setup} = shoes
+const oneCandleMS = setup.candle.interval*60000
+const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
 const winston = require('winston')
-
 const colorizer = winston.format.colorize();
 const isoTimestamp = winston.format((info, opts) => {
-  info.timestamp = new Date().toISOString()
+  info.timestamp = new Date(getTimeNow()).toISOString()
   return info;
 });
 
@@ -62,6 +67,10 @@ function getTimeNow() {
   return timeNow //new Date().getTime()
 }
 
+function getISOTimeNow() {
+  return new Date(timeNow).toISOString()
+}
+
 function authorize() {
 
 }
@@ -94,22 +103,71 @@ function updateLeverage() {
 
 }
 
+var margin = {
+  walletBalance: 100000000
+}
+var orders = []
+var position = {
+  currentQty: 0
+}
 var trades, currentTradeIndex
+
+async function nextMargin() {
+  await handleMargin([margin])
+}
+
+function fillOrder(o) {
+  var {orderQty,side} = o
+  o.cumQty = orderQty 
+  o.ordStatus = 'Filled'
+  return side == 'Buy' ? orderQty : -orderQty
+}
+
+async function nextOrder(lastPrice) {
+  var execOrders = orders.filter(o => {
+    let {ordStatus,ordType,side,orderQty,price,stopPx,execInst} = o
+    if (ordStatus == 'New') {
+      switch(ordType) {
+        case 'Limit':
+          return ((side == 'Buy' && lastPrice < price) || (side == 'Sell' && lastPrice > price))
+        case 'Stop':
+          return ((side == 'Buy' && lastPrice >= stopPx) || (side == 'Sell' && lastPrice <= stopPx))
+      }
+    }
+  })
+  if (execOrders.length) {
+    execOrders.forEach(o => {
+      o.orderQty = o.orderQty || Math.abs(position.currentQty)
+      position.currentQty += fillOrder(o)
+    })
+    await handleOrder(orders)
+    await handlePosition([position])
+  }
+}
+
+async function nextPosition() {
+  await handlePosition([position])
+}
 
 async function nextInstrument() {
   var trade = trades[currentTradeIndex]
   timeNow = trade.time
+  await nextOrder(trade.price)
   await handleInstrument([{
     symbol: shoes.symbol,
-    timestamp: new Date(timeNow).toISOString,
+    timestamp: new Date(timeNow).toISOString(),
     lastPrice: trade.price,
     bidPrice: trade.price,
     askPrice: trade.price
   }])
-  setTimeout(() => {
-    currentTradeIndex++
-    nextInstrument()
-  },0)
+  // if (timeNow < new Date('2019-04-29T12:00:42.620Z').getTime()) {
+    setTimeout(() => {
+      currentTradeIndex++
+      if (currentTradeIndex < trades.length) {
+        nextInstrument()
+      }
+    },0)
+  // }
 }
 
 async function streamInstrument(time) {
@@ -120,15 +178,24 @@ async function streamInstrument(time) {
   },0)
 }
 
-async function connect(hMargin,hOrder,hPosition,hInstrument,hXBTUSDInstrument) {
+async function connect(hMargin,hOrder,hPosition,hInstrument,hXBTUSDInstrument) { try {
   handleMargin = hMargin
   handleOrder = hOrder
   handlePosition = hPosition
   handleInstrument = hInstrument
   handleXBTUSDInstrument = hXBTUSDInstrument
 
+  if (shoes.symbol != 'XBTUSD') {
+    handleXBTUSDInstrument([{
+      symbol: 'XBTUSD',
+      lastPrice: 5000
+    }])
+  }
+  await nextMargin()
+  await nextOrder()
+  await nextPosition()
   await streamInstrument(timeNow)
-}
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 function next() {
 
@@ -142,15 +209,100 @@ async function cancelAll() {
 
 }
 
-async function orderNewBulk() {
+function newOrder({side,orderQty,price,stopPx,ordType,execInst}) {
+  var isoTimeNow = getISOTimeNow()
+  var o = {
+    orderID: uuid.v1(),
+    side: side,
+    orderQty: Math.abs(orderQty),
+    price: price,
+    stopPx: stopPx,
+    ordType: ordType,
+    execInst: execInst,
+    ordStatus: 'New',
+    cumQty: 0,
+    transactTime: isoTimeNow,
+    timestamp: isoTimeNow
+  }
+  orders.push(o)
+  return o
+}
+      // {  
+      //    "orderID":"bf655a67-321f-ba6e-9287-974431526550",
+      //    "side":"Buy",
+      //    "orderQty":33,
+      //    "price":156.15,
+      //    "stopPx":null,
+      //    "ordType":"Limit",
+      //    "execInst":"ParticipateDoNotInitiate",
+      //    "ordStatus":"New",
+      //    "cumQty":0,
+      //    "transactTime":"2019-05-02T13:36:30.327Z",
+      //    "timestamp":"2019-05-02T13:36:30.327Z"
+      // }
+
+async function orderNewBulk(ords) {
+  var newOrders = ords.map(o => {
+    return newOrder(o)
+  })
   return {
     status: 200,
-    obj: []
+    obj: newOrders
   }
+}
+
+async function orderAmendBulk(ords) {
+  var amendOrders = []
+  ords.forEach(o => {
+    let ord = orders.find(ao => {
+      return ao.orderID == o.orderID
+    })
+    if (ord) {
+      ord.orderQty = Math.abs(o.orderQty)
+      amendOrders.push(ord)
+    }
+  })
+  return {
+    status: 200,
+    obj: amendOrders
+  }
+}
+
+async function cancelOrders(ords) {
+  var cancelOrders = []
+  ords.forEach(o => {
+    let ord = orders.find(ao => {
+      return ao.orderID == o.orderID
+    })
+    if (ord) {
+      ord.ordStatus = 'Canceled'
+      cancelOrders.push(ord)
+    }
+  })
+  return {
+    status: 200,
+    obj: cancelOrders
+  }
+}
+
+async function getOrders(startTime) {
+  startTime = startTime || (getTimeNow() - (candleLengthMS))
+
+  return orders.filter(({timestamp}) => {
+    return (new Date(timestamp).getTime() >= startTime)
+  })
 }
 
 function init() {
   timeNow = new Date(shoes.mock.startTime).getTime()
+  try {
+    fs.unlinkSync(global.logDir+'/combined.log')
+    fs.unlinkSync(global.logDir+'/entry_signal_table.log')
+    fs.unlinkSync(global.logDir+'/warn.log')
+  }
+  catch(e) {
+
+  }
 }
 
 module.exports = {
@@ -164,6 +316,10 @@ module.exports = {
 
   cancelAll: cancelAll,
   orderNewBulk: orderNewBulk,
+  orderAmendBulk: orderAmendBulk,
+  cancelOrders: cancelOrders,
+
+  getOrders: getOrders,
 
   next: next,
   createInterval: createInterval,

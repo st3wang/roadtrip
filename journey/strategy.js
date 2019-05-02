@@ -4,6 +4,9 @@ const talibExecute = util.promisify(talib.execute)
 const bitmex = require('./bitmex')
 const shoes = require('./shoes')
 
+var mock
+if (shoes.mock) mock = require('./mock.js')
+
 var roundPriceFactor
 
 function getTimeNow() {
@@ -131,10 +134,10 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   minOrderSizeBTC /= coinPairRate
 
   // Test
-  if (shoes.test ) {
-    if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
-    else if (signalCondition == 'L') signalCondition = 'LONG'
-  }
+  // if (shoes.test ) {
+  //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
+  //   else if (signalCondition == 'L') signalCondition = 'LONG'
+  // }
 
   switch(signalCondition) {
     case 'SHORT':
@@ -255,7 +258,14 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function init() {
+  if (mock) {
+    getTimeNow = mock.getTimeNow
+  }
+}
+
 module.exports = {
+  init: init,
   getSignal: getSignal,
   getOrderSignal: getOrderSignal,
   getRsi: getRsi
