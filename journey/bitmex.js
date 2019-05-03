@@ -268,6 +268,10 @@ async function handleXBTUSDInstrument(data) {
   lastRates[lastCoinPairInstrument.symbol] = lastCoinPairInstrument.lastPrice
 }
 
+async function handleInterval() {
+  checkPositionCallback(checkPositionParams)
+}
+
 async function appendCandleLastPrice() {
   var candleTimeOffset = getCandleTimeOffset()
   if (candleTimeOffset >= currentCandleTimeOffset) {
@@ -1023,7 +1027,7 @@ async function init(checkPositionCb) { try {
   await initMarket()
   await initOrders()
   await updateLeverage(0) // cross margin
-  await connect(handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument)
+  await connect(handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 if (mock) {

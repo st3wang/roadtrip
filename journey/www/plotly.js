@@ -16,7 +16,6 @@ function getShape(startTime,endTime,startPrice,endPrice) {
 }
 
 function getAnnotation({timestamp,transactTime,price,stopPx,ordStatus,orderQty},arrowColor) {
-  console.log(timestamp,transactTime)
   return {
     x: transactTime,
     y: (price||stopPx),
@@ -38,7 +37,8 @@ function getAnnotation({timestamp,transactTime,price,stopPx,ordStatus,orderQty},
 async function init() {
   var marketResponse = await fetch('market.json')
   var market = await marketResponse.json()
-
+  var lastCandleDate = new Date(market.candles[market.candles.length-1].time)
+  var lastCandleTime = lastCandleDate.getTime() + (lastCandleDate.getTimezoneOffset()*60000)
   var marketTrace = {
     type: 'candlestick',
     xaxis: 'x',
@@ -66,14 +66,26 @@ async function init() {
   trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders,otherOrders}) => {
 //     var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
     var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders).concat(otherOrders)
-    var endTime = allOrders.reduce((a,c) => {
-      return (new Date(c.timestamp).getTime() > new Date(a).getTime()) ? c.timestamp : a
-    },timestamp)
-    if (endTime == timestamp) {
-      var endTime = new Date(new Date(timestamp).getTime() + 600000).toISOString()
+    var closeOrders = allOrders.filter(({ordStatus,execInst}) => {
+      return execInst != 'ParticipateDoNotInitiate' && ordStatus == 'Filled'
+    })
+    var endTime
+    if (closeOrders.length == 0) {
+      endTime =  lastCandleTime 
     }
+    else {
+      endTime = allOrders.reduce((a,c) => {
+        return (new Date(c.timestamp).getTime() > new Date(a).getTime()) ? c.timestamp : a
+      },timestamp)
+      if (endTime == timestamp) {
+        endTime = new Date(new Date(timestamp).getTime() + 600000).toISOString()
+      }
+    }
+
+    console.log(new Date(endTime).toISOString())
+    
+
     var arrowColor
-    console.log('endTime',endTime)
     if (type == 'LONG') {
       shapes.push(getShape(timestamp,endTime,entryPrice,takeProfit))
       shapes.push(getShape(timestamp,endTime,entryPrice,stopLoss))

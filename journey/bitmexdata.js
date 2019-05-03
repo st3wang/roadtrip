@@ -213,12 +213,15 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
+const msPerDay = 24*60*60000
+
 async function getTradeBucketed(interval,startTime,endTime,symbol) {
   var readPath = getCandleFile(interval,ymdHelper.YYYYMMDD(startTime),symbol)
   var str = fs.readFileSync(readPath,readFileOptions)
   var dayMarket = JSON.parse(str)
-  var startIndex = startTime%(24*60*60)/60
-  var endIndex = endTime%(24*60*60)/60 + dayMarket.candles.length
+  var startIndex = startTime%(msPerDay)/60000
+  var endIndex = endTime%(msPerDay)/60000
+  if (endIndex == 0) endIndex = dayMarket.candles.length
   var market = {
     opens: dayMarket.opens.slice(startIndex,endIndex),
     highs: dayMarket.highs.slice(startIndex,endIndex),
@@ -229,7 +232,10 @@ async function getTradeBucketed(interval,startTime,endTime,symbol) {
   return market
 }
 
-async function readTradeDay(time,symbol) {
+//04-29 12:58:58.400
+//04-29 12:59:04.145
+
+async function readTradeDay(time,symbol,startTimeMs,endTimeMs) {
   var ymd = ymdHelper.YYYYMMDD(time)
   return new Promise((resolve, reject) => {
     const readPath = getCleanedTradeFile(ymd,symbol)
@@ -237,9 +243,34 @@ async function readTradeDay(time,symbol) {
     fs.createReadStream(readPath).pipe(csvParse())
       .on('data', ([timestamp,side,size,price]) => {
         timestamp = +timestamp
+        if (timestamp < startTimeMs || timestamp > endTimeMs) return
         price = +price
-        let {time:lastTime=0,price:lastPrice=0} = trades[trades.length-1] || {}
+        let {time:lastTime=0,side:lastSide='B',price:lastPrice=0} = trades[trades.length-1] || {}
         let diff = timestamp - lastTime
+        let date = new Date(timestamp)
+        let minutes = date.getMinutes()
+        let lastDate = new Date(lastTime)
+        let lastMinutes = lastDate.getMinutes()
+        if (minutes != lastMinutes) {
+          let insertTimeOffset = 60000 - (lastTime % 60000)
+          let insertTime = lastTime + insertTimeOffset + 100
+          do {
+            let insertDate = new Date(insertTime)
+            // let insertISOString = insertDate.toISOString()
+            let insertMinutes = insertDate.getMinutes()
+            let seconds = date.getSeconds()
+            let milliseconds = date.getMilliseconds()
+            if (insertMinutes < minutes || seconds > 0 || milliseconds > 100 ) {
+              trades.push({
+                time: insertTime,
+                side: lastSide,
+                price: lastPrice,
+                isInterval: true
+              })
+            }
+            insertTime += 60000
+          } while(insertTime < timestamp)
+        }
         if (diff > 5000 || price != lastPrice) {
           trades.push({
             time: timestamp,
