@@ -394,21 +394,24 @@ async function checkExit(params) { try {
     // submit orders if there is any remaining qty
     if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
     if (takeHalfProfitOrder.orderQty != 0) orders.push(takeHalfProfitOrder)
-  
-    var tooSmall = bitmex.ordersTooSmall(orders) 
-    if (tooSmall.length > 0) {
-      if (orders.length > 1) {
-        orders[0].orderQty += orders[1].orderQty
-        orders.pop()
-      }
-      else {
-        logger.info('order tooSmall', orders)
-        return
-      }
-    }
 
     let existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
     if (existingTakeProfitOrders.length != orders.length) {
+      let tooSmall = bitmex.ordersTooSmall(orders) 
+      if (tooSmall.length > 0) {
+        if (orders.length > 1) {
+          orders[0].orderQty += orders[1].orderQty
+          orders.pop()
+          existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
+          if (existingTakeProfitOrders.length == 1) {
+            return
+          }
+        }
+        else {
+          logger.info('order tooSmall', orders)
+          return
+        }
+      }
       await bitmex.order(orders)
     }
   }
