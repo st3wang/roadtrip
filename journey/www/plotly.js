@@ -63,14 +63,14 @@ async function init() {
     annotations.push(getAnnotation(o,'#888'))
   })
 
-  trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders,otherOrders}) => {
+  trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders,otherOrders},i) => {
 //     var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
     var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders).concat(otherOrders)
     var closeOrders = allOrders.filter(({ordStatus,execInst}) => {
       return execInst != 'ParticipateDoNotInitiate' && ordStatus == 'Filled'
     })
     var endTime
-    if (closeOrders.length == 0) {
+    if (closeOrders.length == 0 && i == trade.trades.length-1) {
       endTime =  lastCandleTime 
     }
     else {
