@@ -39,7 +39,7 @@ function writeCleanedFile(ymd,symbol,output) {
 function downloadTradeDay(ymd) { try {
   return new Promise((resolve, reject) => {
     const request = http.get(shoes.bitmexdata.url + ymd + '.csv.gz', function(response) {
-      const csvFilename = filePath.replace('YYYYMMDD',ymd) //'data/trade/' + ymd + '.csv'
+      const csvFilename = tradeFilePath.replace('YYYYMMDD',ymd) //'data/trade/' + ymd + '.csv'
       const gzFilename = csvFilename + '.gz'
       const ws = fs.createWriteStream(gzFilename);
       response.pipe(ws)
@@ -56,7 +56,7 @@ function downloadTradeDay(ymd) { try {
 
 function readAndParseCleanUp(ymd) {
   return new Promise((resolve, reject) => {
-    const readPath = filePath.replace('YYYYMMDD',ymd)
+    const readPath = tradeFilePath.replace('YYYYMMDD',ymd)
     var trades ={}
     var symbolsString = ''
     symbols.forEach(symbol => {
@@ -245,7 +245,7 @@ async function readTradeDay(time,symbol,startTimeMs,endTimeMs) {
         timestamp = +timestamp
         if (timestamp < startTimeMs || timestamp > endTimeMs) return
         price = +price
-        let {time:lastTime=0,side:lastSide='B',price:lastPrice=0} = trades[trades.length-1] || {}
+        let {time:lastTime=startTimeMs,side:lastSide='B',price:lastPrice=price} = trades[trades.length-1] || {}
         let diff = timestamp - lastTime
         let date = new Date(timestamp)
         let minutes = date.getMinutes()

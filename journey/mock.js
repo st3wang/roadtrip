@@ -109,7 +109,7 @@ function updateLeverage() {
 var margin = {
   walletBalance: 100000000
 }
-var orders = []
+var orders = [], historyOrders = []
 var position = {
   currentQty: 0
 }
@@ -120,7 +120,7 @@ async function nextMargin() {
 }
 
 function fillOrder(o) {
-  var {orderQty,side} = o
+  var {orderQty,side,execInst} = o
   o.cumQty = orderQty 
   o.ordStatus = 'Filled'
   o.transactTime = getISOTimeNow()
@@ -142,8 +142,13 @@ async function nextOrder(lastPrice) {
   })
   if (execOrders.length) {
     execOrders.forEach(o => {
-      o.orderQty = o.orderQty || Math.abs(position.currentQty)
-      position.currentQty += fillOrder(o)
+      if (position.currentQty == 0 && o.execInst.indexOf('ReduceOnly') > 0) {
+        o.ordStatus = 'Canceled'
+      }
+      else {
+        o.orderQty = o.orderQty || Math.abs(position.currentQty)
+        position.currentQty += fillOrder(o)
+      }
     })
     await handleOrder(orders)
     await handlePosition([position])
@@ -215,7 +220,11 @@ function createInterval() {
 }
 
 async function cancelAll() {
-
+  orders.forEach(o => {
+    if (o.ordStatus == 'New') {
+      o.ordStatus = 'Canceled'
+    }
+  })
 }
 
 function newOrder({side,orderQty,price,stopPx,ordType,execInst}) {
@@ -234,6 +243,7 @@ function newOrder({side,orderQty,price,stopPx,ordType,execInst}) {
     timestamp: isoTimeNow
   }
   orders.push(o)
+  historyOrders.push(o)
   return o
 }
 
@@ -284,7 +294,7 @@ async function cancelOrders(ords) {
 async function getOrders(startTime) {
   startTime = startTime || (getTimeNow() - (candleLengthMS))
 
-  return orders.filter(({timestamp}) => {
+  return historyOrders.filter(({timestamp}) => {
     return (new Date(timestamp).getTime() >= startTime)
   })
 }
@@ -325,5 +335,5 @@ module.exports = {
 
 init()
 
-// bitmexdata.downloadTradeData(20190425,20190429)
-// bitmexdata.generateCandleDayFiles(20190425,20190429,1)
+// bitmexdata.downloadTradeData(20190430,20190502)
+// bitmexdata.generateCandleDayFiles(20190430,20190502,1)
