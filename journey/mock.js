@@ -64,7 +64,7 @@ const logger = winston.createLogger({
   ]
 })
 
-var timeNow, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
+var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
 
 function getTimeNow() {
   return timeNow //new Date().getTime()
@@ -81,8 +81,34 @@ function authorize() {
 async function getTradeBucketed(interval,length) { try {
   var endTime = getTimeNow()
   var startTime = endTime - (interval*length*60000)
-  // TODO: load more than one day
-  return await bitmexdata.getTradeBucketed(interval,startTime,endTime,shoes.symbol)
+  var startDayTime = startTime - (startTime % oneDayMs) 
+  var endDayTime
+  var marketBuffer = {
+    opens: [],
+    highs: [],
+    lows: [],
+    closes: [],
+    candles: []
+  }
+  for (; startDayTime < startTimeMs; startDayTime += oneDayMs) {
+    endDayTime = startDayTime + oneDayMs - 1
+    let {opens,highs,lows,closes,candles} = await bitmexdata.getTradeBucketed(interval,startDayTime,shoes.symbol)
+    marketBuffer.opens.push(...opens)
+    marketBuffer.highs.push(...highs)
+    marketBuffer.lows.push(...lows)
+    marketBuffer.closes.push(...closes)
+    marketBuffer.candles.push(...candles)
+  }  
+  var startIndex = startTime % (oneDayMs) / 60000
+  var endIndex = startIndex + (endTime - startTime) / 60000
+  var market = {
+    opens: marketBuffer.opens.slice(startIndex,endIndex),
+    highs: marketBuffer.highs.slice(startIndex,endIndex),
+    lows: marketBuffer.lows.slice(startIndex,endIndex),
+    closes: marketBuffer.closes.slice(startIndex,endIndex),
+    candles: marketBuffer.candles.slice(startIndex,endIndex),
+  }
+  return market
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getCurrentTradeBucketed(interval) { try {
@@ -166,6 +192,7 @@ async function readNextDayTrades() { try {
   var startTime, endTime, dayTrades
   // var lastTrade = trades[trades.length-1]
   if (trades.length == 0) {
+    console.time('readNextDayTrades')
     startTime = startTimeMs
   }
   else {
@@ -173,6 +200,7 @@ async function readNextDayTrades() { try {
     startTime = lastTradeTime - (lastTradeTime % oneDayMs) + oneDayMs
   }
   if (startTime > endTimeMs) {
+    console.timeEnd('readNextDayTrades')
     return
   }
   endTime = startTime - (startTime % oneDayMs) + oneDayMs - 1
@@ -180,9 +208,7 @@ async function readNextDayTrades() { try {
     endTime = endTimeMs
   }
   trades = await bitmexdata.readTradeDay(startTime,shoes.symbol)
-  console.log('start', new Date(trades[0].time).toISOString())
-  console.log('end', new Date(trades[trades.length-1].time).toISOString())
-  debugger
+  console.log('readNextDayTrades trades.length', trades.length)
   var filterStartTime = (startTime % oneDayMs) != 0
   var filterEndTime = (endTime % oneDayMs) != oneDayMs - 1
   if (filterStartTime && filterEndTime) {
@@ -194,9 +220,6 @@ async function readNextDayTrades() { try {
   else if (filterEndTime) {
     trades = trades.filter(({time}) => (time <= endTime))
   }
-  console.log('filtered start', new Date(trades[0].time).toISOString())
-  console.log('filtered end', new Date(trades[trades.length-1].time).toISOString())
-  debugger
   return trades
 } catch(e) {logger.error(e.stack||e); debugger} }
 
@@ -211,14 +234,19 @@ async function nextInstrument() { try {
       trade = trades[0]
     }
     else {
-      logger.info('nextInstrument End')
       return
     }
   }
 
   timeNow = trade.time
   if (trade.isInterval) {
-    await handleInterval()
+    await handleInterval([{
+      symbol: shoes.symbol,
+      timestamp: new Date(timeNow).toISOString(),
+      lastPrice: trade.price,
+      bidPrice: trade.price,
+      askPrice: trade.price
+    }])
   }
   else {
     await nextOrder(trade.price)
@@ -234,14 +262,6 @@ async function nextInstrument() { try {
     nextInstrument()
   },0)
 } catch(e) {logger.error(e.stack||e); debugger} }
-
-async function streamInstrument(time) {
-  trades = await bitmexdata.readTradeDay(time,shoes.symbol,startTimeMs,endTimeMs)
-  currentTradeIndex = 0
-  setTimeout(() => {
-    nextInstrument()
-  },0)
-}
 
 async function connect(hInterval,hMargin,hOrder,hPosition,hInstrument,hXBTUSDInstrument) { try {
   handleInterval = hInterval
@@ -351,7 +371,16 @@ async function getOrders(startTime) {
   })
 }
 
-function init() {
+async function updateData() {
+  var start = 20190503
+  var end = 20190505
+  await bitmexdata.downloadTradeData(start,end)
+  await bitmexdata.generateCandleDayFiles(start,end,1)
+}
+
+async function init() {
+  // await updateData()
+  // debugger
   timeNow = startTimeMs
   try {
     fs.unlinkSync(global.logDir+'/combined.log')
@@ -364,6 +393,7 @@ function init() {
 }
 
 module.exports = {
+  init: init,
   getTimeNow: getTimeNow,
   authorize: authorize,
   getTradeBucketed: getTradeBucketed,
@@ -381,11 +411,4 @@ module.exports = {
 
   next: next,
   createInterval: createInterval,
-
-
 }
-
-init()
-
-// bitmexdata.downloadTradeData(20190430,20190502)
-// bitmexdata.generateCandleDayFiles(20190430,20190502,1)

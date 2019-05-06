@@ -28,11 +28,14 @@ function getCandleFile(interval,ymd,symbol) {
   return candleFilePath.replace('YYYYMMDD',interval + '/' + ymd + '_' + symbol)
 }
 
-function writeCleanedFile(ymd,symbol,output) {
-  var writePath = getCleanedTradeFile(ymd,symbol)
-  csvStringify(output, async (err, outputString) => {
-    await writeFile(writePath,outputString,writeFileOptions)
-    console.log('done writing', ymd, symbol)
+async function writeCleanedFile(ymd,symbol,output) {
+  return new Promise((resolve,reject) => {
+    var writePath = getCleanedTradeFile(ymd,symbol)
+    csvStringify(output, async (err, outputString) => {
+      await writeFile(writePath,outputString,writeFileOptions)
+      console.log('done writing', ymd, symbol)
+      resolve()
+    })
   })
 }
 
@@ -88,9 +91,10 @@ async function downloadTradeData(startYmd,endYmd) { try {
       const csvFilename = await downloadTradeDay(ymd)
       const trades = await readAndParseCleanUp(ymd)
       fs.unlink(csvFilename,_=>{})
-      symbols.forEach(symbol => {
-        writeCleanedFile(ymd,symbol,trades[symbol])
+      var writeAll = symbols.map(symbol => {
+        return writeCleanedFile(ymd,symbol,trades[symbol])
       })
+      await Promise.all(writeAll)
     }
     ymd = ymdHelper.nextDay(ymd)
   }
@@ -215,25 +219,12 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
 
 const msPerDay = 24*60*60000
 
-async function getTradeBucketed(interval,startTime,endTime,symbol) {
-  var readPath = getCandleFile(interval,ymdHelper.YYYYMMDD(startTime),symbol)
+async function getTradeBucketed(interval,time,symbol) {
+  var readPath = getCandleFile(interval,ymdHelper.YYYYMMDD(time),symbol)
   var str = fs.readFileSync(readPath,readFileOptions)
   var dayMarket = JSON.parse(str)
-  var startIndex = startTime%(msPerDay)/60000
-  var endIndex = endTime%(msPerDay)/60000
-  if (endIndex == 0) endIndex = dayMarket.candles.length
-  var market = {
-    opens: dayMarket.opens.slice(startIndex,endIndex),
-    highs: dayMarket.highs.slice(startIndex,endIndex),
-    lows: dayMarket.lows.slice(startIndex,endIndex),
-    closes: dayMarket.closes.slice(startIndex,endIndex),
-    candles: dayMarket.candles.slice(startIndex,endIndex),
-  }
-  return market
+  return dayMarket
 }
-
-//04-29 12:58:58.400
-//04-29 12:59:04.145
 
 async function readTradeDay(time,symbol) {
   var ymd = ymdHelper.YYYYMMDD(time)
@@ -243,10 +234,9 @@ async function readTradeDay(time,symbol) {
     fs.createReadStream(readPath).pipe(csvParse())
       .on('data', ([timestamp,side,size,price]) => {
         timestamp = +timestamp
-        // if (timestamp < startTimeMs || timestamp > endTimeMs) return
         price = +price
         let {time:lastTime,side:lastSide,price:lastPrice} = trades[trades.length-1] || {}
-        let diff = timestamp - lastTime
+        // let diff = timestamp - lastTime
         let date = new Date(timestamp)
         let minutes = date.getMinutes()
         if (lastTime) {
@@ -257,13 +247,13 @@ async function readTradeDay(time,symbol) {
             let insertTime = lastTime + insertTimeOffset + 100
             do {
               let insertDate = new Date(insertTime)
-              // let insertISOString = insertDate.toISOString()
               let insertMinutes = insertDate.getMinutes()
               let seconds = date.getSeconds()
               let milliseconds = date.getMilliseconds()
               if (insertMinutes < minutes || seconds > 0 || milliseconds > 100 ) {
                 trades.push({
                   time: insertTime,
+                  // timestamp: new Date(insertTime).toISOString(),
                   side: lastSide,
                   price: lastPrice,
                   isInterval: true
@@ -273,9 +263,12 @@ async function readTradeDay(time,symbol) {
             } while(insertTime < timestamp)
           }
         }
-        if (diff > 5000 || price != lastPrice) {
+        if (
+          // diff > 5000 || 
+          price != lastPrice) {
           trades.push({
             time: timestamp,
+            // timestamp: new Date(timestamp).toISOString(),
             side: side,
             price: price
           })

@@ -286,12 +286,16 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   if (candleTimeOffset >= setup.candle.signalTimeOffsetMax) {
     signals = await getOrderSignalWithCurrentCandle(walletBalance)
     orderSignal = signals.orderSignal
-    logger.debug('enterSignal',signals)
+    if (!mock) {
+      logger.debug('enterSignal',signals)
+    }
   }
   else if (candleTimeOffset <= setup.candle.signalTimeOffsetMin) {
     signals = await getOrderSignal(walletBalance)
     orderSignal = signals.orderSignal
-    logger.debug('enterSignal',signals)
+    if (!mock) {
+      logger.debug('enterSignal',signals)
+    }
   }
 
   if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG') && 
@@ -302,7 +306,9 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
         logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
     }
     else {
-      logger.info('enterSignal',signals)
+      if (!mock) {
+        logger.info('enterSignal',signals)
+      }
       enter = {type:'Limit',price:orderSignal.entryPrice,size:orderSignal.positionSize,execInst:'ParticipateDoNotInitiate',signal:orderSignal}
     }
   }
@@ -420,7 +426,9 @@ async function checkExit(params) { try {
 var checking = false, recheckWhenDone = false
 
 async function checkPosition(params) { try {
-  logger.info('checkPosition',params)
+  if (!mock) {
+    logger.info('checkPosition',params)
+  }
   if (checking) {
     recheckWhenDone = true
     return
@@ -441,6 +449,7 @@ async function checkPosition(params) { try {
 async function next() { try {
   var now = getTimeNow()
   if (now-lastCheckPositionTime > 2500) {
+    bitmex.getMarket() // to start a new candle if necessary
     bitmex.checkPositionParams.caller = 'interval'
     bitmex.checkPositionParams.signal = entrySignal
     checkPosition(bitmex.checkPositionParams)
@@ -449,6 +458,17 @@ async function next() { try {
 
 async function getMarketJson() { try {
   var market = await bitmex.getMarketWithCurrentCandle()
+  // market.candles.reduce((a,c) => {
+  //   if (a) {
+  //     let lastMinute = new Date(a.time).getMinutes()
+  //     let minute = new Date(c.time).getMinutes()
+  //     if (minute - lastMinute > 1) {
+  //       console.log(a,c)
+  //       // debugger
+  //     }
+  //   }
+  //   return c
+  // },null)
   return JSON.stringify(market)
   // var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
   // var csv = 'Date,Open,High,Low,Close,Rsi\n'
@@ -637,6 +657,7 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
 
 async function init() { try {
   if (mock) {
+    await mock.init()
     getTimeNow = mock.getTimeNow
     next = mock.next
     createInterval = mock.createInterval

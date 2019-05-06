@@ -21,7 +21,7 @@ var ws
 var lastMargin = {}, lastInstrument = {}, lastPosition = {}, lastOrders = [], lastXBTUSDInstrument = {}
 var lastBid, lastAsk, lastQty, lastRates = {}
 
-var currentCandle, currentCandleTimeOffset
+var currentCandle
 
 const colorizer = winston.format.colorize();
 
@@ -179,7 +179,9 @@ async function pruneOrders(orders) { try {
       return false
     })
     if (found >= 0) {
-      logger.info('pruneOrders',orders[found])
+      if (!mock) {
+        logger.info('pruneOrders',orders[found])
+      }
       orders.splice(found,1)
     }
   } while(found >= 0)
@@ -188,11 +190,7 @@ async function pruneOrders(orders) { try {
 
 async function handleMargin(data) { try {
   lastMargin = data[0]
-  // checkPositionParams.walletBalance = lastWallet.amount
-  // checkPositionParams.availableMargin = lastMargin.availableMargin
-  // checkPositionParams.marginBalance = lastMargin.marginBalance
   checkPositionParams.walletBalance = lastMargin.walletBalance
-  // console.log(checkPositionParams.availableMargin, checkPositionParams.marginBalance, checkPositionParams.walletBalance)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function handleOrder(orders) { try {
@@ -213,11 +211,12 @@ async function handleOrder(orders) { try {
     }
   })
 
-  lastOrders.forEach((order,i) => {
-    logger.info('handleOrder',order)
-    // console.log('ORDER '+i,order.ordStatus,order.ordType,order.side,order.price,order.stopPx,order.cumQty+'/'+order.orderQty)
-  })
-  console.log('---------------------')
+  if (!mock) {
+    lastOrders.forEach((order,i) => {
+      logger.info('handleOrder',order)
+    })
+    console.log('---------------------')
+  }
 
   var prunedCanceledOrder = pruneOrders(orders)
   pruneOrders(lastOrders)
@@ -268,19 +267,20 @@ async function handleXBTUSDInstrument(data) {
   lastRates[lastCoinPairInstrument.symbol] = lastCoinPairInstrument.lastPrice
 }
 
-async function handleInterval() {
+async function handleInterval(data) {  
+  getMarket() // to start a new candle if necessary
   checkPositionCallback(checkPositionParams)
 }
 
 async function appendCandleLastPrice() {
   var candleTimeOffset = getCandleTimeOffset()
-  if (candleTimeOffset >= currentCandleTimeOffset) {
-    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),lastInstrument.lastPrice)
-  }
-  else {
+  var candleStartTime = getTimeNow() - candleTimeOffset
+  if (candleStartTime > currentCandle.startTimeMs) {
     startNextCandle()
   }
-  currentCandleTimeOffset = candleTimeOffset
+  else {
+    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),lastInstrument.lastPrice)
+  }
 }
 
 function getCandleTimeOffset() {
@@ -466,7 +466,6 @@ async function getCurrentTradeBucketed(interval) { try {
   candle.startTimeMs = timeMs
   candle.endTimeMs = timeMs + 899999
   candle.lastTradeTimeMs = timeMs // accepting new trade data
-  // debugger
   return {candle:candle,candleTimeOffset:candleTimeOffset}
 } catch(e) {logger.error(e.stack||e); debugger} }
 
@@ -648,7 +647,9 @@ async function order(orders,cancelAllBeforeOrder) { try {
     cancelAllBeforeOrder:cancelAllBeforeOrder
   })
   
-  logger.info('order',response)
+  if (!mock) {
+    logger.info('order',response)
+  }
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
@@ -668,7 +669,9 @@ function popOrderQueue(ord) {
 }
 
 async function orderQueue(ord) { try {
-  logger.info('orderQueue -->',ord)
+  if (!mock) {
+    logger.info('orderQueue -->',ord)
+  }
   var foundPendingQueue = orderQueueArray.find(o => {
     if (o.orders.length != ord.orders.length || o.obsoleted) return false
     for (var i = 0; i < o.orders.length; i++) {
@@ -704,7 +707,9 @@ async function orderQueue(ord) { try {
   pendingLimitOrderRetry.ord = ord
   var response = await pendingLimitOrderRetry
   pendingLimitOrderRetry = null
-  logger.info('orderQueue',response)
+  if (!mock) {
+    logger.info('orderQueue',response)
+  }
   popOrderQueue(ord)
   return response
 } catch(e) {logger.error(e.stack||(e));debugger} }
@@ -760,7 +765,9 @@ async function orderBulkRetry(ord) { try {
   if (ord.obsoleted) {
     logger.info('orderBulkRetry obsoleted',ord)
   }
-  logger.info('orderBulkRetry', response)
+  if (!mock) {
+    logger.info('orderBulkRetry', response)
+  }
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
@@ -988,12 +995,8 @@ async function initMarket() { try {
   console.log('Initializing market')
   await getMarket()
   let currentTradeBucketed = await getCurrentTradeBucketed()
-  currentCandleTimeOffset = currentTradeBucketed.candleTimeOffset
-  if (currentTradeBucketed.candle.open) {
-    currentCandle = currentTradeBucketed.candle
-  }
-  else {
-    currentCandle = {}
+  currentCandle = currentTradeBucketed.candle
+  if (!currentTradeBucketed.candle.open) {
     var open = marketCache.closes[marketCache.closes.length-1]
     currentCandle.open = currentCandle.high = currentCandle.low = currentCandle.close = open
   }
