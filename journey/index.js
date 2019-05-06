@@ -436,8 +436,12 @@ async function checkPosition(params) { try {
   checking = true
   lastCheckPositionTime = getTimeNow()
 
-  await checkExit(params)
-  await checkEntry(params)
+  if (params.positionSize == 0) {
+    await checkEntry(params)
+  }
+  else {
+    await checkExit(params)
+  }
 
   if (recheckWhenDone) {
     setTimeout(next,50)
@@ -470,13 +474,6 @@ async function getMarketJson() { try {
   //   return c
   // },null)
   return JSON.stringify(market)
-  // var rsis = await strategy.getRsi(market.closes,setup.rsi.length)
-  // var csv = 'Date,Open,High,Low,Close,Rsi\n'
-  // market.candles.forEach((candle,i) => {
-  //   csv += //new Date(candle.time).toUTCString()
-  //   candle.time+','+candle.open+','+candle.high+','+candle.low+','+candle.close+','+rsis[i]+'\n'
-  // })
-  // return csv
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
