@@ -6,8 +6,8 @@ var now = new Date()
 setup.startTime = new Date(now.getTime() - 480*60000).toISOString()
 setup.endTime = now.toISOString()
 if (location.hostname == 'localhost') {
-  setup.startTime = '2019-05-07T18:00:00Z'
-  setup.endTime = '2019-05-07T20:00:00Z'
+  setup.startTime = '2019-04-02T00:00:00.000Z'
+  setup.endTime = '2019-05-07T23:59:59.999Z'
 }
 
 symbolInput.value = setup.symbol

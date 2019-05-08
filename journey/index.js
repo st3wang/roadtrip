@@ -701,3 +701,14 @@ async function init() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 init()
+
+// var lineReader = require('readline').createInterface({
+//   input: require('fs').createReadStream('combined.log')
+// })
+
+// lineReader.on('line', (line) => {
+//   var {timestamp,rsiSignal} = JSON.parse(line)
+//   if (rsiSignal && timestamp.indexOf('T16:22:') > 0) {
+//     debugger
+//   }
+// })
