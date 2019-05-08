@@ -83,7 +83,6 @@ async function getTradeBucketed({symbol,interval,startTime:st,endTime:et}) { try
   var startTime = new Date(st).getTime()
   var endTime = new Date(et).getTime()
   var startDayTime = startTime - (startTime % oneDayMs) 
-  var endDayTime
   var marketBuffer = {
     opens: [],
     highs: [],
@@ -359,8 +358,8 @@ async function getOrders({startTime,endTime}) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updateData() {
-  var start = 20190501
-  var end = 20190506
+  var start = 20190507
+  var end = 20190507
   await bitmexdata.downloadTradeData(start,end)
   await bitmexdata.generateCandleDayFiles(start,end,1)
 }

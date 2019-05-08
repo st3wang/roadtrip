@@ -5,6 +5,10 @@ setup.interval = 1
 var now = new Date()
 setup.startTime = new Date(now.getTime() - 480*60000).toISOString()
 setup.endTime = now.toISOString()
+if (location.hostname == 'localhost') {
+  setup.startTime = '2019-05-07T18:00:00Z'
+  setup.endTime = '2019-05-07T20:00:00Z'
+}
 
 symbolInput.value = setup.symbol
 intervalInput.value = setup.interval

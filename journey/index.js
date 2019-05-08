@@ -290,7 +290,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   //   }
   // }
   // else 
-  if (candleTimeOffset <= setup.candle.signalTimeOffsetMin) {
+  if (candleTimeOffset >= setup.candle.signalTimeOffsetMin && candleTimeOffset <= setup.candle.signalTimeOffsetMax) {
     signals = await getOrderSignal(walletBalance)
     orderSignal = signals.orderSignal
     if (!mock) {
@@ -650,7 +650,7 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
 
 async function init() { try {
   if (mock) {
-    await mock.init()
+    await mock.init(shoes.mock)
     getTimeNow = mock.getTimeNow
     next = mock.next
     createInterval = mock.createInterval
