@@ -4,7 +4,8 @@ const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 const winston = require('winston')
 const shoes = require('./shoes')
 const {symbol,account,setup} = shoes
-const oneCandleMS = setup.candle.interval*60000
+const oneCandleMs = setup.candle.interval*60000
+const oneCandleEndMs = oneCandleMs-1
 const oneDayMS = 14400000
 
 var mock
@@ -277,27 +278,29 @@ async function handleInterval(data) {
 }
 
 async function appendCandleLastPrice() {
-  var candleTimeOffset = getCandleTimeOffset()
-  var candleStartTime = getTimeNow() - candleTimeOffset
-  if (candleStartTime > currentCandle.startTimeMs) {
-    startNextCandle()
-  }
-  else {
-    addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),lastInstrument.lastPrice)
-  }
+  startNextCandle()
+  addTradeToCandle(new Date(lastInstrument.timestamp).getTime(),lastInstrument.lastPrice)
 }
 
 function getCandleTimeOffset() {
-  return ((getTimeNow()) % oneCandleMS)
+  return ((getTimeNow()) % oneCandleMs)
 }
 
 function startNextCandle() {
   var now = getTimeNow()
-  var candleTimeOffset = now % oneCandleMS
-  var currentCandleTime = now - candleTimeOffset
-  var currentCandleISOString = new Date(currentCandleTime).toISOString()
+  var newCandleTime = now - (now % oneCandleMs)
 
-  if (marketCache.candles[marketCache.candles.length-1].time == currentCandleISOString) {
+  if (newCandleTime == currentCandle.startTimeMs) {
+    return
+  }
+  else if (newCandleTime < currentCandle.startTimeMs) {
+    logger.error('invalid candle time', newCandleTime, currentCandle)
+    throw new Error('invalid candle time')
+  }
+
+  var newCandleISOString = new Date(newCandleTime).toISOString()
+
+  if (marketCache.candles[marketCache.candles.length-1].time == newCandleISOString) {
     return
   }
 
@@ -317,10 +320,10 @@ function startNextCandle() {
 
   let open = currentCandle.close
   currentCandle = {
-    time:currentCandleISOString,
-    startTimeMs: currentCandleTime,
-    endTimeMs: currentCandleTime + 899999,
-    lastTradeTimeMs: currentCandleTime,
+    time:newCandleISOString,
+    startTimeMs: newCandleTime,
+    endTimeMs: newCandleTime + oneCandleEndMs,
+    lastTradeTimeMs: newCandleTime,
     open:open, high:open, low:open, close: open
   }
 }
@@ -335,6 +338,7 @@ function addTradeToCandle(time,price) {
     else if (price < currentCandle.low) {
       currentCandle.low = price
     }
+
     if (time > currentCandle.lastTradeTimeMs) {
       currentCandle.lastTradeTimeMs = time
       currentCandle.close = price
@@ -436,8 +440,8 @@ function toCandle(group) {
   let candle = {
     time: new Date(timeMs).toISOString(),
     startTimeMs: timeMs,
-    endTimeMs: timeMs + 899999,
-    lastTradeTimeMs: timeMs + 899999,
+    endTimeMs: timeMs + oneCandleEndMs,
+    lastTradeTimeMs: timeMs + oneCandleEndMs,
     open: open,
     high: open,
     low: open,
@@ -470,7 +474,7 @@ async function getCurrentTradeBucketed(interval) { try {
   let timeMs = now-candleTimeOffset
   candle.time = new Date(timeMs).toISOString()
   candle.startTimeMs = timeMs
-  candle.endTimeMs = timeMs + 899999
+  candle.endTimeMs = timeMs + oneCandleEndMs
   candle.lastTradeTimeMs = timeMs // accepting new trade data
   return {candle:candle,candleTimeOffset:candleTimeOffset}
 } catch(e) {logger.error(e.stack||e); debugger} }
