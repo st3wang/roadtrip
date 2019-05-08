@@ -282,14 +282,15 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   let candleTimeOffset = bitmex.getCandleTimeOffset()
 
   let signals, orderSignal
-  if (candleTimeOffset >= setup.candle.signalTimeOffsetMax) {
-    signals = await getOrderSignalWithCurrentCandle(walletBalance)
-    orderSignal = signals.orderSignal
-    if (!mock) {
-      logger.debug('enterSignal',signals)
-    }
-  }
-  else if (candleTimeOffset <= setup.candle.signalTimeOffsetMin) {
+  // if (candleTimeOffset >= setup.candle.signalTimeOffsetMax) {
+  //   signals = await getOrderSignalWithCurrentCandle(walletBalance)
+  //   orderSignal = signals.orderSignal
+  //   if (!mock) {
+  //     logger.debug('enterSignal',signals)
+  //   }
+  // }
+  // else 
+  if (candleTimeOffset <= setup.candle.signalTimeOffsetMin) {
     signals = await getOrderSignal(walletBalance)
     orderSignal = signals.orderSignal
     if (!mock) {
