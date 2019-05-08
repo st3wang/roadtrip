@@ -217,11 +217,15 @@ async function readNextDayTrades() { try {
   return trades
 } catch(e) {logger.error(e.stack||e); debugger} }
 
+var lastIntervalTime = 0
+
 async function nextInstrument() { try {
   currentTradeIndex++
   var trade = trades[currentTradeIndex]
 
   if (!trade) {
+    console.timeEnd('readNextDayTrades')
+    console.time('readNextDayTrades')
     trades = await readNextDayTrades()
     if (trades && trades.length) {
       currentTradeIndex = 0
@@ -247,6 +251,27 @@ async function nextInstrument() { try {
     await handleInstrument(instruments)
   }
   else {
+    // let now = getTimeNow()
+    // let date = new Date(now)
+    // let ms = date.getMilliseconds()
+    // if (ms != 0) debugger
+    // if (now - lastIntervalTime != 60000) {
+    //   console.log('last', new Date(lastIntervalTime).toISOString())
+    //   console.log('now', new Date(now).toISOString())
+    //   let missing = new Date(now-60000).toISOString()
+    //   let found
+    //   for (let i = currentTradeIndex; i >=0; i--) {
+    //     if (trades[i][4] == missing) {
+    //       console.log('found trade', missing)
+    //       found = true
+    //       i = 0
+    //     }
+    //   }
+    //   if (!found) {
+    //     console.error('not found trade', missing)
+    //   }
+    // }
+    // lastIntervalTime = now
     await handleInterval(instruments)
   }
   return true
@@ -358,8 +383,8 @@ async function getOrders({startTime,endTime}) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updateData() {
-  var start = 20190507
-  var end = 20190507
+  var start = 20190401
+  var end = 20190430
   await bitmexdata.downloadTradeData(start,end)
   await bitmexdata.generateCandleDayFiles(start,end,1)
 }

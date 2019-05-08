@@ -241,6 +241,7 @@ async function getTradeBucketed(interval,time,symbol) {
 async function readTradeDay(time,symbol) {
   var ymd = ymdHelper.YYYYMMDD(time)
   return new Promise((resolve, reject) => {
+    console.log('readTradeDay',ymd)
     console.time('readTradeDay')
     const minPath = getMinTradeFile(ymd,symbol)
     if (fs.existsSync(minPath)) {
@@ -257,15 +258,20 @@ async function readTradeDay(time,symbol) {
           side = +side
           size = +size
           price = +price
-          let [lastTime,lastSide,lastSize,lastPrice] = trades[trades.length-1] || []
+          let [lastTime,lastSide,lastSize,lastPrice] = trades[trades.length-1] || [time]
           // let diff = timestamp - lastTime
-          let currentMs = timestamp % 60000
-          let lastMs = lastTime ? lastTime % 60000 : 0
-          if (lastMs < 6000 && currentMs > 6000) {
-            let insertTime = timestamp - currentMs + 6000
+          let insertTime = lastTime - (lastTime % 60000) + 6000
+          if (insertTime <= lastTime) insertTime += 60000
+          // if (timestamp >= 1556874366000+60000-2000) {
+          //   console.log('lastTime',new Date(lastTime).toISOString())
+          //   console.log('insertTime',new Date(insertTime).toISOString())
+          //   console.log('timestamp',new Date(timestamp).toISOString())
+          //   debugger
+          // }
+          if (lastTime < insertTime && timestamp > insertTime) {
             do {
               trades.push([insertTime, null, 0, lastPrice
-                // , new Date(insertTime).toISOString()
+                , new Date(insertTime).toISOString()
               ])
               insertTime += 60000
             } while(insertTime < timestamp)
@@ -274,7 +280,7 @@ async function readTradeDay(time,symbol) {
             // diff > 5000 || 
             price != lastPrice) {
             trades.push([timestamp, side, size, price
-              // , new Date(timestamp).toISOString()
+              , new Date(timestamp).toISOString()
             ])
           }
         })

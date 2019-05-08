@@ -438,13 +438,19 @@ async function checkPosition(params) { try {
       else if (positionSize == 0) {
         console.log('POSITION EXIT')
       }
-    }
+    } break;
     // case 'interval': {
     //   let now = getTimeNow()
     //   let date = new Date(now)
-    //   if (date.getMinutes() == 10)
+    //   let ms = date.getMilliseconds()
+    //   if (ms != 0) debugger
+    //   if (now - lastIntervalTime != 60000) {
+    //     console.log('last', new Date(lastIntervalTime).toISOString())
+    //     console.log('now', new Date(now).toISOString())
     //     debugger
-    // }
+    //   }
+    //   lastIntervalTime = now
+    // } break;
   }
   if (checking) {
     recheckWhenDone = true
