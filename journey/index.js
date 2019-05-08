@@ -18,7 +18,6 @@ const strategy = require('./strategy')
 const server = require('./server')
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
-const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
 global.bitmex = bitmex
 

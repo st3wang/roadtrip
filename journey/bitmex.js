@@ -5,7 +5,7 @@ const winston = require('winston')
 const shoes = require('./shoes')
 const {symbol,account,setup} = shoes
 const oneCandleMS = setup.candle.interval*60000
-const candleLengthMS = setup.candle.interval*setup.candle.length*60000
+const oneDayMS = 14400000
 
 var mock
 if (shoes.mock) mock = require('./mock.js')
@@ -165,7 +165,7 @@ async function connect() { try {
 
 async function pruneOrders(orders) { try {
   var found, pruned
-  var yesterday = getTimeNow() - 14400000
+  var yesterday = getTimeNow() - oneDayMS
   var prunedCanceledOrder = false
   do {
     found = orders.findIndex(order => {
@@ -562,21 +562,21 @@ async function getCurrentMarketWithCurrentCandle() { try {
   return marketWithCurrentCandleCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getTradeHistory(startTime) { try {
-  startTime = startTime || (getTimeNow() - (candleLengthMS))
-  let response = await client.Execution.Execution_getTradeHistory({symbol: symbol,
-    startTime: new Date(startTime).toISOString(),
-    columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
-  })
-  let data = JSON.parse(response.data)
-  data.forEach(d => {
-    console.log(d.timestamp,d.execType,d.price,d.orderQty)
-  })
-  debugger
-} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+// async function getTradeHistory(startTime) { try {
+//   startTime = startTime || (getTimeNow() - (candleLengthMS))
+//   let response = await client.Execution.Execution_getTradeHistory({symbol: symbol,
+//     startTime: new Date(startTime).toISOString(),
+//     columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
+//   })
+//   let data = JSON.parse(response.data)
+//   data.forEach(d => {
+//     console.log(d.timestamp,d.execType,d.price,d.orderQty)
+//   })
+//   debugger
+// } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getFundingHistory(startTime) { try {
-  startTime = startTime || (getTimeNow() - (candleLengthMS))
+  startTime = startTime || (getTimeNow() - oneDayMS)
   let response = await client.Funding.Funding_get({symbol: symbol,
     startTime: new Date(startTime).toISOString()
   })
@@ -589,7 +589,7 @@ async function getFundingHistory(startTime) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getNewOrders(startTime) { try {
-  startTime = startTime || (getTimeNow() - (candleLengthMS))
+  startTime = startTime || (getTimeNow() - oneDayMS)
   let response = await client.Order.Order_getOrders({symbol: symbol,
     startTime: new Date(startTime).toISOString(),
     filter: '{"ordStatus":"New"}',
@@ -600,7 +600,7 @@ async function getNewOrders(startTime) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getOrders({startTime,endTime}) { try {
-  startTime = startTime || new Date(getTimeNow() - (candleLengthMS)).toISOString()
+  startTime = startTime || new Date(getTimeNow() - oneDayMS).toISOString()
   endTime = endTime || new Date(getTimeNow()).toISOString()
   let response = await client.Order.Order_getOrders({symbol: symbol,
     startTime: startTime,
@@ -1086,7 +1086,6 @@ module.exports = {
   getQuote: getQuote,
 
   getOrders: getOrders,
-  getTradeHistory: getTradeHistory,
   getFundingHistory: getFundingHistory, 
   getCurrentCandle: getCurrentCandle,
   getNextFunding: getNextFunding,

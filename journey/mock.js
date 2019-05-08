@@ -13,6 +13,8 @@ const isoTimestamp = winston.format((info, opts) => {
   return info;
 });
 
+const oneDayMs = 24*60*60000
+
 var startTimeMs = new Date(shoes.mock.startTime).getTime()
 var endTimeMs = new Date(shoes.mock.endTime).getTime()
 
@@ -185,8 +187,6 @@ async function nextPosition() {
   await handlePosition([position])
 }
 
-const oneDayMs = 24*60*60000
-
 async function readNextDayTrades() { try {
   var startTime, endTime
   if (trades.length == 0) {
@@ -349,13 +349,14 @@ async function cancelOrders(ords) {
   }
 }
 
-async function getOrders(startTime) {
-  startTime = startTime || (getTimeNow() - (candleLengthMS))
+async function getOrders({startTime,endTime}) { try {
+  startTime = startTime ? new Date(startTime).getTime() : new Date(getTimeNow() - oneDayMs)
+  endTime = endTime ? new Date(endTime).getTime() : new Date(getTimeNow())
 
   return historyOrders.filter(({timestamp}) => {
     return (new Date(timestamp).getTime() >= startTime)
   })
-}
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updateData() {
   var start = 20190501

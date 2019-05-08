@@ -28,35 +28,33 @@ async function getRsi(data,length) { try {
 async function getSignal(closes,{length,shortPrsi,shortRsi,longPrsi,longRsi}) { try {
   var rsis = await getRsi(closes,length)
   var len = closes.length
-  var last0 = len - 1
-  var last1 = len - 2
-  var rsi = rsis[last0]
-  var prsi = rsis[last1]
-  // var close = closes[last0]
-  var shortCondition = prsi > shortPrsi && rsi <= shortRsi 
-  var longCondition = prsi < longPrsi && rsi >= longRsi 
-  var signal = {
-    condition: '-',
-    prsi: Math.round(prsi*100)/100,
-    rsi: Math.round(rsi*100)/100,
-    // rsis: rsis,
-    // length: rsiLength,
-    // overbought: rsiOverbought,
-    // oversold: rsiOversold,
+  var rsi = rsis[len - 1]
+  var prsi = rsis[len - 2]
+  var condition = '-'
+  if (prsi > shortPrsi && rsi <= shortRsi ) {
+    condition = 'SHORT'
   }
-  if (shortCondition) {
-    signal.condition = 'SHORT'
-  }
-  else if (longCondition) {
-    signal.condition = 'LONG'
+  else if (prsi < longPrsi && rsi >= longRsi ) {
+    condition = 'LONG'
   }
   else if (prsi > shortPrsi) {
-    signal.condition = 'S'
+    condition = 'S'
   }
   else if (prsi < longPrsi) {
-    signal.condition = 'L'
+    condition = 'L'
   }
-  return signal
+  return {
+    condition: condition,
+    prsi: Math.round(prsi*100)/100,
+    rsi: Math.round(rsi*100)/100,
+    rsis: rsis,
+    closes: closes,
+    length: length,
+    shortPrsi: shortPrsi,
+    shortRsi: shortRsi,
+    longPrsi: longPrsi,
+    longRsi: longRsi
+  }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function lowest(values,start,length) {
