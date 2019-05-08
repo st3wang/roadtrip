@@ -290,7 +290,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   //   }
   // }
   // else 
-  if (candleTimeOffset >= setup.candle.signalTimeOffsetMin && candleTimeOffset <= setup.candle.signalTimeOffsetMax) {
+  if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
     signals = await getOrderSignal(walletBalance)
     orderSignal = signals.orderSignal
     if (!mock) {
@@ -673,13 +673,13 @@ async function init() { try {
   // createInterval(-5000*2**5)
   // createInterval(-5000*2**4)
   // createInterval(-5000*2**3)
-  createInterval(-5000*2**2)
-  createInterval(-5000*2**1)
-  createInterval(-5000*2**0)
+  createInterval(-6000*2**2)
+  createInterval(-6000*2**1)
+  createInterval(-6000*2**0)
   createInterval(100)
-  createInterval(5000*2**0)
-  createInterval(5000*2**1)
-  createInterval(5000*2**2)
+  createInterval(6000*2**0)
+  createInterval(6000*2**1)
+  createInterval(6000*2**2)
   // createInterval(5000*2**3)
   // createInterval(5000*2**4)
   // createInterval(5000*2**5)
