@@ -259,30 +259,23 @@ async function readTradeDay(time,symbol) {
           price = +price
           let [lastTime,lastSide,lastSize,lastPrice] = trades[trades.length-1] || []
           // let diff = timestamp - lastTime
-          let date = new Date(timestamp)
-          let minutes = date.getMinutes()
-          if (lastTime) {
-            let lastDate = new Date(lastTime)
-            let lastMinutes = lastDate.getMinutes()
-            if (minutes != lastMinutes) {
-              let insertTimeOffset = 60000 - (lastTime % 60000)
-              let insertTime = lastTime + insertTimeOffset + 100
-              do {
-                let insertDate = new Date(insertTime)
-                let insertMinutes = insertDate.getMinutes()
-                let seconds = date.getSeconds()
-                let milliseconds = date.getMilliseconds()
-                if (insertMinutes < minutes || seconds > 0 || milliseconds > 100 ) {
-                  trades.push([insertTime, null, 0, lastPrice])
-                }
-                insertTime += 60000
-              } while(insertTime < timestamp)
-            }
+          let currentMs = timestamp % 60000
+          let lastMs = lastTime ? lastTime % 60000 : 0
+          if (lastMs < 6000 && currentMs > 6000) {
+            let insertTime = timestamp - currentMs + 6000
+            do {
+              trades.push([insertTime, null, 0, lastPrice
+                // , new Date(insertTime).toISOString()
+              ])
+              insertTime += 60000
+            } while(insertTime < timestamp)
           }
           if (
             // diff > 5000 || 
             price != lastPrice) {
-            trades.push([timestamp, side, size, price])
+            trades.push([timestamp, side, size, price
+              // , new Date(timestamp).toISOString()
+            ])
           }
         })
         .on('error', e => reject(e))

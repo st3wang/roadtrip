@@ -430,13 +430,21 @@ async function checkPosition(params) { try {
   if (!mock) {
     logger.info('checkPosition',params)
   }
-  if (caller == 'position') {
-    if (lastPositionSize == 0) {
-      console.log('POSITION ENTER')
+  switch(caller) {
+    case 'position': {
+      if (lastPositionSize == 0) {
+        console.log('POSITION ENTER')
+      }
+      else if (positionSize == 0) {
+        console.log('POSITION EXIT')
+      }
     }
-    else if (positionSize == 0) {
-      console.log('POSITION EXIT')
-    }
+    // case 'interval': {
+    //   let now = getTimeNow()
+    //   let date = new Date(now)
+    //   if (date.getMinutes() == 10)
+    //     debugger
+    // }
   }
   if (checking) {
     recheckWhenDone = true
@@ -673,13 +681,13 @@ async function init() { try {
   // createInterval(-5000*2**5)
   // createInterval(-5000*2**4)
   // createInterval(-5000*2**3)
-  createInterval(-6000*2**2)
-  createInterval(-6000*2**1)
-  createInterval(-6000*2**0)
-  createInterval(100)
+  // createInterval(-6000*2**2)
+  // createInterval(-6000*2**1)
+  // createInterval(-6000*2**0)
+  // createInterval(100)
   createInterval(6000*2**0)
   createInterval(6000*2**1)
-  createInterval(6000*2**2)
+  // createInterval(6000*2**2)
   // createInterval(5000*2**3)
   // createInterval(5000*2**4)
   // createInterval(5000*2**5)

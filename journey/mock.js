@@ -223,7 +223,7 @@ async function nextInstrument() { try {
 
   if (!trade) {
     trades = await readNextDayTrades()
-    if (trades) {
+    if (trades && trades.length) {
       currentTradeIndex = 0
       trade = trades[0]
     }
