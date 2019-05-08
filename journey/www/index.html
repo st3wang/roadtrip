@@ -2,19 +2,43 @@
 <head>
 <meta charset="utf-8">
 <style>
+  *:focus {
+      outline: none;
+  }
   body {
     margin: 0;
     font: 8px sans-serif;
     background-color: #131722;
   }
+  input {
+    font: 8px sans-serif;
+    border-style: none;
+    background-color: #283240;
+    color: white;
+    margin: 2px;
+  }
   #plotlyDiv {
+    float: left;
     background-color: #131722;
+    width: 90%;
+  }
+  #configDiv {
+    background-color: #101219;
+/*     position: relative; */
+    width: 10%;
+    height: 100vh;
+    float: right;
   }
 </style>
-<script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
-
+<script src="https://cdn.plot.ly/plotly-latest.min.js" async></script>
+<script src="app.js" async defer></script>
 </head>
 <body>
 <div id="plotlyDiv"></div>
-<script src="plotly.js"></script>
+<div id="configDiv">
+  <input type="text" id="symbolInput" size="8">
+  <input type="text" id="intervalInput" size="4">
+  <input type="text" id="startTimeInput" size="24">
+  <input type="text" id="endTimeInput" size="24">
+</div>
 </body> 

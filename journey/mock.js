@@ -4,7 +4,6 @@ const fs = require('fs')
 
 const shoes = require('./shoes')
 const {symbol,account,setup} = shoes
-const oneCandleMS = setup.candle.interval*60000
 const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
 const winston = require('winston')
@@ -14,8 +13,8 @@ const isoTimestamp = winston.format((info, opts) => {
   return info;
 });
 
-const startTimeMs = new Date(shoes.mock.startTime).getTime()
-const endTimeMs = new Date(shoes.mock.endTime).getTime()
+var startTimeMs = new Date(shoes.mock.startTime).getTime()
+var endTimeMs = new Date(shoes.mock.endTime).getTime()
 
 const logger = winston.createLogger({
   format: winston.format.label({label:'bitmex'}),
@@ -78,9 +77,9 @@ function authorize() {
 
 }
 
-async function getTradeBucketed(interval,length) { try {
-  var endTime = getTimeNow()
-  var startTime = endTime - (interval*length*60000)
+async function getTradeBucketed({symbol,interval,startTime:st,endTime:et}) { try {
+  var startTime = new Date(st).getTime()
+  var endTime = new Date(et).getTime()
   var startDayTime = startTime - (startTime % oneDayMs) 
   var endDayTime
   var marketBuffer = {
@@ -90,9 +89,9 @@ async function getTradeBucketed(interval,length) { try {
     closes: [],
     candles: []
   }
-  for (; startDayTime < startTimeMs; startDayTime += oneDayMs) {
+  for (; startDayTime < endTime; startDayTime += oneDayMs) {
     endDayTime = startDayTime + oneDayMs - 1
-    let {opens,highs,lows,closes,candles} = await bitmexdata.getTradeBucketed(interval,startDayTime,shoes.symbol)
+    let {opens,highs,lows,closes,candles} = await bitmexdata.getTradeBucketed(interval,startDayTime,symbol)
     marketBuffer.opens.push(...opens)
     marketBuffer.highs.push(...highs)
     marketBuffer.lows.push(...lows)
@@ -189,18 +188,15 @@ async function nextPosition() {
 const oneDayMs = 24*60*60000
 
 async function readNextDayTrades() { try {
-  var startTime, endTime, dayTrades
-  // var lastTrade = trades[trades.length-1]
+  var startTime, endTime
   if (trades.length == 0) {
-    console.time('readNextDayTrades')
     startTime = startTimeMs
   }
   else {
-    let lastTradeTime = trades[trades.length-1].time
+    let lastTradeTime = trades[trades.length-1][0]
     startTime = lastTradeTime - (lastTradeTime % oneDayMs) + oneDayMs
   }
   if (startTime > endTimeMs) {
-    console.timeEnd('readNextDayTrades')
     return
   }
   endTime = startTime - (startTime % oneDayMs) + oneDayMs - 1
@@ -208,17 +204,16 @@ async function readNextDayTrades() { try {
     endTime = endTimeMs
   }
   trades = await bitmexdata.readTradeDay(startTime,shoes.symbol)
-  console.log('readNextDayTrades trades.length', trades.length)
   var filterStartTime = (startTime % oneDayMs) != 0
   var filterEndTime = (endTime % oneDayMs) != oneDayMs - 1
   if (filterStartTime && filterEndTime) {
-    trades = trades.filter(({time}) => (time >= startTime && time <= endTime))
+    trades = trades.filter(([time]) => (time >= startTime && time <= endTime))
   }
   else if (filterStartTime) {
-    trades = trades.filter(({time}) => (time >= startTime))
+    trades = trades.filter(([time]) => (time >= startTime))
   }
   else if (filterEndTime) {
-    trades = trades.filter(({time}) => (time <= endTime))
+    trades = trades.filter(([time]) => (time <= endTime))
   }
   return trades
 } catch(e) {logger.error(e.stack||e); debugger} }
@@ -238,29 +233,24 @@ async function nextInstrument() { try {
     }
   }
 
-  timeNow = trade.time
-  if (trade.isInterval) {
-    await handleInterval([{
-      symbol: shoes.symbol,
-      timestamp: new Date(timeNow).toISOString(),
-      lastPrice: trade.price,
-      bidPrice: trade.price,
-      askPrice: trade.price
-    }])
+  const [time,side,size,price] = trade
+  timeNow = time
+  const instruments = [{
+    symbol: shoes.symbol,
+    timestamp: new Date(timeNow).toISOString(),
+    lastPrice: price,
+    bidPrice: price,
+    askPrice: price
+  }]
+
+  if (size) {
+    await nextOrder(price)
+    await handleInstrument(instruments)
   }
   else {
-    await nextOrder(trade.price)
-    await handleInstrument([{
-      symbol: shoes.symbol,
-      timestamp: new Date(timeNow).toISOString(),
-      lastPrice: trade.price,
-      bidPrice: trade.price,
-      askPrice: trade.price
-    }])
+    await handleInterval(instruments)
   }
-  setTimeout(() => {
-    nextInstrument()
-  },0)
+  return true
 } catch(e) {logger.error(e.stack||e); debugger} }
 
 async function connect(hInterval,hMargin,hOrder,hPosition,hInstrument,hXBTUSDInstrument) { try {
@@ -277,10 +267,6 @@ async function connect(hInterval,hMargin,hOrder,hPosition,hInstrument,hXBTUSDIns
       lastPrice: 5000
     }])
   }
-  await nextMargin()
-  await nextOrder()
-  await nextPosition()
-  await nextInstrument()
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function next() {
@@ -372,24 +358,55 @@ async function getOrders(startTime) {
 }
 
 async function updateData() {
-  var start = 20190503
-  var end = 20190505
+  var start = 20190501
+  var end = 20190506
   await bitmexdata.downloadTradeData(start,end)
   await bitmexdata.generateCandleDayFiles(start,end,1)
 }
 
-async function init() {
+async function init(sp) {
   // await updateData()
   // debugger
+  margin = {
+    walletBalance: 100000000
+  }
+  orders = []
+  historyOrders = []
+  position = {
+    currentQty: 0
+  }
+  trades = []
+  currentTradeIndex = -1
+  if (sp) {
+    startTimeMs = new Date(sp.startTime).getTime()
+    endTimeMs = new Date(sp.endTime).getTime()
+  }
+
   timeNow = startTimeMs
   try {
-    fs.unlinkSync(global.logDir+'/combined.log')
-    fs.unlinkSync(global.logDir+'/entry_signal_table.log')
-    fs.unlinkSync(global.logDir+'/warn.log')
+    fs.writeFileSync(global.logDir+'/combined.log', '')
+    fs.writeFileSync(global.logDir+'/entry_signal_table.log', '')
+    fs.writeFileSync(global.logDir+'/warn.log', '')
   }
   catch(e) {
 
   }
+}
+
+async function start() {
+  return new Promise(async (resolve,reject) => {
+    var cont
+
+    await nextMargin()
+    await nextOrder()
+    await nextPosition()
+    
+    do {
+      cont = await nextInstrument()
+    } while(cont)
+
+    resolve()
+  })
 }
 
 module.exports = {
@@ -411,4 +428,5 @@ module.exports = {
 
   next: next,
   createInterval: createInterval,
+  start: start
 }

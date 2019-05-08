@@ -15,13 +15,18 @@ const csvParse = require('csv-parse')
 const csvStringify = require('csv-stringify')
 
 const tradeFilePath = 'data/bitmex/trade/YYYYMMDD.csv'
+const minTradeFilePath = 'data/bitmex/trade/YYYYMMDD.min.json'
 const candleFilePath = 'data/bitmex/candle/YYYYMMDD.json'
 
-const symbols = ['XBTUSD','ETHUSD']
+const symbols = ['XBTUSD','ETHUSD','LTCUSD']
 // const historyStartYmd = 20170101
 
 function getCleanedTradeFile(ymd,symbol) {
   return tradeFilePath.replace('YYYYMMDD',ymd+'_'+symbol)
+}
+
+function getMinTradeFile(ymd,symbol) {
+  return minTradeFilePath.replace('YYYYMMDD',ymd+'_'+symbol)
 }
 
 function getCandleFile(interval,ymd,symbol) {
@@ -33,7 +38,7 @@ async function writeCleanedFile(ymd,symbol,output) {
     var writePath = getCleanedTradeFile(ymd,symbol)
     csvStringify(output, async (err, outputString) => {
       await writeFile(writePath,outputString,writeFileOptions)
-      console.log('done writing', ymd, symbol)
+      console.log('done writing', writePath)
       resolve()
     })
   })
@@ -41,6 +46,7 @@ async function writeCleanedFile(ymd,symbol,output) {
 
 function downloadTradeDay(ymd) { try {
   return new Promise((resolve, reject) => {
+    console.log('downloadTradeDay',ymd)
     const request = http.get(shoes.bitmexdata.url + ymd + '.csv.gz', function(response) {
       const csvFilename = tradeFilePath.replace('YYYYMMDD',ymd) //'data/trade/' + ymd + '.csv'
       const gzFilename = csvFilename + '.gz'
@@ -48,7 +54,7 @@ function downloadTradeDay(ymd) { try {
       response.pipe(ws)
       ws.on('finish', _ => {
         gunzip(gzFilename, csvFilename, _ => {
-          console.log(ymd + ' gunzipped')
+          console.log('gunzipped',ymd)
           fs.unlink(gzFilename,_=>{});
           resolve(csvFilename)
         })
@@ -72,7 +78,7 @@ function readAndParseCleanUp(ymd) {
           var timeString = timestamp.slice(0,23).replace('D',' ').replace('.',':')
           var timeLocal = new Date(timeString)
           var timeGMT = new Date(timeLocal.valueOf() - timeLocal.getTimezoneOffset() * 60000)
-          trades[symbol].push([timeGMT.getTime(),side[0],size,price])
+          trades[symbol].push([timeGMT.getTime(),side=='Buy'?1:-1,size,price])
         }
       })
       .on('error', e => reject(e))
@@ -83,15 +89,21 @@ function readAndParseCleanUp(ymd) {
 async function downloadTradeData(startYmd,endYmd) { try {
   var ymd = startYmd
   while (ymd <= endYmd) {
-    const cleanedTradeFile = getCleanedTradeFile(ymd)
-    if (fs.existsSync(cleanedTradeFile)) {
-      console.log('skip',cleanedTradeFile)
-    }
-    else {
+    let toDoSymbols = symbols.filter(symbol => {
+      let cleanedTradeFile = getCleanedTradeFile(ymd,symbol)
+      if (fs.existsSync(cleanedTradeFile)) {
+        console.log('skip',cleanedTradeFile)
+        return false
+      }
+      else {
+        return true
+      }
+    })
+    if (toDoSymbols.length > 0) {
       const csvFilename = await downloadTradeDay(ymd)
       const trades = await readAndParseCleanUp(ymd)
       fs.unlink(csvFilename,_=>{})
-      var writeAll = symbols.map(symbol => {
+      var writeAll = toDoSymbols.map(symbol => {
         return writeCleanedFile(ymd,symbol,trades[symbol])
       })
       await Promise.all(writeAll)
@@ -184,7 +196,7 @@ function getCandles(groups,startTime,interval) {
 }
 
 async function getCandleDay(ymd,interval,symbol) { try {
-  console.log('getCandleDay',ymd,interval)
+  console.log('getCandleDay',ymd,interval,symbol)
   var trades = await readAndParseForCandle(ymd,symbol)
   var startTimeGMT = new Date(ymdHelper.YYYY_MM_DD(ymd))
   var startTimeGMTMS = startTimeGMT.getTime()
@@ -229,54 +241,58 @@ async function getTradeBucketed(interval,time,symbol) {
 async function readTradeDay(time,symbol) {
   var ymd = ymdHelper.YYYYMMDD(time)
   return new Promise((resolve, reject) => {
-    const readPath = getCleanedTradeFile(ymd,symbol)
-    var trades = []
-    fs.createReadStream(readPath).pipe(csvParse())
-      .on('data', ([timestamp,side,size,price]) => {
-        timestamp = +timestamp
-        price = +price
-        let {time:lastTime,side:lastSide,price:lastPrice} = trades[trades.length-1] || {}
-        // let diff = timestamp - lastTime
-        let date = new Date(timestamp)
-        let minutes = date.getMinutes()
-        if (lastTime) {
-          let lastDate = new Date(lastTime)
-          let lastMinutes = lastDate.getMinutes()
-          if (minutes != lastMinutes) {
-            let insertTimeOffset = 60000 - (lastTime % 60000)
-            let insertTime = lastTime + insertTimeOffset + 100
-            do {
-              let insertDate = new Date(insertTime)
-              let insertMinutes = insertDate.getMinutes()
-              let seconds = date.getSeconds()
-              let milliseconds = date.getMilliseconds()
-              if (insertMinutes < minutes || seconds > 0 || milliseconds > 100 ) {
-                trades.push({
-                  time: insertTime,
-                  // timestamp: new Date(insertTime).toISOString(),
-                  side: lastSide,
-                  price: lastPrice,
-                  isInterval: true
-                })
-              }
-              insertTime += 60000
-            } while(insertTime < timestamp)
+    console.time('readTradeDay')
+    const minPath = getMinTradeFile(ymd,symbol)
+    if (fs.existsSync(minPath)) {
+      let trades = JSON.parse(fs.readFileSync(minPath,readFileOptions))
+      resolve(trades)
+      console.timeEnd('readTradeDay')
+    }
+    else {
+      const readPath = getCleanedTradeFile(ymd,symbol)
+      var trades = []
+      fs.createReadStream(readPath).pipe(csvParse())
+        .on('data', ([timestamp,side,size,price]) => {
+          timestamp = +timestamp
+          side = +side
+          size = +size
+          price = +price
+          let [lastTime,lastSide,lastSize,lastPrice] = trades[trades.length-1] || []
+          // let diff = timestamp - lastTime
+          let date = new Date(timestamp)
+          let minutes = date.getMinutes()
+          if (lastTime) {
+            let lastDate = new Date(lastTime)
+            let lastMinutes = lastDate.getMinutes()
+            if (minutes != lastMinutes) {
+              let insertTimeOffset = 60000 - (lastTime % 60000)
+              let insertTime = lastTime + insertTimeOffset + 100
+              do {
+                let insertDate = new Date(insertTime)
+                let insertMinutes = insertDate.getMinutes()
+                let seconds = date.getSeconds()
+                let milliseconds = date.getMilliseconds()
+                if (insertMinutes < minutes || seconds > 0 || milliseconds > 100 ) {
+                  trades.push([insertTime, null, 0, lastPrice])
+                }
+                insertTime += 60000
+              } while(insertTime < timestamp)
+            }
           }
-        }
-        if (
-          // diff > 5000 || 
-          price != lastPrice) {
-          trades.push({
-            time: timestamp,
-            // timestamp: new Date(timestamp).toISOString(),
-            side: side,
-            price: price
-          })
-        }
-      })
-      .on('error', e => reject(e))
-      .on('end', () => resolve(trades));
-  });
+          if (
+            // diff > 5000 || 
+            price != lastPrice) {
+            trades.push([timestamp, side, size, price])
+          }
+        })
+        .on('error', e => reject(e))
+        .on('end', () => {
+          fs.writeFileSync(minPath,JSON.stringify(trades),writeFileOptions)
+          resolve(trades)
+          console.timeEnd('readTradeDay')
+        })
+    }
+  })
 }
 
 module.exports = {

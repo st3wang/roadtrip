@@ -13,7 +13,7 @@ function getTimeNow() {
   return new Date().getTime()
 }
 
-async function getRsi(data,length) {
+async function getRsi(data,length) { try {
   var result = await talibExecute({
     name: "RSI",
     inReal: data,
@@ -23,7 +23,7 @@ async function getRsi(data,length) {
   })
 
   return Array(length).fill(0).concat(result.result.outReal)
-}
+} catch(e) {console.error(e.stack||e);debugger} }
 
 async function getSignal(closes,{length,shortPrsi,shortRsi,longPrsi,longRsi}) { try {
   var rsis = await getRsi(closes,length)

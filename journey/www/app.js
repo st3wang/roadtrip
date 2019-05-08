@@ -1,3 +1,16 @@
+var setup = {}
+setup.symbol = 'ETHUSD'
+setup.interval = 1
+
+var now = new Date()
+setup.startTime = new Date(now.getTime() - 480*60000).toISOString()
+setup.endTime = now.toISOString()
+
+symbolInput.value = setup.symbol
+intervalInput.value = setup.interval
+startTimeInput.value = setup.startTime
+endTimeInput.value = setup.endTime
+
 function getShape(startTime,endTime,startPrice,endPrice) {
   return {
     type: 'rect',
@@ -35,7 +48,10 @@ function getAnnotation({timestamp,transactTime,price,stopPx,ordStatus,orderQty},
 }
 
 async function init() {
-  var marketResponse = await fetch('market.json')
+  var marketResponse = await fetch('GetMarket', {
+    method: "POST",
+    body: JSON.stringify(setup)
+  })
   var market = await marketResponse.json()
   var lastCandleDate = new Date(market.candles[market.candles.length-1].time)
   var lastCandleTime = lastCandleDate.getTime() + (lastCandleDate.getTimezoneOffset()*60000)
@@ -53,7 +69,10 @@ async function init() {
     close: market.closes,
   }
 
-  var tradeResponse = await fetch('trade.json')
+  var tradeResponse = await fetch('GetTrade', {
+    method: "POST",
+    body: JSON.stringify(setup)
+  })
   var trade = await tradeResponse.json()
 
   var annotations = []
@@ -81,8 +100,6 @@ async function init() {
         endTime = new Date(new Date(timestamp).getTime() + 600000).toISOString()
       }
     }
-
-    console.log(new Date(endTime).toISOString())
     
 
     var arrowColor
@@ -156,17 +173,4 @@ async function init() {
 }
 
 window.onload = init
-
-// var trace1 = {
-//   x: ['2017-02-01T00:00:00.000Z', '2017-02-01T00:01:00.000Z', '2017-02-01T00:02:00.000Z', '2017-02-01T00:03:00.000Z'], 
-//   open: [100,102,102,107],
-//   high: [103,103,109,108],
-//   low: [99,101,102,103],
-//   close: [102,102,107,105],
-//   increasing: {line: {color: '#53B987'}},
-//   decreasing: {line: {color: '#EB4D5C'}},
-//   type: 'candlestick',
-//   xaxis: 'x',
-//   yaxis: 'y'
-// }
 

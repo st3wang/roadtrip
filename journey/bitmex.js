@@ -222,18 +222,21 @@ async function handleOrder(orders) { try {
   pruneOrders(lastOrders)
   if (!prunedCanceledOrder) {
     checkPositionParams.caller = 'order'
-    checkPositionCallback(checkPositionParams)
+    await checkPositionCallback(checkPositionParams)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-function handlePosition(data) {
+async function handlePosition(data) {
   lastPosition = data[0]
 
   var qty = lastPosition.currentQty
   if (qty != lastQty) {
+    checkPositionParams.lastPositionSize = lastQty
     checkPositionParams.positionSize = qty
-    checkPositionParams.caller = 'position'
-    checkPositionCallback(checkPositionParams)
+    if (lastQty != undefined) {
+      checkPositionParams.caller = 'position'
+      await checkPositionCallback(checkPositionParams)
+    }
   }
 
   lastQty = lastPosition.currentQty
@@ -255,7 +258,7 @@ async function handleInstrument(data) { try {
     checkPositionParams.fundingTimestamp = lastInstrument.fundingTimestamp
     checkPositionParams.fundingRate = lastInstrument.fundingRate
     checkPositionParams.caller = 'instrument'
-    checkPositionCallback(checkPositionParams)
+    await checkPositionCallback(checkPositionParams)
   }
 
   lastBid = bid
@@ -268,8 +271,9 @@ async function handleXBTUSDInstrument(data) {
 }
 
 async function handleInterval(data) {  
-  getMarket() // to start a new candle if necessary
-  checkPositionCallback(checkPositionParams)
+  getCurrentMarket() // to start a new candle if necessary
+  checkPositionParams.caller = 'interval'
+  await checkPositionCallback(checkPositionParams)
 }
 
 async function appendCandleLastPrice() {
@@ -397,9 +401,11 @@ function inspect(client) {
   console.log("------------------------\n");
 }
 
-function getPageTimes(interval,length,binSize) {
-  var currentMS = getTimeNow()
-  var offset = (length * interval * 60000) + (currentMS % (interval * 60000))
+function getPageTimes({interval,startTime,endTime}) {
+  var startTimeMs = new Date(startTime).getTime()
+  var endTimeMs = new Date(endTime).getTime()
+  var length = (endTimeMs - startTimeMs) / (interval*60000)
+  var offset = (length * interval * 60000) + (endTimeMs % (interval * 60000))
   var bitMexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
   offset -= bitMexOffset
   var totalMinutes = interval*length
@@ -410,15 +416,15 @@ function getPageTimes(interval,length,binSize) {
     var end = pageIncrement - bitMexOffset
     for (; offset > end; offset-=pageIncrement) {
       pages.push({
-        startTime: new Date(currentMS - offset).toISOString(),
-        endTime: new Date(currentMS - (offset-pageIncrement+1)).toISOString()
+        startTime: new Date(endTimeMs - offset).toISOString(),
+        endTime: new Date(endTimeMs - (offset-pageIncrement+1)).toISOString()
       })
     }
   }
   else {
     pages.push({
-      startTime: new Date(currentMS - offset).toISOString(),
-      endTime: new Date(currentMS - (offset-(length*interval*60000)+1)).toISOString()
+      startTime: new Date(endTimeMs - offset).toISOString(),
+      endTime: new Date(endTimeMs - (offset-(length*interval*60000)+1)).toISOString()
     })
   }
   return pages
@@ -471,11 +477,12 @@ async function getCurrentTradeBucketed(interval) { try {
 
 var getTradeBucketedRequesting 
 
-async function getTradeBucketed(interval,length) { try {
+async function getTradeBucketed(sp) { try {
+  var {interval,startTime,endTime} = sp
   if (getTradeBucketedRequesting) {
     await getTradeBucketedRequesting
   }
-  let pages = getPageTimes(interval,length,binSize)
+  let pages = getPageTimes(sp)
   getTradeBucketedRequesting = Promise.all(pages.map(async (page,i) => {
     let response = await client.Trade.Trade_getBucketed({symbol: symbol, binSize: binSize+'m', 
       startTime:page.startTime,endTime:page.endTime})
@@ -505,18 +512,29 @@ async function getTradeBucketed(interval,length) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getMarket() { try {
+async function getMarket(sp) {
+  return await getTradeBucketed(sp)
+}
+
+async function getCurrentMarket() { try {
   if (marketCache) {
     // update current candle
     appendCandleLastPrice()
   }
   else {
-    marketCache = await getTradeBucketed(setup.candle.interval,setup.candle.length)
+    let now = getTimeNow()
+    let startTime = new Date(now-setup.candle.length*setup.candle.interval*60000).toISOString()
+    let endTime = new Date(now).toISOString()
+    marketCache = await getTradeBucketed({
+      interval: setup.candle.interval,
+      startTime: startTime,
+      endTime: endTime
+    })
   }
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getMarketWithCurrentCandle() { try {
+async function getCurrentMarketWithCurrentCandle() { try {
   appendCandleLastPrice()
   if (marketWithCurrentCandleCache) {
     let lastIndex = marketWithCurrentCandleCache.candles.length - 1
@@ -527,7 +545,7 @@ async function getMarketWithCurrentCandle() { try {
     marketWithCurrentCandleCache.closes[lastIndex] = currentCandle.close
   }
   else {
-    var market = await getMarket()
+    var market = await getCurrentMarket()
     var candles = market.candles.slice(1)
     var opens = market.opens.slice(1)
     var highs = market.highs.slice(1)
@@ -581,10 +599,12 @@ async function getNewOrders(startTime) { try {
   return orders
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function getOrders(startTime) { try {
-  startTime = startTime || (getTimeNow() - (candleLengthMS))
+async function getOrders({startTime,endTime}) { try {
+  startTime = startTime || new Date(getTimeNow() - (candleLengthMS)).toISOString()
+  endTime = endTime || new Date(getTimeNow()).toISOString()
   let response = await client.Order.Order_getOrders({symbol: symbol,
-    startTime: new Date(startTime).toISOString(),
+    startTime: startTime,
+    endTime: endTime,
     // filter: '{"ordType":"Limit"}',
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType,execInst,cumQty,transactTime'
   })
@@ -993,7 +1013,7 @@ function getRate(symbol) {
 
 async function initMarket() { try {
   console.log('Initializing market')
-  await getMarket()
+  await getCurrentMarket()
   let currentTradeBucketed = await getCurrentTradeBucketed()
   currentCandle = currentTradeBucketed.candle
   if (!currentTradeBucketed.candle.open) {
@@ -1005,7 +1025,7 @@ async function initMarket() { try {
 
 async function initOrders() { try {
   console.log('Initializing orders')
-  var orders = await getOrders()
+  var orders = await getOrders({})
   await handleOrder(orders)
 
   var newOrders = await getNewOrders()
@@ -1024,6 +1044,14 @@ async function initOrders() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init(checkPositionCb) { try {
+  lastMargin = {}
+  lastInstrument = {}
+  lastPosition = {}
+  lastOrders = []
+  lastXBTUSDInstrument = {}
+  lastRates = {}
+  marketCache = null
+
   checkPositionCallback = checkPositionCb
   client = await authorize()
   // inspect(client.apis)
@@ -1051,7 +1079,8 @@ if (mock) {
 module.exports = {
   init: init,
   getMarket: getMarket,
-  getMarketWithCurrentCandle: getMarketWithCurrentCandle,
+  getCurrentMarket: getCurrentMarket,
+  getCurrentMarketWithCurrentCandle: getCurrentMarketWithCurrentCandle,
   getPosition: getPosition,
   getInstrument: getInstrument,
   getQuote: getQuote,

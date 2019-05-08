@@ -179,7 +179,7 @@ function isInPositionForTooLong(signal) {
 }
 
 async function getOrderSignalWithCurrentCandle(walletBalance) {
-  var market = await bitmex.getMarketWithCurrentCandle()
+  var market = await bitmex.getCurrentMarketWithCurrentCandle()
   var closes = market.closes
   var lastPrice = closes[closes.length-1]
   var rsiSignal = await strategy.getSignal(closes,setup.rsi)
@@ -213,7 +213,7 @@ async function getOrderSignalWithCurrentCandle(walletBalance) {
 }
 
 async function getOrderSignal(walletBalance) {
-  var market = await bitmex.getMarket()
+  var market = await bitmex.getCurrentMarket()
   var closes = market.closes
   // var lastPrice = closes[closes.length-1]
   var rsiSignal = await strategy.getSignal(closes,setup.rsi)
@@ -426,8 +426,17 @@ async function checkExit(params) { try {
 var checking = false, recheckWhenDone = false
 
 async function checkPosition(params) { try {
+  const {lastPositionSize,positionSize,caller} = params
   if (!mock) {
     logger.info('checkPosition',params)
+  }
+  if (caller == 'position') {
+    if (lastPositionSize == 0) {
+      console.log('POSITION ENTER')
+    }
+    else if (positionSize == 0) {
+      console.log('POSITION EXIT')
+    }
   }
   if (checking) {
     recheckWhenDone = true
@@ -453,40 +462,22 @@ async function checkPosition(params) { try {
 async function next() { try {
   var now = getTimeNow()
   if (now-lastCheckPositionTime > 2500) {
-    bitmex.getMarket() // to start a new candle if necessary
+    bitmex.getCurrentMarket() // to start a new candle if necessary
     bitmex.checkPositionParams.caller = 'interval'
     bitmex.checkPositionParams.signal = entrySignal
     checkPosition(bitmex.checkPositionParams)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getMarketJson() { try {
-  var market = await bitmex.getMarketWithCurrentCandle()
-  // market.candles.reduce((a,c) => {
-  //   if (a) {
-  //     let lastMinute = new Date(a.time).getMinutes()
-  //     let minute = new Date(c.time).getMinutes()
-  //     if (minute - lastMinute > 1) {
-  //       console.log(a,c)
-  //       // debugger
-  //     }
-  //   }
-  //   return c
-  // },null)
+async function getMarketJson(sp) { try {
+  var market = await bitmex.getMarket(sp)
   return JSON.stringify(market)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-function getOrderCsv(order,execution,stopLoss,takeProfit,stopMarket) {
-  var status = order.ordStatus.toUpperCase()
-  var side = execution=='ENTER'?(order.side=='Buy'?'LONG':'SHORT'):(order.side=='Buy'?'SHORT':'LONG')
-
-  return order.timestamp+','+
-    execution+'-'+side+'-'+status+','+
-    (order.price||order.stopPx)+','+order.orderQty+','+stopLoss+','+takeProfit+','+stopMarket+'\n'
-}
-
-async function getTradeSignals(sinceTime) { try {
+async function getTradeSignals({startTime,endTime}) { try {
   return new Promise((resolve,reject) => {
+    var startTimeMs = new Date(startTime).getTime()
+    var endTimeMs = new Date(endTime).getTime()
     var signals = []
     var stream = fsR(entrySignalTableFilePath, {})
     const outStream = new Writable({
@@ -495,7 +486,7 @@ async function getTradeSignals(sinceTime) { try {
         if (str && str.length > 0) {
           let signal = JSON.parse(str)
           let signalTime = new Date(signal.timestamp).getTime()
-          if (signalTime >= sinceTime) {
+          if (signalTime >= startTimeMs && signalTime <= endTimeMs) {
             var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(signal)
             signal.entryOrders = entryOrders
             signal.closeOrders = closeOrders
@@ -520,11 +511,16 @@ async function getTradeSignals(sinceTime) { try {
   })
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getTradeJson() { try {
-  var sinceTime = getTimeNow() - (candleLengthMS)
+async function getTradeJson(sp) { try {
+  if (mock) {
+    await mock.init(sp)
+    await bitmex.init(checkPositionCallback)
+    await mock.start()
+  }
+
   var [orders,signals] = await Promise.all([
-    bitmex.getOrders(sinceTime),
-    getTradeSignals(sinceTime)
+    bitmex.getOrders(sp),
+    getTradeSignals(sp)
   ])
   orders = orders.filter(o => {
     return o.stopPx != 1
