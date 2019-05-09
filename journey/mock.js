@@ -4,7 +4,6 @@ const fs = require('fs')
 
 const shoes = require('./shoes')
 const {symbol,account,setup} = shoes
-const candleLengthMS = setup.candle.interval*setup.candle.length*60000
 
 const winston = require('winston')
 const colorizer = winston.format.colorize();
