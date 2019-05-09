@@ -13,9 +13,16 @@ const isoTimestamp = winston.format((info, opts) => {
 });
 
 const oneDayMs = 24*60*60000
+const XBTUSDRate = 5400
+const makerFee = -0.00025
+const takerFee = 0.00075
 
 var startTimeMs = new Date(shoes.mock.startTime).getTime()
 var endTimeMs = new Date(shoes.mock.endTime).getTime()
+
+var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
+
+var margin, walletHistory, orders, historyOrders, position, trades, currentTradeIndex
 
 const logger = winston.createLogger({
   format: winston.format.label({label:'bitmex'}),
@@ -63,8 +70,6 @@ const logger = winston.createLogger({
     })
   ]
 })
-
-var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
 
 function getTimeNow() {
   return timeNow //new Date().getTime()
@@ -132,26 +137,31 @@ function updateLeverage() {
 
 }
 
-var margin = {
-  walletBalance: 100000000
-}
-var orders = [], historyOrders = []
-var position = {
-  currentQty: 0
-}
-var trades = [], currentTradeIndex = -1
-
-async function nextMargin() {
+async function nextMargin(pnl) {
+  margin.walletBalance += pnl
+  console.log(margin.walletBalance)
+  walletHistory.push({
+    transactTime: getISOTimeNow(),
+    walletBalance: margin.walletBalance
+  })
   await handleMargin([margin])
 }
 
-function fillOrder(o) {
+function fillOrder(o,lastPrice) {
   var {orderQty,side,execInst} = o
   o.cumQty = orderQty 
   o.ordStatus = 'Filled'
   o.transactTime = getISOTimeNow()
   o.timestamp = o.transactTime
-  return side == 'Buy' ? orderQty : -orderQty
+  if (!o.price) {
+    o.price = lastPrice
+  }
+  var foreignNotional = (side == 'Buy' ? -orderQty : orderQty)
+  var homeNotional = -foreignNotional / o.price
+  var coinPairRate = lastPrice/XBTUSDRate
+  var fee = execInst.indexOf('ParticipateDoNotInitiate') >= 0 ? makerFee : takerFee
+  var execComm = Math.round(Math.abs(homeNotional * coinPairRate) * fee * 100000000)
+  return [homeNotional,foreignNotional,execComm]
 }
 
 async function nextOrder(lastPrice) {
@@ -173,7 +183,20 @@ async function nextOrder(lastPrice) {
       }
       else {
         o.orderQty = o.orderQty || Math.abs(position.currentQty)
-        position.currentQty += fillOrder(o)
+        let [homeNotional,foreignNotional,execComm] = fillOrder(o,lastPrice)
+        position.currentQty -= foreignNotional
+        position.homeNotional += homeNotional
+        position.foreignNotional += foreignNotional
+        position.execComm += execComm
+        // console.log(position)
+        if (position.currentQty == 0) {
+          let coinPairRate = lastPrice/XBTUSDRate
+          let pnl = Math.round(position.homeNotional * coinPairRate * 100000000)
+          let fee = position.execComm
+          position.homeNotional = 0
+          position.execComm = 0
+          nextMargin(pnl - fee)
+        }
       }
     })
     await handleOrder(orders)
@@ -215,8 +238,6 @@ async function readNextDayTrades() { try {
   }
   return trades
 } catch(e) {logger.error(e.stack||e); debugger} }
-
-var lastIntervalTime = 0
 
 async function nextInstrument() { try {
   currentTradeIndex++
@@ -287,7 +308,7 @@ async function connect(hInterval,hMargin,hOrder,hPosition,hInstrument,hXBTUSDIns
   if (shoes.symbol != 'XBTUSD') {
     handleXBTUSDInstrument([{
       symbol: 'XBTUSD',
-      lastPrice: 5000
+      lastPrice: XBTUSDRate
     }])
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
@@ -382,22 +403,30 @@ async function getOrders({startTime,endTime}) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updateData() {
-  var start = 20190401
-  var end = 20190430
+  var start = 20190101
+  var end = 20190331
   await bitmexdata.downloadTradeData(start,end)
   await bitmexdata.generateCandleDayFiles(start,end,1)
 }
 
+async function getWalletHistory() {
+  return walletHistory
+}
+
 async function init(sp) {
-  // await updateData()
-  // debugger
+  await updateData()
+  debugger
   margin = {
     walletBalance: 100000000
   }
+  walletHistory = []
   orders = []
   historyOrders = []
   position = {
-    currentQty: 0
+    currentQty: 0,
+    homeNotional: 0,
+    foreignNotional: 0,
+    execComm: 0
   }
   trades = []
   currentTradeIndex = -1
@@ -421,7 +450,7 @@ async function start() {
   return new Promise(async (resolve,reject) => {
     var cont
 
-    await nextMargin()
+    await nextMargin(0)
     await nextOrder()
     await nextPosition()
     
@@ -449,6 +478,7 @@ module.exports = {
   cancelOrders: cancelOrders,
 
   getOrders: getOrders,
+  getWalletHistory: getWalletHistory,
 
   next: next,
   createInterval: createInterval,

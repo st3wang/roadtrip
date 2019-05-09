@@ -17,24 +17,41 @@
     color: white;
     margin: 2px;
   }
-  #plotlyDiv {
+  #plotTradeDiv {
     float: left;
     background-color: #131722;
-    width: 90%;
+    width: 90vw;
+    height: 60vh;
+  }
+  #plotWalletDiv {
+    float: left;
+    background-color: #131722;
+    width: 90vw;
+    height: 40vh;
+  }
+  #plotDrawdownDiv {
+    float: left;
+    background-color: #131722;
+    width: 90vw;
+    height: 40vh;
   }
   #configDiv {
-    background-color: #101219;
-/*     position: relative; */
-    width: 10%;
-    height: 100vh;
     float: right;
+    background-color: #101219;
+    position: absolute;
+    top: 0px;
+    right: 0px;
+    width: 10vw;
+    height: 100vh;
   }
 </style>
 <script src="https://cdn.plot.ly/plotly-latest.min.js" async></script>
 <script src="app.js" async defer></script>
 </head>
 <body>
-<div id="plotlyDiv"></div>
+<div id="plotTradeDiv"></div>
+<div id="plotWalletDiv"></div>
+<!-- <div id="plotDrawdownDiv"></div> -->
 <div id="configDiv">
   <input type="text" id="symbolInput" size="8">
   <input type="text" id="intervalInput" size="4">

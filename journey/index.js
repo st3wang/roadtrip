@@ -564,7 +564,9 @@ async function getTradeJson(sp) { try {
     trades.push(trade)
   })
   
-  return JSON.stringify({trades:trades,orders:orders})
+  let walletHistory = await bitmex.getWalletHistory()
+
+  return JSON.stringify({trades:trades,orders:orders,walletHistory:walletHistory})
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getFundingCsv() { try {
@@ -682,6 +684,14 @@ async function init() { try {
   await bitmex.init(checkPositionCallback)
   await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
+  // var trades = await getTradeJson({
+  //   symbol: 'ETHUSD',
+  //   interval: 1,
+  //   startTime: '2019-05-01T00:00:00.000Z',
+  //   endTime: '2019-05-02T00:00:00.000Z'
+  // })
+  // debugger
+
   next()
   // createInterval(-5000*2**6)
   // createInterval(-5000*2**5)
@@ -707,8 +717,11 @@ init()
 // })
 
 // lineReader.on('line', (line) => {
-//   var {timestamp,rsiSignal} = JSON.parse(line)
-//   if (rsiSignal && timestamp.indexOf('T16:22:') > 0) {
+//   var json = JSON.parse(line)
+//   var {timestamp,url,rsiSignal} = json
+//   if (rsiSignal && timestamp.indexOf('09T11:16:') > 0) {
+//     console.log(json)
+//     console.log(json.message)
 //     debugger
 //   }
 // })

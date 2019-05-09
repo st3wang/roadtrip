@@ -568,6 +568,10 @@ async function getCurrentMarketWithCurrentCandle() { try {
   return marketWithCurrentCandleCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
+async function getWalletHistory() { try {
+  return []
+} catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
+
 // async function getTradeHistory(startTime) { try {
 //   startTime = startTime || (getTimeNow() - (candleLengthMS))
 //   let response = await client.Execution.Execution_getTradeHistory({symbol: symbol,
@@ -1080,6 +1084,7 @@ if (mock) {
   orderAmendBulk = mock.orderAmendBulk
   cancelOrders = mock.cancelOrders
   getOrders = mock.getOrders
+  getWalletHistory = mock.getWalletHistory
 }
 
 module.exports = {
@@ -1093,6 +1098,7 @@ module.exports = {
 
   getOrders: getOrders,
   getFundingHistory: getFundingHistory, 
+  getWalletHistory: getWalletHistory,
   getCurrentCandle: getCurrentCandle,
   getNextFunding: getNextFunding,
   getRate: getRate,

@@ -7,7 +7,7 @@ setup.startTime = new Date(now.getTime() - 480*60000).toISOString()
 setup.endTime = now.toISOString()
 if (location.hostname == 'localhost') {
   setup.startTime = '2019-04-02T00:00:00.000Z'
-  setup.endTime = '2019-05-07T23:59:59.999Z'
+  setup.endTime = '2019-05-07T00:00:00.000Z'
 }
 
 symbolInput.value = setup.symbol
@@ -51,12 +51,23 @@ function getAnnotation({timestamp,transactTime,price,stopPx,ordStatus,orderQty},
   }
 }
 
-async function init() {
+async function getMarket() {
   var marketResponse = await fetch('GetMarket', {
     method: "POST",
     body: JSON.stringify(setup)
   })
-  var market = await marketResponse.json()
+  return await marketResponse.json()
+}
+
+async function getTrade() {
+  var tradeResponse = await fetch('GetTrade', {
+    method: "POST",
+    body: JSON.stringify(setup)
+  })
+  return await tradeResponse.json()
+}
+
+async function plotTrade([market,trade]) {
   var lastCandleDate = new Date(market.candles[market.candles.length-1].time)
   var lastCandleTime = lastCandleDate.getTime() + (lastCandleDate.getTimezoneOffset()*60000)
   var marketTrace = {
@@ -72,12 +83,6 @@ async function init() {
     low: market.lows,
     close: market.closes,
   }
-
-  var tradeResponse = await fetch('GetTrade', {
-    method: "POST",
-    body: JSON.stringify(setup)
-  })
-  var trade = await tradeResponse.json()
 
   var annotations = []
   var shapes = []
@@ -135,12 +140,13 @@ async function init() {
     dragmode: 'zoom',
     paper_bgcolor: '#131722',
     plot_bgcolor: '#131722',
-    height: window.innerHeight,
+//     autosize: true,
+//     height: window.innerHeight,
     margin: {
       r: 10,
       t: 25,
       b: 40,
-      l: 60
+      l: 40
     },
     font: {
       size: 8,
@@ -173,7 +179,97 @@ async function init() {
     shapes: shapes
   }
 
-  Plotly.plot('plotlyDiv', [marketTrace], layout);
+  Plotly.plot('plotTradeDiv', [marketTrace], layout)
+}
+
+async function plotWallet([market,trade]) {
+  var {candles} = market
+  var {walletHistory} = trade
+  var times = [], balances = [], drawdowns = [], highest = -99999999
+  var highestBalance = walletHistory.reduce((a,c) => {
+    c.walletBalance /= 100000000
+    return Math.max(a,c.walletBalance)
+  },-99999999)
+  times.push(candles[0].time)
+  balances.push(walletHistory[0].walletBalance)
+  drawdowns.push(highestBalance)
+  walletHistory.forEach(({transactTime,walletBalance}) => {
+    times.push(transactTime)
+    balances.push(walletBalance)
+    highest = Math.max(highest,walletBalance)
+    let dd = walletBalance - highest + highestBalance
+    drawdowns.push(dd)
+  })
+  times.push(candles[candles.length-1].time)
+  balances.push(walletHistory[walletHistory.length-1].walletBalance)
+  drawdowns.push(highestBalance)
+  var data = [
+    {
+      x: times,
+      y: balances,
+      type: 'scatter',
+      mode: "lines",
+      line: {
+        width: 1
+      }
+    },
+    {
+      x: times,
+      y: drawdowns,
+      type: 'scatter',
+      mode: "lines",
+      line: {
+        width: 1
+      }
+    }
+  ]
+
+  var layout = {
+    dragmode: 'zoom',
+    paper_bgcolor: '#131722',
+    plot_bgcolor: '#131722',
+    margin: {
+      r: 10,
+      t: 25,
+      b: 40,
+      l: 40
+    },
+    font: {
+      size: 8,
+      color: '#888'
+    },
+    showlegend: false,
+    xaxis: {
+      autorange: true,
+      rangeslider: {visible: false},
+      title: 'Date',
+      type: 'date',
+      gridcolor: '#333',
+      spikemode: 'across+marker',
+      spikecolor: '#888',
+      spikethickness: 1,
+      spikesnap: 'cursor',
+      spikedash: 'dot'
+    },
+    yaxis: {
+      autorange: true,
+      type: 'linear',
+      gridcolor: '#333',
+      spikemode: 'across+marker',
+      spikecolor: '#888',
+      spikethickness: 1,
+      spikesnap: 'cursor',
+      spikedash: 'dot'
+    }
+  }
+  
+  Plotly.newPlot('plotWalletDiv', data, layout)
+}
+
+async function init() {
+  var data = await Promise.all([getMarket(), getTrade()])
+  plotTrade(data)
+  plotWallet(data)
 }
 
 window.onload = init
