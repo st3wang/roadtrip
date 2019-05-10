@@ -140,10 +140,7 @@ function updateLeverage() {
 async function nextMargin(pnl) {
   margin.walletBalance += pnl
   console.log(margin.walletBalance)
-  walletHistory.push({
-    transactTime: getISOTimeNow(),
-    walletBalance: margin.walletBalance
-  })
+  walletHistory.push([getISOTimeNow(),margin.walletBalance])
   await handleMargin([margin])
 }
 
@@ -170,7 +167,12 @@ async function nextOrder(lastPrice) {
     if (ordStatus == 'New') {
       switch(ordType) {
         case 'Limit':
-          return ((side == 'Buy' && lastPrice < price) || (side == 'Sell' && lastPrice > price))
+          switch(execInst) {
+            case 'ParticipateDoNotInitiate':
+              return ((side == 'Buy' && lastPrice < price) || (side == 'Sell' && lastPrice > price))
+            default:
+              return ((side == 'Buy' && lastPrice <= price) || (side == 'Sell' && lastPrice >= price))
+          }
         case 'Stop':
           return ((side == 'Buy' && lastPrice >= stopPx) || (side == 'Sell' && lastPrice <= stopPx))
       }
@@ -404,7 +406,7 @@ async function getOrders({startTime,endTime}) { try {
 
 async function updateData() {
   var start = 20190101
-  var end = 20190331
+  var end = 20190509
   await bitmexdata.downloadTradeData(start,end)
   await bitmexdata.generateCandleDayFiles(start,end,1)
 }
@@ -414,8 +416,8 @@ async function getWalletHistory() {
 }
 
 async function init(sp) {
-  await updateData()
-  debugger
+  // await updateData()
+  // debugger
   margin = {
     walletBalance: 100000000
   }

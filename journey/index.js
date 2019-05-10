@@ -291,6 +291,11 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   // }
   // else 
   if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
+    // let testTime = new Date('2019-05-08T04:41:00.000Z').getTime()
+    // console.log(new Date(getTimeNow()).toISOString())
+    // if (getTimeNow() > testTime) {
+    //   debugger
+    // }
     signals = await getOrderSignal(walletBalance)
     orderSignal = signals.orderSignal
     if (!mock) {
@@ -323,7 +328,7 @@ async function checkPositionCallback(params) { try {
 async function checkEntry(params) { try {
   var {positionSize,signal} = params
   var cancel, enter
-  let newEntryOrders = bitmex.findOrders(/New/,signal.entryOrders)  
+  let newEntryOrders = bitmex.findOrders(/New/,signal.entryOrders)
 
   if (newEntryOrders.length > 0 && (cancel = cancelOrder(params))) {
     logger.warn('CANCEL',cancel)
@@ -427,6 +432,14 @@ var checking = false, recheckWhenDone = false
 
 async function checkPosition(params) { try {
   const {lastPositionSize,positionSize,caller} = params
+  // var date = new Date(getTimeNow())
+  // var m = date.getMinutes()
+  // if (m == 20) {
+  //   console.log(params.lastPrice)
+  // }
+  // else if (m > 20) {
+  //   debugger
+  // }
   if (!mock) {
     logger.info('checkPosition',params)
   }
@@ -526,6 +539,11 @@ async function getTradeSignals({startTime,endTime}) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getTradeJson(sp) { try {
+  var cachePath = getSignalPath(sp)
+  if (fs.existsSync(cachePath)) {
+    return fs.readFileSync(cachePath)
+  }
+
   if (mock) {
     await mock.init(sp)
     await bitmex.init(checkPositionCallback)
@@ -565,8 +583,10 @@ async function getTradeJson(sp) { try {
   })
   
   let walletHistory = await bitmex.getWalletHistory()
+  let tradeJSON = JSON.stringify({trades:trades,orders:orders,walletHistory:walletHistory})
+  fs.writeFileSync(cachePath,tradeJSON,writeFileOptions)
 
-  return JSON.stringify({trades:trades,orders:orders,walletHistory:walletHistory})
+  return tradeJSON
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getFundingCsv() { try {
@@ -664,6 +684,10 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
   return {entryOrders:entryOrders,closeOrders:closeOrders,takeProfitOrders:takeProfitOrders}
 }
 
+function getSignalPath({symbol,interval,startTime,endTime}) {
+  return path.resolve(__dirname, 'data/bitmex/signal/'+symbol+'-'+interval+'-'+startTime+'-'+endTime+'.json').replace(/:/g,';')
+}
+
 async function init() { try {
   if (mock) {
     await mock.init(shoes.mock)
@@ -684,30 +708,21 @@ async function init() { try {
   await bitmex.init(checkPositionCallback)
   await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
-  // var trades = await getTradeJson({
-  //   symbol: 'ETHUSD',
-  //   interval: 1,
-  //   startTime: '2019-05-01T00:00:00.000Z',
-  //   endTime: '2019-05-02T00:00:00.000Z'
-  // })
-  // debugger
-
-  next()
-  // createInterval(-5000*2**6)
-  // createInterval(-5000*2**5)
-  // createInterval(-5000*2**4)
-  // createInterval(-5000*2**3)
-  // createInterval(-6000*2**2)
-  // createInterval(-6000*2**1)
-  // createInterval(-6000*2**0)
-  // createInterval(100)
-  createInterval(6000*2**0)
-  createInterval(6000*2**1)
-  // createInterval(6000*2**2)
-  // createInterval(5000*2**3)
-  // createInterval(5000*2**4)
-  // createInterval(5000*2**5)
-  // createInterval(5000*2**6)
+  if (mock) {
+    // var s = {
+    //   symbol: 'ETHUSD',
+    //   interval: 1,
+    //   startTime: '2019-01-02T00:00:00.000Z',
+    //   endTime: '2019-05-09T00:00:00.000Z'
+    // }
+    // var tradeJSON = await getTradeJson(s)
+    // debugger
+  }
+  else {
+    next()
+    createInterval(6000*2**0)
+    createInterval(6000*2**1)
+  }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 init()

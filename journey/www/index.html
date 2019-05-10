@@ -7,15 +7,18 @@
   }
   body {
     margin: 0;
-    font: 8px sans-serif;
+    font: 10px sans-serif;
     background-color: #131722;
   }
   input {
-    font: 8px sans-serif;
+    font: 10px sans-serif;
     border-style: none;
     background-color: #283240;
     color: white;
     margin: 2px;
+  }
+  button {
+    font: 10px sans-serif;
   }
   #plotTradeDiv {
     float: left;
@@ -51,10 +54,10 @@
 <body>
 <div id="plotTradeDiv"></div>
 <div id="plotWalletDiv"></div>
-<!-- <div id="plotDrawdownDiv"></div> -->
 <div id="configDiv">
   <input type="text" id="symbolInput" size="8">
   <input type="text" id="intervalInput" size="4">
+  <button id="plotButton">PLOT</button>
   <input type="text" id="startTimeInput" size="24">
   <input type="text" id="endTimeInput" size="24">
 </div>

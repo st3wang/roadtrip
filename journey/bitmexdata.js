@@ -15,18 +15,18 @@ const csvParse = require('csv-parse')
 const csvStringify = require('csv-stringify')
 
 const tradeFilePath = 'data/bitmex/trade/YYYYMMDD.csv'
-const minTradeFilePath = 'data/bitmex/trade/YYYYMMDD.min.json'
+const minTradeFilePath = 'data/bitmex/trade/min/YYYYMMDD.json'
 const candleFilePath = 'data/bitmex/candle/YYYYMMDD.json'
 
 const symbols = ['XBTUSD','ETHUSD','LTCUSD']
 // const historyStartYmd = 20170101
 
 function getCleanedTradeFile(ymd,symbol) {
-  return tradeFilePath.replace('YYYYMMDD',ymd+'_'+symbol)
+  return tradeFilePath.replace('YYYYMMDD',symbol+'/'+ymd)
 }
 
 function getMinTradeFile(ymd,symbol) {
-  return minTradeFilePath.replace('YYYYMMDD',ymd+'_'+symbol)
+  return minTradeFilePath.replace('YYYYMMDD',symbol+'/'+ymd)
 }
 
 function getCandleFile(interval,ymd,symbol) {
@@ -229,8 +229,6 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
-const msPerDay = 24*60*60000
-
 async function getTradeBucketed(interval,time,symbol) {
   var readPath = getCandleFile(interval,ymdHelper.YYYYMMDD(time),symbol)
   var str = fs.readFileSync(readPath,readFileOptions)
@@ -286,6 +284,7 @@ async function readTradeDay(time,symbol) {
         })
         .on('error', e => reject(e))
         .on('end', () => {
+          trades = trades.sort((a, b) => a[0] - b[0])
           fs.writeFileSync(minPath,JSON.stringify(trades),writeFileOptions)
           resolve(trades)
           console.timeEnd('readTradeDay')

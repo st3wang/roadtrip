@@ -339,7 +339,7 @@ function addTradeToCandle(time,price) {
       currentCandle.low = price
     }
 
-    if (time > currentCandle.lastTradeTimeMs) {
+    if (time >= currentCandle.lastTradeTimeMs) {
       currentCandle.lastTradeTimeMs = time
       currentCandle.close = price
     }
@@ -528,7 +528,7 @@ async function getCurrentMarket() { try {
   else {
     let now = getTimeNow()
     let length = Math.max(setup.candle.length,setup.bankroll.stopLossLookBack)
-    let startTime = new Date(now-setup.candle.length*setup.candle.interval*60000).toISOString()
+    let startTime = new Date(now-length*setup.candle.interval*60000).toISOString()
     let endTime = new Date(now).toISOString()
     marketCache = await getTradeBucketed({
       symbol: symbol,
@@ -746,7 +746,6 @@ async function orderQueue(ord) { try {
 
 async function orderBulkRetry(ord) { try {
   if (ord.cancelAllBeforeOrder) {
-    // new entry
     await cancelAll()
   }
   
@@ -809,7 +808,11 @@ async function orderBulk(orders) { try {
   var response
 
   // Test amend on take profit orders
-  if (orders[0].ordType == 'Limit' && orders[0].execInst == 'ParticipateDoNotInitiate,ReduceOnly') {
+  // ordType: 'Limit',
+  // execInst: 'Close,ParticipateDoNotInitiate'
+  if (orders[0].ordType == 'Limit' && 
+    (orders[0].execInst == 'ParticipateDoNotInitiate,ReduceOnly' ||
+    orders[0].execInst == 'Close,ParticipateDoNotInitiate')) {
     let ordersToAmend = findOrdersToAmend(orders)
     if (ordersToAmend.length == 0) {
       response = await orderNewBulk(orders)

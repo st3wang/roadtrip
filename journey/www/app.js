@@ -1,19 +1,46 @@
-var setup = {}
-setup.symbol = 'ETHUSD'
-setup.interval = 1
+var setup = JSON.parse(localStorage.getItem('setup'))
+if (!setup) {
+  setup = {
+    symbol: 'ETHUSD',
+    interval: 1,
+    startTime: '2019-04-29T00:00:00.000Z',
+    endTime: '2019-04-30T00:00:00.000Z'
+  //   startTime: '2019-05-06T00:00:00.000Z',
+  //   endTime: '2019-05-06T08:00:00.000Z'
+  }
+  localStorage.setItem('setup',JSON.stringify(setup))
+}
 
-var now = new Date()
-setup.startTime = new Date(now.getTime() - 480*60000).toISOString()
-setup.endTime = now.toISOString()
-if (location.hostname == 'localhost') {
-  setup.startTime = '2019-04-02T00:00:00.000Z'
-  setup.endTime = '2019-05-07T00:00:00.000Z'
+if (location.hostname != 'localhost') {
+  var now = new Date()
+  setup.startTime = new Date(now.getTime() - 480*60000).toISOString()
+  setup.endTime = now.toISOString()
 }
 
 symbolInput.value = setup.symbol
 intervalInput.value = setup.interval
 startTimeInput.value = setup.startTime
 endTimeInput.value = setup.endTime
+
+function setupAndPlot() {
+  setup.symbol = symbolInput.value
+  setup.interval = intervalInput.value
+  setup.startTime = startTimeInput.value
+  setup.endTime = endTimeInput.value
+  localStorage.setItem('setup',JSON.stringify(setup))
+  plot()
+}
+
+function handleInputEnter() {
+  if (event.keyCode === 13) {
+    event.preventDefault()
+    setupAndPlot()
+  }
+}
+
+plotButton.onclick = setupAndPlot
+startTimeInput.onkeyup = handleInputEnter
+endTimeInput.onkeyup = handleInputEnter
 
 function getShape(startTime,endTime,startPrice,endPrice) {
   return {
@@ -67,7 +94,7 @@ async function getTrade() {
   return await tradeResponse.json()
 }
 
-async function plotTrade([market,trade]) {
+function plotTrade([market,trade]) {
   var lastCandleDate = new Date(market.candles[market.candles.length-1].time)
   var lastCandleTime = lastCandleDate.getTime() + (lastCandleDate.getTimezoneOffset()*60000)
   var marketTrace = {
@@ -179,30 +206,32 @@ async function plotTrade([market,trade]) {
     shapes: shapes
   }
 
-  Plotly.plot('plotTradeDiv', [marketTrace], layout)
+  Plotly.newPlot('plotTradeDiv', [marketTrace], layout)
 }
 
-async function plotWallet([market,trade]) {
+function plotWallet([market,trade]) {
+  if (!trade.walletHistory.length) return
   var {candles} = market
   var {walletHistory} = trade
   var times = [], balances = [], drawdowns = [], highest = -99999999
-  var highestBalance = walletHistory.reduce((a,c) => {
-    c.walletBalance /= 100000000
-    return Math.max(a,c.walletBalance)
-  },-99999999)
+  
   times.push(candles[0].time)
-  balances.push(walletHistory[0].walletBalance)
-  drawdowns.push(highestBalance)
-  walletHistory.forEach(({transactTime,walletBalance}) => {
+  balances.push(walletHistory[0][1]/100000000)
+  var highestBalance = walletHistory.reduce((a,[transactTime,walletBalance]) => {
+    walletBalance /= 100000000
     times.push(transactTime)
     balances.push(walletBalance)
-    highest = Math.max(highest,walletBalance)
-    let dd = walletBalance - highest + highestBalance
+    return Math.max(a,walletBalance)
+  },-99999999)
+  times.push(candles[candles.length-1].time)
+  balances.push(walletHistory[walletHistory.length-1][1]/100000000)
+
+  balances.forEach((b) => {
+    highest = Math.max(highest,b)
+    let dd = b - highest + highestBalance
     drawdowns.push(dd)
   })
-  times.push(candles[candles.length-1].time)
-  balances.push(walletHistory[walletHistory.length-1].walletBalance)
-  drawdowns.push(highestBalance)
+
   var data = [
     {
       x: times,
@@ -266,11 +295,11 @@ async function plotWallet([market,trade]) {
   Plotly.newPlot('plotWalletDiv', data, layout)
 }
 
-async function init() {
+async function plot() {
   var data = await Promise.all([getMarket(), getTrade()])
   plotTrade(data)
   plotWallet(data)
 }
 
-window.onload = init
+window.onload = plot
 
