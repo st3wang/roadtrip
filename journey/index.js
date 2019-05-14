@@ -721,16 +721,20 @@ function resetEntrySignal() {
   var now = getTimeNow()
   exitCandleTime = now - (now % oneCandleMS)
   entrySignal = {}
+  if (fs.existsSync(entrySignalFilePath)) {
+    fs.unlinkSync(entrySignalFilePath)
+  }
 }
 
 function initEntrySignal() {
-  resetEntrySignal()
+  var now = getTimeNow() 
+  exitCandleTime = now - (now % oneCandleMS)
+  entrySignal = {}
 
   if (!fs.existsSync(entrySignalFilePath)) {
     return
   }
 
-  var now = getTimeNow() 
   var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)
   entrySignal = JSON.parse(entrySignalString)
   entrySignal.time = new Date(entrySignal.timestamp).getTime()
