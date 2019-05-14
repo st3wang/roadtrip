@@ -22,7 +22,7 @@ var ws
 var lastMargin = {}, lastInstrument = {}, lastPosition = {}, lastOrders = [], lastXBTUSDInstrument = {}
 var lastBid, lastAsk, lastQty, lastRates = {}
 
-var currentCandle
+var lastCandle, currentCandle
 
 const colorizer = winston.format.colorize();
 
@@ -306,17 +306,21 @@ function startNextCandle() {
 
   marketWithCurrentCandleCache = null
 
-  marketCache.opens.shift()
-  marketCache.highs.shift()
-  marketCache.lows.shift()
-  marketCache.closes.shift()
-  marketCache.candles.shift()
+  lastCandle = currentCandle
 
-  marketCache.opens.push(currentCandle.open)
-  marketCache.highs.push(currentCandle.high)
-  marketCache.lows.push(currentCandle.low)
-  marketCache.closes.push(currentCandle.close)
-  marketCache.candles.push(currentCandle)
+  var {opens,highs,lows,closes,candles} = marketCache
+  opens.shift()
+  highs.shift()
+  lows.shift()
+  closes.shift()
+  candles.shift()
+
+  opens.push(currentCandle.open)
+  highs.push(currentCandle.high)
+  lows.push(currentCandle.low)
+  closes.push(currentCandle.close)
+  candles.push(currentCandle)
+
 
   let open = currentCandle.close
   currentCandle = {
@@ -338,23 +342,21 @@ function addTradeToCandle(time,price) {
     else if (price < currentCandle.low) {
       currentCandle.low = price
     }
-
     if (time >= currentCandle.lastTradeTimeMs) {
       currentCandle.lastTradeTimeMs = time
       currentCandle.close = price
     }
   }
   else {
-    let lastIndex = marketCache.candles.length - 1
-    let lastCandle = marketCache.candles[lastIndex]
     if (time >= lastCandle.startTimeMs && time <= lastCandle.endTimeMs) {
+      let lastIndex = marketCache.candles.length - 1
       if (price > lastCandle.high) {
         marketCache.highs[lastIndex] = lastCandle.high = price
       }
       else if (price < lastCandle.low) {
         marketCache.lows[lastIndex] = lastCandle.low = price
       }
-      if (time > lastCandle.lastTradeTimeMs) {
+      if (time >= lastCandle.lastTradeTimeMs) {
         lastCandle.lastTradeTimeMs = time
         marketCache.closes[lastIndex] = lastCandle.close = price
       }
@@ -520,6 +522,10 @@ async function getMarket(sp) {
   return await getTradeBucketed(sp)
 }
 
+async function getLastCandle() {
+  return lastCandle
+}
+
 async function getCurrentMarket() { try {
   if (marketCache) {
     // update current candle
@@ -536,6 +542,7 @@ async function getCurrentMarket() { try {
       startTime: startTime,
       endTime: endTime
     })
+    lastCandle = marketCache.candles[marketCache.candles.length-1]
   }
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
@@ -1114,6 +1121,7 @@ module.exports = {
   ordersTooSmall: ordersTooSmall,
 
   getCandleTimeOffset: getCandleTimeOffset,
+  getLastCandle: getLastCandle,
 
   checkPositionParams: checkPositionParams,
 

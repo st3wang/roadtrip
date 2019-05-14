@@ -140,17 +140,17 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   switch(signalCondition) {
     case 'SHORT':
       stopLoss = roundPrice(highestBody(market,stopLossLookBack))
-      entryPrice = Math.max(quote.askPrice||0,close) // use askPrice or close to be a maker
-      entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
+      // entryPrice = Math.max(quote.askPrice||0,close) // use askPrice or close to be a maker
+      // entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
       break;
     case 'LONG':
       stopLoss = roundPrice(lowestBody(market,stopLossLookBack))
-      entryPrice = Math.min(quote.bidPrice||Infinity,close) // use bidPrice or close to be a maker
-      entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
+      // entryPrice = Math.min(quote.bidPrice||Infinity,close) // use bidPrice or close to be a maker
+      // entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       break;
   }
 
-  entryPrice = roundPrice(entryPrice)
+  entryPrice = close
   lossDistance = roundPrice(stopLoss - entryPrice)
   if (!lossDistance || !walletBalance) {
     return {
