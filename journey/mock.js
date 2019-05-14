@@ -139,7 +139,6 @@ function updateLeverage() {
 
 async function nextMargin(pnl) {
   margin.walletBalance += pnl
-  console.log(margin.walletBalance)
   walletHistory.push([getISOTimeNow(),margin.walletBalance])
   await handleMargin([margin])
 }
@@ -405,8 +404,8 @@ async function getOrders({startTime,endTime}) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updateData() {
-  var start = 20190101
-  var end = 20190509
+  var start = 20190509
+  var end = 20190513
   await bitmexdata.downloadTradeData(start,end)
   await bitmexdata.generateCandleDayFiles(start,end,1)
 }

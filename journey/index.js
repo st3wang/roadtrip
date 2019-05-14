@@ -45,7 +45,7 @@ const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
     new winston.transports.Console({
-      level:shoes.log.level||'info',
+      level: shoes.log.level || 'info',
       format: winston.format.combine(
         isoTimestamp(),
         winston.format.prettyPrint(),
@@ -99,14 +99,15 @@ const logger = winston.createLogger({
                 line += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
               }
             } break
-            case 'ENTER': {
+            case 'ENTER SIGNAL': 
+            case 'ENTER ORDER': {
               let {orderQtyUSD,entryPrice} = splat[0]
               line =  (orderQtyUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+orderQtyUSD+' '+entryPrice
             } break
-            case 'EXIT': {
-              let {size,price} = splat[0].exitOrders[0]
-              line = (size>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+size+' '+price
-            }
+            // case 'EXIT ORDER': {
+            //   let {side,price} = splat[0].exitOrders[0]
+            //   line = (side>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+size+' '+price
+            // } break
             default: {
               line += (splat ? JSON.stringify(splat) : '')
             }
@@ -332,7 +333,7 @@ async function checkEntry(params) { try {
   if (newEntryOrders.length > 0) {
     let cancel = cancelOrder(params)
     if (cancel) {
-      logger.warn('CANCEL ORDER',cancel)
+      logger.info('CANCEL ORDER',cancel)
       await bitmex.cancelOrders(newEntryOrders)
       newEntryOrders = []
       resetEntrySignal()
@@ -352,7 +353,7 @@ async function checkEntry(params) { try {
             // logger.info('ENTRY ORDER EXISTS')
           }
           else {
-            logger.info('ENTER',entrySignal)
+            logger.info('ENTER ORDER',entrySignal)
             let response = await bitmex.order(entryOrders.concat(closeOrders),true)
             if (response.status == 200) {
               fs.writeFileSync(entrySignalFilePath,JSON.stringify(entrySignal,null,2),writeFileOptions)
@@ -365,7 +366,7 @@ async function checkEntry(params) { try {
       else {
         let cancel = cancelOrder(params)
         if (cancel) {
-          logger.warn('CANCEL SIGNAL',cancel)
+          logger.info('CANCEL SIGNAL',cancel)
           resetEntrySignal()
         }
       }
@@ -376,9 +377,10 @@ async function checkEntry(params) { try {
     if (!exitCandleTime || now > (exitCandleTime + oneCandleMS)) {
       let enter = (await enterSignal(params))
       if (enter) {
-        entrySignalTable.info('entry',enter.signal)
         entrySignal = enter.signal
+        entrySignalTable.info('entry',entrySignal)
         entrySignal.time = new Date(entrySignal.timestamp).getTime()
+        logger.info('ENTER SIGNAL',entrySignal)
       }
     }
   }
@@ -406,7 +408,7 @@ async function checkExit(params) { try {
       return existingExitOrders
     }
 
-    logger.info('EXIT', exit)
+    logger.info('CLOSE ORDER', exit)
     var response = await bitmex.order(exitOrders,true)
     return response
   }
@@ -458,7 +460,7 @@ async function checkExit(params) { try {
 var checking = false, recheckWhenDone = false
 
 async function checkPosition(params) { try {
-  const {lastPositionSize,positionSize,caller} = params
+  const {walletBalance,lastPositionSize,positionSize,caller,signal} = params
   // var date = new Date(getTimeNow())
   // var m = date.getMinutes()
   // if (m == 20) {
@@ -473,10 +475,10 @@ async function checkPosition(params) { try {
   switch(caller) {
     case 'position': {
       if (lastPositionSize == 0) {
-        console.log('POSITION ENTER')
+        logger.info('ENTER POSITION', walletBalance)
       }
       else if (positionSize == 0) {
-        console.log('POSITION EXIT')
+        logger.info('EXIT POSITION', walletBalance)
         resetEntrySignal()
       }
     } break;
@@ -763,8 +765,8 @@ async function init() { try {
     // var s = {
     //   symbol: 'ETHUSD',
     //   interval: 1,
-    //   startTime: '2019-05-08T00:00:00.000Z',
-    //   endTime: '2019-05-09T00:00:00.000Z'
+    //   startTime: '2019-05-09T00:00:00.000Z',
+    //   endTime: '2019-05-10T00:00:00.000Z'
     // }
     // var tradeJSON = await getTradeJson(s)
     // debugger
