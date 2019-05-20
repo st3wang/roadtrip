@@ -7,18 +7,20 @@
   }
   body {
     margin: 0;
-    font: 10px sans-serif;
+    font: 10px arial;
     background-color: #131722;
   }
   input {
-    font: 10px sans-serif;
+    font: 10px arial;
     border-style: none;
     background-color: #283240;
     color: white;
     margin: 2px;
   }
   button {
-    font: 10px sans-serif;
+    font: 10px arial;
+    width: 15px;
+    padding: 0px;
   }
   #plotTradeDiv {
     float: left;
@@ -58,7 +60,24 @@
   <input type="text" id="symbolInput" size="8">
   <input type="text" id="intervalInput" size="4">
   <button id="plotButton">PLOT</button>
+  <button id="dateButtonLeft">◄</button>
+  <button id="dateButtonRight">►</button>
   <input type="text" id="startTimeInput" size="24">
   <input type="text" id="endTimeInput" size="24">
+  <button id="rsiLengthDown">▼</button>
+  <input type="text" id="rsiLengthInput" size="2">
+  <button id="rsiLengthUp">▲</button><br>
+  <button id="shortPrsiDown">▼</button>
+  <input type="text" id="shortPrsiInput" size="2">
+  <button id="shortPrsiUp">▲</button>
+  <button id="shortRsiDown">▼</button>
+  <input type="text" id="shortRsiInput" size="2">
+  <button id="shortRsiUp">▲</button><br>
+  <button id="longRsiDown">▼</button>
+  <input type="text" id="longRsiInput" size="2">
+  <button id="longRsiUp">▲</button>
+  <button id="longPrsiDown">▼</button>
+  <input type="text" id="longPrsiInput" size="2">
+  <button id="longPrsiUp">▲</button>
 </div>
 </body> 

@@ -6,7 +6,7 @@ const shoes = require('./shoes')
 const {symbol,account,setup} = shoes
 const oneCandleMs = setup.candle.interval*60000
 const oneCandleEndMs = oneCandleMs-1
-const oneDayMS = 14400000
+const oneDayMS = 24*60*60000
 
 var mock
 if (shoes.mock) mock = require('./mock.js')
@@ -252,7 +252,7 @@ async function handleInstrument(data) { try {
 
   appendCandleLastPrice()
   
-  if (bid !== lastBid || ask !== lastAsk) {
+  if (mock || bid !== lastBid || ask !== lastAsk) {
     checkPositionParams.bid = bid
     checkPositionParams.ask = ask
     checkPositionParams.lastPrice = lastInstrument.lastPrice
@@ -1034,7 +1034,7 @@ function getRate(symbol) {
 async function initMarket() { try {
   console.log('Initializing market')
   await getCurrentMarket()
-  let currentTradeBucketed = await getCurrentTradeBucketed()
+  let currentTradeBucketed = await getCurrentTradeBucketed(setup.candle.interval)
   currentCandle = currentTradeBucketed.candle
   if (!currentTradeBucketed.candle.open) {
     var open = marketCache.closes[marketCache.closes.length-1]
@@ -1063,7 +1063,7 @@ async function initOrders() { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function init(checkPositionCb) { try {
+async function init(sp,checkPositionCb) { try {
   lastMargin = {}
   lastInstrument = {}
   lastPosition = {}

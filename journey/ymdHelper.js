@@ -1,5 +1,9 @@
 var padStart = require('string.prototype.padstart');
 
+function getTime(ymd) {
+  return new Date(YYYY_MM_DD(ymd)+'T00:00:00.000Z').getTime()
+}
+
 function YYYYMMDD(time) {
   return (new Date(time).toISOString()).substring(0,10).replace(/-/g,'')
 }
@@ -49,6 +53,7 @@ function nextDay(ymd) {
 module.exports = {
   nextDay: nextDay,
   getYmd: getYmd,
+  getTime: getTime,
   YYYY_MM_DD: YYYY_MM_DD,
   YYYYMMDD: YYYYMMDD
 }

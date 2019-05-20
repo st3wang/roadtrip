@@ -3,7 +3,6 @@ const uuid = require('uuid');
 const fs = require('fs')
 
 const shoes = require('./shoes')
-const {symbol,account,setup} = shoes
 
 const winston = require('winston')
 const colorizer = winston.format.colorize();
@@ -12,17 +11,17 @@ const isoTimestamp = winston.format((info, opts) => {
   return info;
 });
 
-const oneDayMs = 24*60*60000
-const XBTUSDRate = 5400
 const makerFee = -0.00025
 const takerFee = 0.00075
+const oneDayMs = 24*60*60000
+var oneCandleMs
 
-var startTimeMs = new Date(shoes.mock.startTime).getTime()
-var endTimeMs = new Date(shoes.mock.endTime).getTime()
+var setup, startTimeMs, endTimeMs, XBTUSDRate
 
 var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
 
 var margin, walletHistory, orders, historyOrders, position, trades, currentTradeIndex
+var rsis
 
 const logger = winston.createLogger({
   format: winston.format.label({label:'bitmex'}),
@@ -84,6 +83,7 @@ function authorize() {
 }
 
 async function getTradeBucketed({symbol,interval,startTime:st,endTime:et}) { try {
+  oneCandleMs = interval * 60000
   var startTime = new Date(st).getTime()
   var endTime = new Date(et).getTime()
   var startDayTime = startTime - (startTime % oneDayMs) 
@@ -102,9 +102,9 @@ async function getTradeBucketed({symbol,interval,startTime:st,endTime:et}) { try
     marketBuffer.lows.push(...lows)
     marketBuffer.closes.push(...closes)
     marketBuffer.candles.push(...candles)
-  }  
-  var startIndex = startTime % (oneDayMs) / 60000
-  var endIndex = startIndex + (endTime - startTime) / 60000
+  }
+  var startIndex = startTime % (oneDayMs) / oneCandleMs
+  var endIndex = startIndex + (endTime - startTime) / oneCandleMs
   var market = {
     opens: marketBuffer.opens.slice(startIndex,endIndex),
     highs: marketBuffer.highs.slice(startIndex,endIndex),
@@ -139,6 +139,7 @@ function updateLeverage() {
 
 async function nextMargin(pnl) {
   margin.walletBalance += pnl
+  if (!margin.walletBalance) debugger
   walletHistory.push([getISOTimeNow(),margin.walletBalance])
   await handleMargin([margin])
 }
@@ -189,7 +190,6 @@ async function nextOrder(lastPrice) {
         position.homeNotional += homeNotional
         position.foreignNotional += foreignNotional
         position.execComm += execComm
-        // console.log(position)
         if (position.currentQty == 0) {
           let coinPairRate = lastPrice/XBTUSDRate
           let pnl = Math.round(position.homeNotional * coinPairRate * 100000000)
@@ -209,6 +209,16 @@ async function nextPosition() {
   await handlePosition([position])
 }
 
+async function nextXBTUSDInstrument(time) { try {
+  var dayMarket = await bitmexdata.getTradeBucketed(1440,time,'XBTUSD')
+  var {open,high,low,close} = dayMarket.candles[0]
+  XBTUSDRate = (open+high+low+close)/4
+  await handleXBTUSDInstrument([{
+    symbol: 'XBTUSD',
+    lastPrice: XBTUSDRate
+  }])
+} catch(e) {logger.error(e.stack||e); debugger} }
+
 async function readNextDayTrades() { try {
   var startTime, endTime
   if (trades.length == 0) {
@@ -225,7 +235,7 @@ async function readNextDayTrades() { try {
   if (endTime > endTimeMs) {
     endTime = endTimeMs
   }
-  trades = await bitmexdata.readTradeDay(startTime,shoes.symbol)
+  trades = await bitmexdata.readFeedDay(setup.symbol,setup.interval,startTime)
   var filterStartTime = (startTime % oneDayMs) != 0
   var filterEndTime = (endTime % oneDayMs) != oneDayMs - 1
   if (filterStartTime && filterEndTime) {
@@ -245,12 +255,15 @@ async function nextInstrument() { try {
   var trade = trades[currentTradeIndex]
 
   if (!trade) {
-    console.timeEnd('readNextDayTrades')
-    console.time('readNextDayTrades')
+    // console.timeEnd('readNextDayTrades')
+    // console.time('readNextDayTrades')
     trades = await readNextDayTrades()
     if (trades && trades.length) {
       currentTradeIndex = 0
       trade = trades[0]
+      // if (setup.symbol != 'XBTUSD') {
+        nextXBTUSDInstrument(trade[0])
+      // }
     }
     else {
       return
@@ -305,13 +318,6 @@ async function connect(hInterval,hMargin,hOrder,hPosition,hInstrument,hXBTUSDIns
   handlePosition = hPosition
   handleInstrument = hInstrument
   handleXBTUSDInstrument = hXBTUSDInstrument
-
-  if (shoes.symbol != 'XBTUSD') {
-    handleXBTUSDInstrument([{
-      symbol: 'XBTUSD',
-      lastPrice: XBTUSDRate
-    }])
-  }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function next() {
@@ -331,6 +337,7 @@ async function cancelAll() {
 }
 
 function newOrder({side,orderQty,price,stopPx,ordType,execInst}) {
+  // console.log('newOrder',side,orderQty,price,stopPx,ordType,execInst)
   var isoTimeNow = getISOTimeNow()
   var o = {
     orderID: uuid.v1(),
@@ -361,6 +368,7 @@ async function orderNewBulk(ords) {
 }
 
 async function orderAmendBulk(ords) {
+  // console.log('orderAmendBulk')
   var amendOrders = []
   ords.forEach(o => {
     let ord = orders.find(ao => {
@@ -404,19 +412,38 @@ async function getOrders({startTime,endTime}) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updateData() {
-  var start = 20190509
-  var end = 20190513
-  await bitmexdata.downloadTradeData(start,end)
-  await bitmexdata.generateCandleDayFiles(start,end,1)
+  console.time('updateData')
+  var start = 20170101
+  var end = 20190516
+  // await bitmexdata.downloadTradeData(start,end)
+  // await bitmexdata.generateCandleDayFiles(start,end,1)
+  await bitmexdata.generateCandleDayFiles(start,end,5)
+  // await bitmexdata.generateCandleDayFiles(start,end,15)
+  // await bitmexdata.generateCandleDayFiles(start,end,1440)
+  // await bitmexdata.generateRsiFiles('XBTUSD',start,end,1,4)
+  console.timeEnd('updateData')
+  debugger
 }
+
+// updateData()
 
 async function getWalletHistory() {
   return walletHistory
 }
 
+async function getRsisCache(market) {
+  var len = market.candles.length
+  var rsisStartTime = startTimeMs-len*60000
+  rsis = rsis || await bitmexdata.readRsis('XBTUSD',rsisStartTime,setup.interval,setup.rsi.length)
+
+  var st = new Date(market.candles[0].time).getTime()
+  var begin = Math.floor((st - rsisStartTime) / (setup.interval * 60000))
+  return rsis.slice(begin,begin+len)
+}
+
 async function init(sp) {
-  // await updateData()
-  // debugger
+  setup = sp
+  oneCandleMs = sp.interval * 60000
   margin = {
     walletBalance: 100000000
   }

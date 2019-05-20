@@ -5,6 +5,7 @@ const gunzip = require('gunzip-file')
 
 const ymdHelper = require('./ymdHelper')
 const shoes = require('./shoes')
+// const strategy = require('./strategy')
 
 const readFile = util.promisify(fs.readFile)
 const readFileOptions = {encoding:'utf-8', flag:'r'}
@@ -17,9 +18,12 @@ const csvStringify = require('csv-stringify')
 const tradeFilePath = 'data/bitmex/trade/YYYYMMDD.csv'
 const minTradeFilePath = 'data/bitmex/trade/min/YYYYMMDD.json'
 const candleFilePath = 'data/bitmex/candle/YYYYMMDD.json'
+const feedFilePath = 'data/bitmex/feed/YYYYMMDD.json'
+const rsiFilePath = 'data/bitmex/rsi/YYYYMMDD.json'
 
-const symbols = ['XBTUSD','ETHUSD','LTCUSD']
-// const historyStartYmd = 20170101
+const symbols = ['XBTUSD']
+
+const oneDayMs = 24*60*60000
 
 function getCleanedTradeFile(ymd,symbol) {
   return tradeFilePath.replace('YYYYMMDD',symbol+'/'+ymd)
@@ -29,8 +33,16 @@ function getMinTradeFile(ymd,symbol) {
   return minTradeFilePath.replace('YYYYMMDD',symbol+'/'+ymd)
 }
 
-function getCandleFile(interval,ymd,symbol) {
-  return candleFilePath.replace('YYYYMMDD',interval + '/' + ymd + '_' + symbol)
+function getCandleFile(symbol,interval,ymd) {
+  return candleFilePath.replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
+}
+
+function getFeedFile(symbol,interval,ymd) {
+  return feedFilePath.replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
+}
+
+function getRsiFile(symbol,ymd,interval,length) {
+  return rsiFilePath.replace('YYYYMMDD',symbol+'/'+ymd+'_'+interval+'_'+length)
 }
 
 async function writeCleanedFile(ymd,symbol,output) {
@@ -160,24 +172,21 @@ function getCandles(groups,startTime,interval) {
     var intervalMS = interval*60*1000
     var candles = []
     var opens = [], highs = [], lows = [], closes = []
-    groups.forEach((group,i) => {
-      let candle = {
-        time: new Date(startTime + intervalMS*i).toISOString(),
-        open: null,
-        high: null,
-        low: null,
-        close: null
-      }
+    var groupsLen = groups.length
+    for (var i = 0; i < groupsLen; i++) {
+      let group = groups[i]
+      let groupLen = group.length
+      let open,high,low,close
       if (group.length > 0) {
         try {
-          candle.open = candle.high = candle.low = group[0].price
-          candle.close = group[group.length-1].price
-          candle = group.reduce((a,c) => {
-            if (c.price > a.high) a.high = c.price
-            if (c.price < a.low) a.low = c.price
-            return a
-          },candle)
-          if (!candle.open || !candle.close || !candle.high || !candle.low) {
+          open = high = low = group[0].price
+          close = group[group.length-1].price
+          for (let j = 0; j < groupLen; j++) {
+            let price = group[j].price
+            if (price > high) high = price
+            if (price < low) low = price
+          }
+          if (!open || !close || !high || !low) {
             debugger
           }
         }
@@ -185,18 +194,51 @@ function getCandles(groups,startTime,interval) {
           debugger
         }
       }
+      let gain = close - open, 
+          gainPercent = gain / open,
+          candleHeight = high - low,
+          body = Math.abs(gain),
+          bodyTop = Math.max(open,close),
+          bodyBottom = Math.min(open,close),
+          wick = high - bodyTop,
+          tail = bodyBottom - low
+
+      let candle = {
+        time: new Date(startTime + intervalMS*i).toISOString(),
+        open: open,
+        high: high,
+        low: low,
+        close: close,
+        gain: close - open,
+        gainPercent: gainPercent,
+        avgBody: (open+close)/2,
+        candleHeight: candleHeight,
+        candlePricePercent: candleHeight / open,
+        bodyTop: Math.max(open,close),
+        bodyBottom: Math.min(open,close),
+        body: body,
+        bodyPricePercent: body / open,
+        bodyCandlePercent: body / candleHeight,
+        wick: wick,
+        wickPricePercent: wick / open,
+        wickCandlePercent: wick / candleHeight,
+        tail: tail,
+        tailPricePercent: tail / open,
+        tailCandlePercent: tail / candleHeight
+      }
+
       candles.push(candle)
-      opens.push(candle.open)
-      highs.push(candle.high)
-      lows.push(candle.low)
-      closes.push(candle.close)
-    })
+      opens.push(open)
+      highs.push(high)
+      lows.push(low)
+      closes.push(close)
+    }
     resolve({opens:opens, highs:highs, lows:lows, closes:closes, candles:candles})
   })
 }
 
-async function getCandleDay(ymd,interval,symbol) { try {
-  console.log('getCandleDay',ymd,interval,symbol)
+async function getCandleDay(symbol,interval,ymd) { try {
+  console.log('getCandleDay',symbol,interval,ymd)
   var trades = await readAndParseForCandle(ymd,symbol)
   var startTimeGMT = new Date(ymdHelper.YYYY_MM_DD(ymd))
   var startTimeGMTMS = startTimeGMT.getTime()
@@ -205,52 +247,88 @@ async function getCandleDay(ymd,interval,symbol) { try {
   return candles
 } catch(e) {console.error(e.stack||e);debugger} }
 
+function getFeedDay({candles},interval,lastPrice) { try {
+  var feeds = [], len = candles.length, 
+      feedInterval = interval / 4 * 60000
+  for (var i = 0; i < len; i++) {
+    let {time:t,open,high,low,close} = candles[i]
+    let time = new Date(t).getTime()
+        openTime = time + 6000,
+        highTime = time + feedInterval,
+        lowTime = highTime + feedInterval,
+        closeTime = lowTime + feedInterval
+    feeds.push([openTime,1,1,open||lastPrice,new Date(openTime).toISOString()])
+    feeds.push([highTime,1,1,high||lastPrice,new Date(highTime).toISOString()])
+    feeds.push([lowTime,1,1,low||lastPrice,new Date(lowTime).toISOString()])
+    feeds.push([closeTime,1,1,close||lastPrice,new Date(closeTime).toISOString()])
+    lastPrice = (close||lastPrice)
+  }
+  return feeds
+} catch(e) {console.error(e.stack||e);debugger} }
+
 async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
-  var ymd = startYmd
   var len = symbols.length
-  while (ymd <= endYmd) {
-    for (var i = 0; i < len; i++) {
-      let symbol = symbols[i]
-      let writePath = getCandleFile(interval,ymd,symbol)
-      if (fs.existsSync(writePath)) {
-        console.log('skip',writePath)
+  for (var i = 0; i < len; i++) {
+    let symbol = symbols[i],
+        ymd = startYmd,
+        lastPrice
+    while (ymd <= endYmd) {
+      let writeCandlePath = getCandleFile(symbol,interval,ymd)
+      let candles, feeds
+      if (fs.existsSync(writeCandlePath)) {
+        console.log('skip',writeCandlePath)
       }
       else {
-        var candles = await getCandleDay(ymd,interval,symbol)
+        candles = await getCandleDay(symbol,interval,ymd)
         // if (candles.opens.length != 96 || candles.highs.length != 96 || candles.lows.length != 96 || candles.closes.length != 96 || candles.candles.length != 96) {
         //   debugger
         // }
-        var candlesString = JSON.stringify(candles)
-        await writeFile(writePath,candlesString,writeFileOptions)
-        console.log('done writing', writePath)
+        let candlesString = JSON.stringify(candles)
+        await writeFile(writeCandlePath,candlesString,writeFileOptions)
+        console.log('done writing', writeCandlePath)
       }
+      let writeFeedPath = getFeedFile(symbol,interval,ymd)
+      // if (fs.existsSync(writeFeedPath)) {
+      //   console.log('skip',writeFeedPath)
+      // }
+      // else {
+        candles = candles || JSON.parse(fs.readFileSync(writeCandlePath,readFileOptions))
+        feeds = getFeedDay(candles,interval,lastPrice)
+        let feedsString = JSON.stringify(feeds)
+        await writeFile(writeFeedPath,feedsString,writeFileOptions)
+        console.log('done writing', writeFeedPath)
+        lastPrice = feeds[feeds.length-1][3]
+      // }
+      ymd = ymdHelper.nextDay(ymd)
     }
-    ymd = ymdHelper.nextDay(ymd)
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getTradeBucketed(interval,time,symbol) {
-  var readPath = getCandleFile(interval,ymdHelper.YYYYMMDD(time),symbol)
-  var str = fs.readFileSync(readPath,readFileOptions)
-  var dayMarket = JSON.parse(str)
-  return dayMarket
+  var readPath = getCandleFile(symbol,interval,ymdHelper.YYYYMMDD(time))
+  if (fs.existsSync(readPath)) {
+    var str = fs.readFileSync(readPath,readFileOptions)
+    var dayMarket = JSON.parse(str)
+    return dayMarket
+  }
 }
 
 async function readTradeDay(time,symbol) {
   var ymd = ymdHelper.YYYYMMDD(time)
   return new Promise((resolve, reject) => {
-    console.log('readTradeDay',ymd)
-    console.time('readTradeDay')
+    // console.log('readTradeDay',ymd)
+    // console.time('readTradeDay')
     const minPath = getMinTradeFile(ymd,symbol)
     if (fs.existsSync(minPath)) {
       let trades = JSON.parse(fs.readFileSync(minPath,readFileOptions))
       resolve(trades)
-      console.timeEnd('readTradeDay')
+      // console.timeEnd('readTradeDay')
     }
     else {
       const readPath = getCleanedTradeFile(ymd,symbol)
       var trades = []
-      fs.createReadStream(readPath).pipe(csvParse())
+      if (fs.existsSync(readPath)) {
+        fs.createReadStream(readPath).pipe(csvParse())
         .on('data', ([timestamp,side,size,price]) => {
           timestamp = +timestamp
           side = +side
@@ -287,15 +365,61 @@ async function readTradeDay(time,symbol) {
           trades = trades.sort((a, b) => a[0] - b[0])
           fs.writeFileSync(minPath,JSON.stringify(trades),writeFileOptions)
           resolve(trades)
-          console.timeEnd('readTradeDay')
+          // console.timeEnd('readTradeDay')
         })
+      }
+      else {
+        resolve(trades)
+      }
     }
   })
+}
+
+async function readFeedDay(symbol,interval,time) { try {
+  var readPath = getFeedFile(symbol,interval,ymdHelper.YYYYMMDD(time))
+  if (fs.existsSync(readPath)) {
+    var str = fs.readFileSync(readPath,readFileOptions)
+    var feeds = JSON.parse(str)
+    return feeds
+  }
+  else {
+    return []
+  }
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function generateRsiFiles(symbol,startYmd,endYmd,interval,length) { try {
+  var st = ymdHelper.getTime(startYmd)
+  var et = ymdHelper.getTime(endYmd)
+  var closes = []
+  for (var time = st; time <= et; time += oneDayMs) {
+    var dayMarket = await getTradeBucketed(interval,time,symbol)
+    closes.push(...dayMarket.closes)
+  }
+  var rsis = await strategy.getRsi(closes,length)
+  rsis.forEach((r,i) => {
+    rsis[i] = Math.round(r*100)/100
+  })
+  var rsiFile = getRsiFile(symbol,startYmd,interval,length)
+  fs.writeFileSync(rsiFile,JSON.stringify(rsis),writeFileOptions)
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function readRsis(symbol,startTime,interval,length) {
+  console.time('readRsis')
+  var fileYmd = 20190501
+  var rsiFile = getRsiFile(symbol,fileYmd,interval,length)
+  var rsisString = fs.readFileSync(rsiFile,readFileOptions)
+  var rsis = JSON.parse(rsisString)
+  var begin = Math.floor((startTime - ymdHelper.getTime(fileYmd)) / (interval * 60000))
+  var result = rsis.slice(begin)
+  console.timeEnd('readRsis')
+  return result
 }
 
 module.exports = {
   downloadTradeData: downloadTradeData,
   generateCandleDayFiles: generateCandleDayFiles,
+  generateRsiFiles: generateRsiFiles,
   getTradeBucketed: getTradeBucketed,
-  readTradeDay: readTradeDay
+  readTradeDay: readTradeDay,
+  readFeedDay: readFeedDay
 }

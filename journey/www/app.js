@@ -3,13 +3,19 @@ if (!setup) {
   setup = {
     symbol: 'ETHUSD',
     interval: 1,
-    startTime: '2019-04-29T00:00:00.000Z',
-    endTime: '2019-04-30T00:00:00.000Z'
-  //   startTime: '2019-05-06T00:00:00.000Z',
-  //   endTime: '2019-05-06T08:00:00.000Z'
+    startTime: '2018-08-03T00:00:00.000Z',
+    endTime: '2019-05-09T00:00:00.000Z',
+    rsi: {
+      length: 2,
+      shortPrsi: 65,
+      shortRsi: 55,
+      longRsi: 55,
+      longPrsi: 50
+    }
   }
   localStorage.setItem('setup',JSON.stringify(setup))
 }
+var lastStartTime, lastEndTime, lastMarket
 
 if (location.hostname != 'localhost') {
   var now = new Date()
@@ -22,11 +28,38 @@ intervalInput.value = setup.interval
 startTimeInput.value = setup.startTime
 endTimeInput.value = setup.endTime
 
+rsiLengthInput.value = setup.rsi.length
+shortPrsiInput.value = setup.rsi.shortPrsi
+shortRsiInput.value = setup.rsi.shortRsi
+longPrsiInput.value = setup.rsi.longPrsi
+longRsiInput.value = setup.rsi.longRsi
+
+function changeDate(i) {
+  var st = new Date(startTimeInput.value).getTime() + (i * 24*60*60000)
+  var et = new Date(endTimeInput.value).getTime() + (i * 24*60*60000)
+  setup.startTime = new Date(st).toISOString()
+  setup.endTime = new Date(et).toISOString()
+  startTimeInput.value = setup.startTime
+  endTimeInput.value = setup.endTime
+  setupAndPlot()
+}
+
+function changeValue(e,i) {
+  var v = +e.value
+  e.value = (v+i) + ''
+  setupAndPlot()
+}
+
 function setupAndPlot() {
   setup.symbol = symbolInput.value
   setup.interval = intervalInput.value
   setup.startTime = startTimeInput.value
   setup.endTime = endTimeInput.value
+  setup.rsi.length = +rsiLengthInput.value
+  setup.rsi.shortPrsi = +shortPrsiInput.value
+  setup.rsi.shortRsi = +shortRsiInput.value
+  setup.rsi.longPrsi = +longPrsiInput.value
+  setup.rsi.longRsi = +longRsiInput.value
   localStorage.setItem('setup',JSON.stringify(setup))
   plot()
 }
@@ -39,10 +72,31 @@ function handleInputEnter() {
 }
 
 plotButton.onclick = setupAndPlot
-startTimeInput.onkeyup = handleInputEnter
-endTimeInput.onkeyup = handleInputEnter
 
-function getShape(startTime,endTime,startPrice,endPrice) {
+dateButtonLeft.onclick = e => changeDate(-1)
+dateButtonRight.onclick = e => changeDate(1)
+
+startTimeInput.onkeyup = 
+endTimeInput.onkeyup = 
+rsiLengthInput.onkeyup = 
+shortPrsiInput.onkeyup = 
+shortRsiInput.onkeyup = 
+longPrsiInput.onkeyup = 
+longRsiInput.onkeyup = handleInputEnter
+
+const step = 5
+rsiLengthDown.onclick = e => changeValue(rsiLengthInput,-1)
+rsiLengthUp.onclick = e => changeValue(rsiLengthInput,1)
+shortPrsiDown.onclick = e => changeValue(shortPrsiInput,-step)
+shortPrsiUp.onclick = e => changeValue(shortPrsiInput,step)
+shortRsiDown.onclick = e => changeValue(shortRsiInput,-step)
+shortRsiUp.onclick = e => changeValue(shortRsiInput,step)
+longPrsiDown.onclick = e => changeValue(longPrsiInput,-step)
+longPrsiUp.onclick = e => changeValue(longPrsiInput,step)
+longRsiDown.onclick = e => changeValue(longRsiInput,-step)
+longRsiUp.onclick = e => changeValue(longRsiInput,step)
+
+function getTradeShape(startTime,endTime,startPrice,endPrice) {
   return {
     type: 'rect',
     xref: 'x',
@@ -59,7 +113,7 @@ function getShape(startTime,endTime,startPrice,endPrice) {
   }
 }
 
-function getAnnotation({timestamp,transactTime,price,stopPx,ordStatus,orderQty},arrowColor) {
+function getTradeAnnotation({timestamp,transactTime,price,stopPx,ordStatus,orderQty},arrowColor) {
   return {
     x: transactTime,
     y: (price||stopPx),
@@ -75,6 +129,21 @@ function getAnnotation({timestamp,transactTime,price,stopPx,ordStatus,orderQty},
     arrowsize: 0.5,
     arrowcolor: arrowColor,
     opacity: ordStatus == 'Filled' ? 1 : 0.5
+  }
+}
+
+function getCandlestickAnnotation({time,low},text) {
+  return {
+    x: time,
+    y: low,
+    ax: 0,
+    ay: 0,
+    xref: 'x',
+    yref: 'y',
+    yanchor: 'top',
+    text: text,
+//     font: {color: 'white'},
+    showarrow: false
   }
 }
 
@@ -94,6 +163,69 @@ async function getTrade() {
   return await tradeResponse.json()
 }
 
+function addTradeShapesAndAnnotations(trade,lastCandleTime,shapes,annotations) {
+  if (trade && trade.trades.length < 100) {
+    trade.orders.forEach(o => {
+      annotations.push(getTradeAnnotation(o,'#888'))
+    })
+
+    trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders,otherOrders},i) => {
+  //     var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
+      var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders).concat(otherOrders)
+      var closeOrders = allOrders.filter(({ordStatus,execInst}) => {
+        return execInst != 'ParticipateDoNotInitiate' && ordStatus == 'Filled'
+      })
+      var endTime
+      if (closeOrders.length == 0 && i == trade.trades.length-1) {
+        endTime =  lastCandleTime 
+      }
+      else {
+        endTime = allOrders.reduce((a,c) => {
+          return (new Date(c.timestamp).getTime() > new Date(a).getTime()) ? c.timestamp : a
+        },timestamp)
+        if (endTime == timestamp) {
+          endTime = new Date(new Date(timestamp).getTime() + 600000).toISOString()
+        }
+      }
+
+
+      var arrowColor
+      if (type == 'LONG') {
+        shapes.push(getTradeShape(timestamp,endTime,entryPrice,takeProfit))
+        shapes.push(getTradeShape(timestamp,endTime,entryPrice,stopLoss))
+        arrowColor = '#008fff'
+      }
+      else {
+        shapes.push(getTradeShape(timestamp,endTime,takeProfit,entryPrice))
+        shapes.push(getTradeShape(timestamp,endTime,stopLoss,entryPrice))
+        arrowColor = '#cc47ed'
+      }
+      entryOrders.forEach((o) => {
+        annotations.push(getTradeAnnotation(o,arrowColor))
+      })
+      closeOrders.forEach((o) => {
+        annotations.push(getTradeAnnotation(o,arrowColor))
+      })
+      takeProfitOrders.forEach((o) => {
+        annotations.push(getTradeAnnotation(o,arrowColor))
+      })
+      otherOrders.forEach((o) => {
+        annotations.push(getTradeAnnotation(o,arrowColor))
+      })
+    })
+  }
+}
+
+function addCandlestickAnnotations({candles},annotations) {
+  var len = candles.length
+  for (var i = 0; i < len; i++) {
+    let candle = candles[i]
+    if (candle.isHammer) {
+      annotations.push(getCandlestickAnnotation(candle,'H'))
+    }
+  }
+}
+
 function plotTrade([market,trade]) {
   var lastCandleDate = new Date(market.candles[market.candles.length-1].time)
   var lastCandleTime = lastCandleDate.getTime() + (lastCandleDate.getTimezoneOffset()*60000)
@@ -111,58 +243,12 @@ function plotTrade([market,trade]) {
     close: market.closes,
   }
 
-  var annotations = []
-  var shapes = []
+  var shapes = [], annotations = []
 
-  trade.orders.forEach(o => {
-    annotations.push(getAnnotation(o,'#888'))
-  })
+  addCandlestickAnnotations(market,annotations)
+  addTradeShapesAndAnnotations(trade,lastCandleTime,shapes,annotations)
 
-  trade.trades.forEach(({timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders,otherOrders},i) => {
-//     var endTime = new Date(new Date(timestamp).getTime() + 3600000).toISOString()
-    var allOrders = entryOrders.concat(closeOrders).concat(takeProfitOrders).concat(otherOrders)
-    var closeOrders = allOrders.filter(({ordStatus,execInst}) => {
-      return execInst != 'ParticipateDoNotInitiate' && ordStatus == 'Filled'
-    })
-    var endTime
-    if (closeOrders.length == 0 && i == trade.trades.length-1) {
-      endTime =  lastCandleTime 
-    }
-    else {
-      endTime = allOrders.reduce((a,c) => {
-        return (new Date(c.timestamp).getTime() > new Date(a).getTime()) ? c.timestamp : a
-      },timestamp)
-      if (endTime == timestamp) {
-        endTime = new Date(new Date(timestamp).getTime() + 600000).toISOString()
-      }
-    }
-    
-
-    var arrowColor
-    if (type == 'LONG') {
-      shapes.push(getShape(timestamp,endTime,entryPrice,takeProfit))
-      shapes.push(getShape(timestamp,endTime,entryPrice,stopLoss))
-      arrowColor = '#008fff'
-    }
-    else {
-      shapes.push(getShape(timestamp,endTime,takeProfit,entryPrice))
-      shapes.push(getShape(timestamp,endTime,stopLoss,entryPrice))
-      arrowColor = '#cc47ed'
-    }
-    entryOrders.forEach((o) => {
-      annotations.push(getAnnotation(o,arrowColor))
-    })
-    closeOrders.forEach((o) => {
-      annotations.push(getAnnotation(o,arrowColor))
-    })
-    takeProfitOrders.forEach((o) => {
-      annotations.push(getAnnotation(o,arrowColor))
-    })
-    otherOrders.forEach((o) => {
-      annotations.push(getAnnotation(o,arrowColor))
-    })
-  })
-
+  
   var layout = {
     dragmode: 'zoom',
     paper_bgcolor: '#131722',
@@ -206,7 +292,7 @@ function plotTrade([market,trade]) {
     shapes: shapes
   }
 
-  Plotly.newPlot('plotTradeDiv', [marketTrace], layout)
+  Plotly.newPlot(plotTradeDiv, [marketTrace], layout)
 }
 
 function plotWallet([market,trade]) {
@@ -292,13 +378,32 @@ function plotWallet([market,trade]) {
     }
   }
   
-  Plotly.newPlot('plotWalletDiv', data, layout)
+  Plotly.newPlot(plotWalletDiv, data, layout)
 }
 
 async function plot() {
-  var data = await Promise.all([getMarket(), getTrade()])
+  setup.candlestick = true
+  var data = await Promise.all([getMarket()])
+  lastMarket = data[0]
   plotTrade(data)
-  plotWallet(data)
+  return
+  
+  if (lastStartTime != setup.startTime || lastEndTime != setup.endTime) {
+    Plotly.purge(plotTradeDiv)
+    Plotly.purge(plotWalletDiv)
+    var data = await Promise.all([getMarket(), getTrade()])
+    lastMarket = data[0]
+    plotTrade(data)
+    plotWallet(data)
+  }
+  else {
+    Plotly.purge(plotWalletDiv);
+    var data = await Promise.all([null,getTrade()])
+    data[0] = lastMarket
+    plotWallet(data)
+  }
+  lastStartTime = setup.startTime
+  lastEndTime = setup.endTime
 }
 
 window.onload = plot

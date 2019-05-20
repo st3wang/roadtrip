@@ -25,9 +25,8 @@ async function getRsi(data,length) { try {
   return Array(length).fill(0).concat(result.result.outReal)
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function getSignal(closes,{length,shortPrsi,shortRsi,longPrsi,longRsi}) { try {
-  var rsis = await getRsi(closes,length)
-  var len = closes.length
+function getRsiSignal(rsis,{shortPrsi,shortRsi,longPrsi,longRsi}) { try {
+  var len = rsis.length
   var rsi = rsis[len - 1]
   var prsi = rsis[len - 2]
   var condition = '-'
@@ -48,8 +47,6 @@ async function getSignal(closes,{length,shortPrsi,shortRsi,longPrsi,longRsi}) { 
     prsi: Math.round(prsi*100)/100,
     rsi: Math.round(rsi*100)/100,
     rsis: rsis,
-    closes: closes,
-    length: length,
     shortPrsi: shortPrsi,
     shortRsi: shortRsi,
     longPrsi: longPrsi,
@@ -57,21 +54,8 @@ async function getSignal(closes,{length,shortPrsi,shortRsi,longPrsi,longRsi}) { 
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
-function lowest(values,start,length) {
-  start++
-  var array = values.slice(start-length,start)
-  return Math.min.apply( Math, array )
-}
-
-function highest(values,start,length) {
-  start++
-  var array = values.slice(start-length,start)
-  return Math.max.apply( Math, array )
-}
-
 function lowestBody(market,length) {
   var opens = market.opens, closes = market.closes, lows = market.lows
-  var weightedLows = []
   var lowest = 9999999
   var start = market.closes.length - length
   var end = market.closes.length
@@ -82,14 +66,10 @@ function lowestBody(market,length) {
     }
   }
   return lowest
-  // var lowestOpen = lowest(market.opens,start,length)
-  // var lowestClose = lowest(market.closes,start,length)
-  // return Math.min(lowestOpen,lowestClose)
 }
 
 function highestBody(market,length) {
   var opens = market.opens, closes = market.closes, highs = market.highs
-  var weightedHighs = []
   var highest = 0
   var start = market.closes.length - length
   var end = market.closes.length
@@ -100,18 +80,20 @@ function highestBody(market,length) {
     }
   }
   return highest
-  // var highestOpen = highest(market.opens,start,length)
-  // var highestClose = highest(market.closes,start,length)
-  // return Math.max(highestOpen,highestClose)
 }
 
 function roundPrice(p) {
   return +((Math.round(p*roundPriceFactor)/roundPriceFactor).toFixed(2))
 }
 
-async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
+async function getSignals(market,rsi,bankroll,walletBalance) { try {
   var timestamp = new Date(getTimeNow()).toISOString()
-  var signalCondition = signal.condition
+  var rsis = (market.rsis || await getRsi(market.closes,rsi.length))
+  var rsiSignal = getRsiSignal(rsis,rsi)
+  rsiSignal.length = rsi.length
+  rsiSignal.closes = market.closes
+
+  var signalCondition = rsiSignal.condition
   
   var lastIndex = market.closes.length - 1
   var close = market.closes[lastIndex]
@@ -154,8 +136,11 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   lossDistance = roundPrice(stopLoss - entryPrice)
   if (!lossDistance || !walletBalance) {
     return {
-      timestamp: timestamp,
-      type: '-'
+      rsiSignal: rsiSignal,
+      orderSignal: {
+        timestamp: timestamp,
+        type: '-'
+      }
     }
   }
 
@@ -230,7 +215,7 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
   //   if (scaleInOrders.length <= 1) goodStopDistance = false
   // }
 
-  return {
+  var orderSignal = {
     timestamp: timestamp,
     capitalBTC: capitalBTC,
     capitalUSD: capitalUSD,
@@ -254,6 +239,11 @@ async function getOrderSignal(signal,market,bankroll,walletBalance) { try {
     leverage: leverage,
     scaleInOrders: scaleInOrders
   }
+
+  return {
+    rsiSignal: rsiSignal,
+    orderSignal: orderSignal
+  }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function init() {
@@ -264,7 +254,6 @@ async function init() {
 
 module.exports = {
   init: init,
-  getSignal: getSignal,
-  getOrderSignal: getOrderSignal,
+  getSignals: getSignals,
   getRsi: getRsi
 }
