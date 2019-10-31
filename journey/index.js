@@ -86,14 +86,12 @@ const logger = winston.createLogger({
                 ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
             case 'enterSignal': {
-              let {rsiSignal,conservativeRsiSignal,orderSignal} = splat[0]
-              if (rsiSignal) {
-                let {condition,prsi=NaN,rsi=NaN} = rsiSignal
-                line += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
-              }
-              if (conservativeRsiSignal) {
-                let {condition,prsi=NaN,rsi=NaN} = conservativeRsiSignal
-                line += ' '+conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
+              let {signal,orderSignal} = splat[0]
+              if (signal) {
+                if (signal.rsis) {
+                  let {condition,prsi=NaN,rsi=NaN} = signal
+                  line += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
+                }
               }
               if (orderSignal) {
                 let {type,entryPrice=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
@@ -179,43 +177,9 @@ function isInPositionForTooLong(signal) {
   }
 }
 
-async function getOrderSignalWithCurrentCandle(walletBalance) {
-  var market = await bitmex.getCurrentMarketWithCurrentCandle()
-  var closes = market.closes
-  var lastPrice = closes[closes.length-1]
-  var rsiSignal = await strategy.getSignal(closes,setup.rsi)
-  var conservativeCloses, conservativeRsiSignal, orderSignal
-  
-  // logger.verbose('getOrderSignalWithCurrentCandle rsiSignal', rsiSignal)
-
-  if (rsiSignal.condition == 'LONG') { 
-    conservativeCloses = market.closes.slice(1)
-    conservativeCloses.push(lastPrice-setup.bankroll.tick)
-    conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi)
-  }
-  else if (rsiSignal.condition == 'SHORT') {
-    conservativeCloses = market.closes.slice(1)
-    conservativeCloses.push(lastPrice+setup.bankroll.tick)
-    conservativeRsiSignal = await strategy.getSignal(closes,setup.rsi)
-  }
-
-  // if (conservativeRsiSignal) {
-  //   logger.verbose('getOrderSignalWithCurrentCandle conservativeRsiSignal', conservativeRsiSignal)
-  // }
-  // else {
-  //   logger.verbose('getOrderSignalWithCurrentCandle conservativeRsiSignal null')
-  // }
-
-  if (conservativeRsiSignal && conservativeRsiSignal.condition == rsiSignal.condition) {
-    orderSignal = await strategy.getOrderSignal(rsiSignal,market,setup.bankroll,walletBalance)
-    // logger.verbose('getOrderSignalWithCurrentCandle orderSignal', orderSignal)
-  }
-  return {rsiSignal:rsiSignal,conservativeRsiSignal:conservativeRsiSignal,orderSignal:orderSignal}
-}
-
 async function getOrderSignal(walletBalance) {
   var market = await bitmex.getCurrentMarket()
-  var signals = await strategy.getSignals(market,setup.rsi,setup.bankroll,walletBalance)
+  var signals = await strategy.getSignals(market,setup,walletBalance)
   return signals
 }
 
@@ -279,14 +243,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   let candleTimeOffset = bitmex.getCandleTimeOffset()
 
   let signals, orderSignal
-  // if (candleTimeOffset >= setup.candle.signalTimeOffsetMax) {
-  //   signals = await getOrderSignalWithCurrentCandle(walletBalance)
-  //   orderSignal = signals.orderSignal
-  //   if (!mock) {
-  //     logger.debug('enterSignal',signals)
-  //   }
-  // }
-  // else 
+
   if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
     signals = await getOrderSignal(walletBalance)
     orderSignal = signals.orderSignal
@@ -454,7 +411,7 @@ async function checkExit(params) { try {
 var checking = false, recheckWhenDone = false
 
 async function checkPosition(params) { try {
-  const {walletBalance,lastPositionSize,positionSize,caller,signal} = params
+  const {walletBalance,lastPositionSize,positionSize,caller} = params
   if (!mock) logger.info('checkPosition',params)
   switch(caller) {
     case 'position': {
@@ -664,7 +621,7 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
     }]
   }
 
-  var exitPriceOffset = (-orderQtyUSD/Math.abs(orderQtyUSD)*setup.bankroll.tick)
+  var exitPriceOffset = (-orderQtyUSD/Math.abs(orderQtyUSD)*setup.candle.tick)
   var closeOrders = [{
     stopPx: stopMarket,
     side: exitSide,
@@ -766,27 +723,27 @@ async function init() { try {
     var tradeJSON = await getTradeJson(s)
     var t = JSON.parse(tradeJSON)
     debugger
-  //   for (var sprsi = 55; sprsi <= 75; sprsi+=5) {
-  //     for (var srsi = 50; srsi <= 70; srsi+=5) {
-  //       for (var lrsi = 30; lrsi <= 55; lrsi+=5) {
-  //         for (var lprsi = 25; lprsi <= 50; lprsi+=5) {
-  //           if (sprsi >= srsi && lrsi >= lprsi) {
-  //             s.rsi.shortPrsi = sprsi
-  //             s.rsi.shortRsi = srsi
-  //             s.rsi.longRsi = lrsi
-  //             s.rsi.longPrsi = lprsi
-  //             let tradeJSON = await getTradeJson(s)
-  //             let t = JSON.parse(tradeJSON)
-  //             let startBalance = t.walletHistory[0][1]
-  //             let endBalance = t.walletHistory[t.walletHistory.length-1][1]
-  //             let gain = endBalance-startBalance
-  //             console.log(sprsi,srsi,lrsi,lprsi,startBalance,endBalance,gain)
-  //             if (gain > 0) debugger
-  //           }
-  //         }
-  //       }
-  //     }
-  //   }
+    // for (var sprsi = 55; sprsi <= 75; sprsi+=5) {
+    //   for (var srsi = 50; srsi <= 70; srsi+=5) {
+    //     for (var lrsi = 30; lrsi <= 55; lrsi+=5) {
+    //       for (var lprsi = 25; lprsi <= 50; lprsi+=5) {
+    //         if (sprsi >= srsi && lrsi >= lprsi) {
+    //           s.rsi.shortPrsi = sprsi
+    //           s.rsi.shortRsi = srsi
+    //           s.rsi.longRsi = lrsi
+    //           s.rsi.longPrsi = lprsi
+    //           let tradeJSON = await getTradeJson(s)
+    //           let t = JSON.parse(tradeJSON)
+    //           let startBalance = t.walletHistory[0][1]
+    //           let endBalance = t.walletHistory[t.walletHistory.length-1][1]
+    //           let gain = endBalance-startBalance
+    //           console.log(sprsi,srsi,lrsi,lprsi,startBalance,endBalance,gain)
+    //           if (gain > 0) debugger
+    //         }
+    //       }
+    //     }
+    //   }
+    // }
   }
   else {
     await bitmex.init(setup,checkPositionCallback)
@@ -804,8 +761,8 @@ init()
 
 // lineReader.on('line', (line) => {
 //   var json = JSON.parse(line)
-//   var {timestamp,url,rsiSignal} = json
-//   if (rsiSignal && timestamp.indexOf('09T11:16:') > 0) {
+//   var {timestamp,url,signal} = json
+//   if (signal && timestamp.indexOf('09T11:16:') > 0) {
 //     console.log(json)
 //     console.log(json.message)
 //     debugger

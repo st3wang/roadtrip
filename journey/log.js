@@ -41,43 +41,6 @@ function writeOrderSignal(bankroll,signal) {
   })
 }
 
-function writeInterval(rsiSignal,market,bankroll,position,margin,signal,orderSent) {
-  var isoString = signal.timestamp
-  var signalCSV = isoString + ',' + rsiSignal.prsi.toFixed(2) + ',' + rsiSignal.rsi.toFixed(2) + ',' + market.closes[market.closes.length-1].toFixed(1) + ',' +
-    rsiSignal.condition + ',' + signal.type + ',' + position.currentQty + ',' + (margin.marginBalance/100000000).toFixed(4) + '\n'
-  console.log(signalCSV.replace('\n',''))
-  fs.appendFile(conditionFile, signalCSV, e => {
-    if (e) {
-      console.log(e)
-    }
-  })
-  var dataFile = logDir+'/'+isoString.replace(/\:/g,',')+'.json'
-  var content = JSON.stringify({rsiSignal:rsiSignal,market:market,bankroll:bankroll,position:position,margin:margin,signal:signal})
-  fs.writeFile(dataFile,content,writeFileOptions, e => {
-    if (e) {
-      console.log(e)
-    }
-  })
-  if (orderSent) {
-    // Time,Capital,Risk,R/R,
-    // Type,Entry,Stop,Target,StopMarket,StopPercent,StopDistance,TargetDistance,
-    // RiskBTC,RiskUSD,SizeBTC,SizeUSD,Leverage
-    entrySignalsCache = null
-    var entryData = [isoString,bankroll.capitalUSD,bankroll.riskPerTradePercent,bankroll.profitFactor,
-      signal.type,signal.entryPrice,signal.stopLoss,signal.takeProfit,signal.stopMarket,signal.lossDistancePercent,signal.lossDistance,signal.profitDistance,
-      signal.riskAmountBTC,signal.riskAmountUSD,signal.qtyBTC,signal.orderQtyUSD,signal.leverage]
-    var entryCSV = entryData.toString()
-    console.log(entryCSV)
-    fs.appendFile(signalsfile, entryCSV+'\n', e => {
-      if (e) {
-        console.log(e)
-      }
-    })
-    // sheets.enterTrade(entryData).catch(e => {
-    //   console.log(e)
-    // })
-  }
-}
 function writeExit(exitData) {
   // sheets.exitTrade(exitData).catch(e => {
   //   console.log(e)

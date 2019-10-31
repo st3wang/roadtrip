@@ -414,12 +414,12 @@ async function getOrders({startTime,endTime}) { try {
 async function updateData() {
   console.time('updateData')
   var start = 20170101
-  var end = 20190516
-  // await bitmexdata.downloadTradeData(start,end)
+  var end = 20191016
+  await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.generateCandleDayFiles(start,end,1)
-  await bitmexdata.generateCandleDayFiles(start,end,5)
+  // await bitmexdata.generateCandleDayFiles(start,end,5)
   // await bitmexdata.generateCandleDayFiles(start,end,15)
-  // await bitmexdata.generateCandleDayFiles(start,end,1440)
+  await bitmexdata.generateCandleDayFiles(start,end,60)
   // await bitmexdata.generateRsiFiles('XBTUSD',start,end,1,4)
   console.timeEnd('updateData')
   debugger

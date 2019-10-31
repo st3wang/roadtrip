@@ -13,47 +13,6 @@ function getTimeNow() {
   return new Date().getTime()
 }
 
-async function getRsi(data,length) { try {
-  var result = await talibExecute({
-    name: "RSI",
-    inReal: data,
-    startIdx: 0,
-    endIdx: data.length - 1,
-    optInTimePeriod: length
-  })
-
-  return Array(length).fill(0).concat(result.result.outReal)
-} catch(e) {console.error(e.stack||e);debugger} }
-
-function getRsiSignal(rsis,{shortPrsi,shortRsi,longPrsi,longRsi}) { try {
-  var len = rsis.length
-  var rsi = rsis[len - 1]
-  var prsi = rsis[len - 2]
-  var condition = '-'
-  if (prsi > shortPrsi && rsi <= shortRsi ) {
-    condition = 'SHORT'
-  }
-  else if (prsi < longPrsi && rsi >= longRsi ) {
-    condition = 'LONG'
-  }
-  else if (prsi > shortPrsi) {
-    condition = 'S'
-  }
-  else if (prsi < longPrsi) {
-    condition = 'L'
-  }
-  return {
-    condition: condition,
-    prsi: Math.round(prsi*100)/100,
-    rsi: Math.round(rsi*100)/100,
-    rsis: rsis,
-    shortPrsi: shortPrsi,
-    shortRsi: shortRsi,
-    longPrsi: longPrsi,
-    longRsi: longRsi
-  }
-} catch(e) {console.error(e.stack||e);debugger} }
-
 function lowestBody(market,length) {
   var opens = market.opens, closes = market.closes, lows = market.lows
   var lowest = 9999999
@@ -86,66 +45,77 @@ function roundPrice(p) {
   return +((Math.round(p*roundPriceFactor)/roundPriceFactor).toFixed(2))
 }
 
-async function getSignals(market,rsi,bankroll,walletBalance) { try {
-  var timestamp = new Date(getTimeNow()).toISOString()
-  var rsis = (market.rsis || await getRsi(market.closes,rsi.length))
-  var rsiSignal = getRsiSignal(rsis,rsi)
-  rsiSignal.length = rsi.length
-  rsiSignal.closes = market.closes
+async function getRsi(data,length) { try {
+  var result = await talibExecute({
+    name: "RSI",
+    inReal: data,
+    startIdx: 0,
+    endIdx: data.length - 1,
+    optInTimePeriod: length
+  })
 
-  var signalCondition = rsiSignal.condition
-  
-  var lastIndex = market.closes.length - 1
-  var close = market.closes[lastIndex]
-  var {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,halfProfitFactor,
-    stopMarketFactor,stopLossLookBack,scaleInFactor,scaleInLength,minOrderSizeBTC,tick} = bankroll
+  return Array(length).fill(0).concat(result.result.outReal)
+} catch(e) {console.error(e.stack||e);debugger} }
 
-  var leverageMargin = walletBalance*0.000000008
-  var entryPrice, lossDistance, stopLoss, profitDistance, takeProfit, stopMarketDistance, 
-    stopLossTrigger, takeProfitTrigger,lossDistancePercent,
-    riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
+async function getRsiSignal(market,{shortPrsi,shortRsi,longPrsi,longRsi,length}) { try {
+  var rsis = (market.rsis || await getRsi(market.closes,length))
+  var len = rsis.length
+  var rsi = rsis[len - 1]
+  var prsi = rsis[len - 2]
+  var condition = '-'
+  if (prsi > shortPrsi && rsi <= shortRsi ) {
+    condition = 'SHORT'
+  }
+  else if (prsi < longPrsi && rsi >= longRsi ) {
+    condition = 'LONG'
+  }
+  else if (prsi > shortPrsi) {
+    condition = 'S'
+  }
+  else if (prsi < longPrsi) {
+    condition = 'L'
+  }
+  return {
+    condition: condition,
+    prsi: Math.round(prsi*100)/100,
+    rsi: Math.round(rsi*100)/100,
+    rsis: rsis,
+    shortPrsi: shortPrsi,
+    shortRsi: shortRsi,
+    longPrsi: longPrsi,
+    longRsi: longRsi,
+    length:length,
+    closes: market.closes
+  }
+} catch(e) {console.error(e.stack||e);debugger} }
 
-  var quote = bitmex.getQuote()
-  var XBTUSDRate = bitmex.getRate('XBTUSD')
-  var coinPairRate = quote.lastPrice/XBTUSDRate
-
-  roundPriceFactor = 1/tick
-  walletBalance /= coinPairRate
-  minOrderSizeBTC /= coinPairRate
-
-  // Test
-  // if (shoes.test ) {
-  //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
-  //   else if (signalCondition == 'L') signalCondition = 'LONG'
-  // }
-
+function getRsiStopLoss(signalCondition,market,stopLossLookBack) {
   switch(signalCondition) {
     case 'SHORT':
-      stopLoss = roundPrice(highestBody(market,stopLossLookBack))
+      return roundPrice(highestBody(market,stopLossLookBack))
       // entryPrice = Math.max(quote.askPrice||0,close) // use askPrice or close to be a maker
       // entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
       break;
     case 'LONG':
-      stopLoss = roundPrice(lowestBody(market,stopLossLookBack))
+      return roundPrice(lowestBody(market,stopLossLookBack))
       // entryPrice = Math.min(quote.bidPrice||Infinity,close) // use bidPrice or close to be a maker
       // entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       break;
   }
+}
 
-  entryPrice = close
-  lossDistance = roundPrice(stopLoss - entryPrice)
-  if (!lossDistance || !walletBalance) {
-    return {
-      rsiSignal: rsiSignal,
-      orderSignal: {
-        timestamp: timestamp,
-        type: '-'
-      }
-    }
-  }
+async function getOrder(setup,signalCondition,walletBalance,entryPrice,lossDistance,coinPairRate) {
+  var tick = setup.candle.tick
+  var leverageMargin = walletBalance*0.000000008
+  var profitDistance, takeProfit, stopMarketDistance, 
+    stopLossTrigger, takeProfitTrigger,lossDistancePercent,
+    riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
 
+  var {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,halfProfitFactor,
+    stopMarketFactor,scaleInFactor,scaleInLength,minOrderSizeBTC,minStopLoss,maxStopLoss} = setup.bankroll
   var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
 
+  minOrderSizeBTC /= coinPairRate
   stopMarketDistance = roundPrice(lossDistance * stopMarketFactor)
   profitDistance = roundPrice(-lossDistance * profitFactor)
   halfProfitDistance = roundPrice(-lossDistance * halfProfitFactor)
@@ -182,7 +152,7 @@ async function getSignals(market,rsi,bankroll,walletBalance) { try {
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
-  var goodStopDistance = absLossDistancePercent >= bankroll.minStopLoss && absLossDistancePercent <= bankroll.maxStopLoss
+  var goodStopDistance = absLossDistancePercent >= minStopLoss && absLossDistancePercent <= maxStopLoss
 
   var scaleInSize = Math.round(orderQtyUSD / scaleInLength)
   var absScaleInsize = Math.abs(scaleInSize)
@@ -215,8 +185,7 @@ async function getSignals(market,rsi,bankroll,walletBalance) { try {
   //   if (scaleInOrders.length <= 1) goodStopDistance = false
   // }
 
-  var orderSignal = {
-    timestamp: timestamp,
+  return {
     capitalBTC: capitalBTC,
     capitalUSD: capitalUSD,
     type: (goodStopDistance ? signalCondition : '-'),
@@ -225,7 +194,6 @@ async function getSignals(market,rsi,bankroll,walletBalance) { try {
     lossDistancePercent: lossDistance/entryPrice,
     profitDistance: profitDistance,
     halfProfitDistance: halfProfitDistance,
-    stopLoss: stopLoss,
     takeProfit: takeProfit,
     takeHalfProfit: takeHalfProfit,
     stopMarket: stopMarket,
@@ -239,9 +207,49 @@ async function getSignals(market,rsi,bankroll,walletBalance) { try {
     leverage: leverage,
     scaleInOrders: scaleInOrders
   }
+}
+
+async function getSignals(market,setup,walletBalance) { try {
+  var timestamp = new Date(getTimeNow()).toISOString()
+  var signal, stopLoss, entryPrice, lossDistance
+  roundPriceFactor = 1/setup.candle.tick
+
+  if (setup.rsi) {
+    signal = await getRsiSignal(market,setup.rsi)
+    // Test
+    // if (shoes.test ) {
+    //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
+    //   else if (signalCondition == 'L') signalCondition = 'LONG'
+    // }
+    stopLoss = getRsiStopLoss(signal.condition, market, setup.rsi.stopLossLookBack)
+  }
+
+  var quote = bitmex.getQuote()
+  var XBTUSDRate = bitmex.getRate('XBTUSD')
+  var coinPairRate = quote.lastPrice/XBTUSDRate
+  walletBalance /= coinPairRate
+  
+  var lastIndex = market.closes.length - 1
+  var close = market.closes[lastIndex]
+
+  entryPrice = close
+  lossDistance = roundPrice(stopLoss - entryPrice)
+  if (!lossDistance || !walletBalance) {
+    return {
+      signal: signal,
+      orderSignal: {
+        timestamp: timestamp,
+        type: '-'
+      }
+    }
+  }
+
+  var orderSignal = await getOrder(setup,signal.condition,walletBalance,entryPrice,lossDistance,coinPairRate)
+  orderSignal.stopLoss = stopLoss
+  orderSignal.timestamp = timestamp
 
   return {
-    rsiSignal: rsiSignal,
+    signal: signal,
     orderSignal: orderSignal
   }
 } catch(e) {console.error(e.stack||e);debugger} }
@@ -254,6 +262,5 @@ async function init() {
 
 module.exports = {
   init: init,
-  getSignals: getSignals,
-  getRsi: getRsi
+  getSignals: getSignals
 }

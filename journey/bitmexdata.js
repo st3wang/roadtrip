@@ -176,15 +176,17 @@ function getCandles(groups,startTime,interval) {
     for (var i = 0; i < groupsLen; i++) {
       let group = groups[i]
       let groupLen = group.length
+      let volume = 0
       let open,high,low,close
       if (group.length > 0) {
         try {
           open = high = low = group[0].price
           close = group[group.length-1].price
           for (let j = 0; j < groupLen; j++) {
-            let price = group[j].price
+            let {price,size} = group[j]
             if (price > high) high = price
             if (price < low) low = price
+            volume += size
           }
           if (!open || !close || !high || !low) {
             debugger
@@ -205,6 +207,7 @@ function getCandles(groups,startTime,interval) {
 
       let candle = {
         time: new Date(startTime + intervalMS*i).toISOString(),
+        volume: volume,
         open: open,
         high: high,
         low: low,

@@ -533,7 +533,7 @@ async function getCurrentMarket() { try {
   }
   else {
     let now = getTimeNow()
-    let length = Math.max(setup.candle.length,setup.bankroll.stopLossLookBack)
+    let length = Math.max(setup.candle.length,setup.candle.lookBack)
     let startTime = new Date(now-length*setup.candle.interval*60000).toISOString()
     let endTime = new Date(now).toISOString()
     marketCache = await getTradeBucketed({
