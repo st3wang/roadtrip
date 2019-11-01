@@ -4,6 +4,8 @@ const talib = require('talib')
 const talibExecute = util.promisify(talib.execute)
 const bitmex = require('./bitmex')
 const shoes = require('./shoes')
+const readFileOptions = {encoding:'utf-8', flag:'r'}
+const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
 const entrySignalFilePath = global.logDir + '/entry_signal.json'
 
