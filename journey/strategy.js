@@ -545,6 +545,79 @@ function initEntrySignal() {
   entrySignal.takeProfitOrders = takeProfitOrders
 }
 
+
+function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
+  var entrySide, exitSide
+  if (orderQtyUSD > 0) {
+    entrySide = 'Buy'
+    exitSide = 'Sell'
+  }
+  else {
+    entrySide = 'Sell'
+    exitSide = 'Buy'
+  }
+
+  var entryOrders
+  if (scaleInOrders && scaleInOrders.length > 0) {
+    entryOrders = scaleInOrders.map(o => {
+      return {
+        price: o.price,
+        side: entrySide,
+        orderQty: o.size,
+        ordType: 'Limit',
+        execInst: 'ParticipateDoNotInitiate'
+      }
+    })
+  }
+  else {
+    entryOrders = [{
+      price: entryPrice,
+      side: entrySide,
+      orderQty: orderQtyUSD,
+      ordType: 'Limit',
+      execInst: 'ParticipateDoNotInitiate'
+    }]
+  }
+
+  var exitPriceOffset = (-orderQtyUSD/Math.abs(orderQtyUSD)*setup.candle.tick)
+  var closeOrders = [{
+    stopPx: stopMarket,
+    side: exitSide,
+    ordType: 'Stop',
+    execInst: 'Close,LastPrice'
+  },
+  // {
+  //   price: stopLoss,
+  //   stopPx: stopLoss + exitPriceOffset,
+  //   side: exitSide,
+  //   ordType: 'StopLimit',
+  //   execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
+  // },
+  {
+    price: takeProfit - exitPriceOffset * 2,
+    stopPx: takeProfit - exitPriceOffset,
+    side: exitSide,
+    ordType: 'LimitIfTouched',
+    execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
+  }]
+
+  var takeProfitOrders = [{
+    price: takeProfit,
+    orderQty: orderQtyUSD/2,
+    side: exitSide,
+    ordType: 'Limit',
+    execInst: 'ParticipateDoNotInitiate,ReduceOnly'
+  },{
+    price: takeHalfProfit,
+    orderQty: orderQtyUSD/2,
+    side: exitSide,
+    ordType: 'Limit',
+    execInst: 'ParticipateDoNotInitiate,ReduceOnly'
+  }]
+
+  return {entryOrders:entryOrders,closeOrders:closeOrders,takeProfitOrders:takeProfitOrders}
+}
+
 async function init(_logger, _entrySignalTable) {
   logger = _logger
   entrySignalTable = _entrySignalTable
@@ -560,5 +633,6 @@ module.exports = {
   getSignals: getSignals,
   checkPosition: checkPosition,
   resetEntrySignal: resetEntrySignal,
-  getEntrySignal: getEntrySignal
+  getEntrySignal: getEntrySignal,
+  getEntryExitOrders: getEntryExitOrders
 }
