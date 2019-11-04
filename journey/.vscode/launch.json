@@ -10,7 +10,7 @@
       "name": "Launch Program",
       "program": "${workspaceFolder}/index.js",
       "outputCapture": "std",
-      "args": ["XBTUSD","rsi"]
+      "args": ["rsi","XBTUSD"]
     }
   ]
 }
