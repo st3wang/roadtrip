@@ -240,7 +240,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
 
   if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG') && 
     orderSignal.entryPrice && orderSignal.orderQtyUSD) {
-    if (isFundingWindow(fundingTimestamp) &&
+    if (base.isFundingWindow(fundingTimestamp) &&
       ((orderSignal.orderQtyUSD > 0 && fundingRate > 0) || 
       (orderSignal.orderQtyUSD < 0 && fundingRate < 0))) {
         logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')

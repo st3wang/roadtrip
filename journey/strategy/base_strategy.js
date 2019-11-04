@@ -249,6 +249,7 @@ module.exports = {
   getRsi: getRsi,
   writeEntrySignal: writeEntrySignal,
   resetEntrySignal: resetEntrySignal,
+  isFundingWindow: isFundingWindow,
   getEntrySignal: getEntrySignal,
   getEntryExitOrders: getEntryExitOrders,
   exitTooLong: exitTooLong,
