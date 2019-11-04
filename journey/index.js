@@ -14,7 +14,7 @@ var mock
 if (shoes.mock) mock = require('./mock.js')
 
 const bitmex = require('./bitmex')
-const strategy = require('./strategy')
+const strategy = require('./strategy/' + shoes.strategy + '_strategy')
 const server = require('./server')
 const candlestick = require('./candlestick')
 const setup = shoes.setup
