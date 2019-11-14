@@ -138,9 +138,9 @@ async function getOrder(setup,signalCondition,walletBalance,entryPrice,lossDista
     })
   }
   
-  // if (shoes.test ) {
-  //   if (scaleInOrders.length <= 1) goodStopDistance = false
-  // }
+  if (shoes.test ) {
+    goodStopDistance = true
+  }
 
   return {
     capitalBTC: capitalBTC,
@@ -173,10 +173,10 @@ async function getSignals(market,setup,walletBalance) { try {
   if (setup.rsi) {
     signal = await getRsiSignal(market,setup.rsi)
     // Test
-    // if (shoes.test ) {
-    //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
-    //   else if (signalCondition == 'L') signalCondition = 'LONG'
-    // }
+    if (shoes.test ) {
+      if (signal.condition == 'S' || signal.condition == '-') signal.condition = 'SHORT'
+      else if (signal.condition == 'L') signal.condition = 'LONG'
+    }
     stopLoss = getRsiStopLoss(signal.condition, market, setup.rsi.stopLossLookBack)
   }
 
@@ -253,7 +253,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   return enter
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function orderEntry() { try {
+async function orderEntry(entrySignal) { try {
   let {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal)
   let existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders).filter(o => {
     return (new Date(o.timestamp).getTime() >= entrySignal.time)
@@ -294,7 +294,7 @@ async function checkEntry(params) { try {
       let {open,close} = await bitmex.getLastCandle()
       if ((entrySignal.type == 'LONG' && close > entrySignal.entryPrice && close > open) ||
         (entrySignal.type == 'SHORT' && close < entrySignal.entryPrice && close < open)) {
-          await orderEntry()
+          await orderEntry(entrySignal)
       }
       else {
         let cancel = cancelOrder(params)
@@ -315,7 +315,6 @@ async function checkEntry(params) { try {
         entrySignalTable.info('entry',entrySignal)
         entrySignal.time = new Date(entrySignal.timestamp).getTime()
         if (!mock) logger.info('ENTER SIGNAL',entrySignal)
-        // await orderEntry()
       }
     }
   }
