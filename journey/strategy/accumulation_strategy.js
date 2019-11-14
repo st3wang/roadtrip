@@ -14,35 +14,132 @@ function getTimeNow() {
   return new Date().getTime()
 }
 
-async function getRsiSignal(market,{shortPrsi,shortRsi,longPrsi,longRsi,length}) { try {
-  var rsis = (market.rsis || await base.getRsi(market.closes,length))
-  var len = rsis.length
-  var rsi = rsis[len - 1]
-  var prsi = rsis[len - 2]
+function findBottom(v,start) {
+  var stop = Math.max(start - 30,0)
+  for (var i = start; i > stop; i--) {
+      if (v[i-1] > v[i]) {
+        return i
+      }
+  }
+  return start
+}
+
+function findTop(v,start) {
+  var stop = Math.max(start - 30,0)
+  for (var i = start; i > stop; i--) {
+      if (v[i] > v[i-1]) {
+        return i
+      }
+  }
+  return start
+}
+
+function findW(v,start,confirmValue,confirmOpen,confirmClose) {
+  var bottom1 = findBottom(v,start)
+  var top1 = findTop(v,bottom1)
+  var bottom2 = findBottom(v,top1)
+  var result = 0
+  if (bottom1 < start && v[bottom1] >= v[bottom2]) {
+    if (confirmOpen <= confirmValue[top1]) {
+        if (confirmClose >= confirmValue[top1]) {
+          result = 3
+        }
+        else {
+          result = 1
+        }
+    }
+    else {
+      result = 2
+    }
+  }
+  return [result,bottom1,top1,bottom2]
+}
+
+function findM(v,start,confirmValue,confirmOpen,confirmClose) {
+  var top1 = findTop(v,start)
+  var bottom1 = findBottom(v,top1)
+  var top2 = findTop(v,bottom1)
+  var result = 0
+  if (top1 < start && v[top1] <= v[top2]) {
+    if (confirmOpen >= confirmValue[bottom1]) {
+        if (confirmClose <= confirmValue[bottom1]) {
+          result = 3
+        }
+        else {
+          result = 1
+        }
+    }
+    else {
+      result = 2
+    }
+  }
+  return [result,top1,bottom1,top2]
+}
+
+var W3 = [2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,
+  9,8,7,6,5,6,7,8,7,6,7,8,9]
+var M3 = [2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,
+  5,6,7,9,8,6,7,8,7,6,5,4,3]
+
+// var resultW0 = findW(M3,M3.length-1,M3,7,8)
+// var resultW1 = findW(W3,W3.length-1,W3,6,7)
+// var resultW2 = findW(W3,W3.length-1,W3,9,10)
+// var resultW3 = findW(W3,W3.length-1,W3,8,10)
+
+// var resultM0 = findM(W3,W3.length-1,W3,7,8)
+// var resultM1 = findM(M3,M3.length-1,M3,8,7)
+// var resultM2 = findM(M3,M3.length-1,M3,4,3)
+// var resultM3 = findM(M3,M3.length-1,M3,7,5)
+// debugger
+
+function getBody(market) {
+  var opens = market.opens
+  var closes = market.closes
+  var avgBodies = []
+  var bodyHighs = []
+  var len = opens.length
+  for (var i = 0; i < len; i++) {
+    avgBodies.push((opens[i] + closes[i])/2)
+    bodyHighs.push(Math.max(opens[i], closes[i]))
+  }
+  return [avgBodies,bodyHighs]
+}
+
+async function getAccumulationSignal(market,{rsilength}) { try {
+  var rsis = (market.rsis || await base.getRsi(market.closes,rsilength))
+  var [avgBodies,bodyHighs] = getBody(market)
+  var last = rsis.length-1
+  var [isWRsi,wrb1,wrt1,wrb2] = findW(rsis,last,rsis,rsis[last],rsis[last])
+  var open = market.opens[last]
+  var close = market.closes[last]
+  var [isWPrice,wbottom1,wtop1,wbottom2] = findW(avgBodies,0,bodyHighs,open,close)
+  if (isWRsi > 0 && isWPrice > 0) {
+    debugger
+  }
   var condition = '-'
-  if (prsi > shortPrsi && rsi <= shortRsi ) {
-    condition = 'SHORT'
-  }
-  else if (prsi < longPrsi && rsi >= longRsi ) {
-    condition = 'LONG'
-  }
-  else if (prsi > shortPrsi) {
-    condition = 'S'
-  }
-  else if (prsi < longPrsi) {
-    condition = 'L'
-  }
+  // if (prsi > shortPrsi && rsi <= shortRsi ) {
+  //   condition = 'SHORT'
+  // }
+  // else if (prsi < longPrsi && rsi >= longRsi ) {
+  //   condition = 'LONG'
+  // }
+  // else if (prsi > shortPrsi) {
+  //   condition = 'S'
+  // }
+  // else if (prsi < longPrsi) {
+  //   condition = 'L'
+  // }
   return {
-    condition: condition,
-    prsi: Math.round(prsi*100)/100,
-    rsi: Math.round(rsi*100)/100,
-    rsis: rsis,
-    shortPrsi: shortPrsi,
-    shortRsi: shortRsi,
-    longPrsi: longPrsi,
-    longRsi: longRsi,
-    length:length,
-    closes: market.closes
+    condition: '-',
+    // prsi: Math.round(prsi*100)/100,
+    // rsi: Math.round(rsi*100)/100,
+    // rsis: rsis,
+    // shortPrsi: shortPrsi,
+    // shortRsi: shortRsi,
+    // longPrsi: longPrsi,
+    // longRsi: longRsi,
+    // length:length,
+    // closes: market.closes
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
@@ -170,8 +267,8 @@ async function getSignals(market,setup,walletBalance) { try {
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal, stopLoss, entryPrice, lossDistance
 
-  if (setup.rsi) {
-    signal = await getRsiSignal(market,setup.rsi)
+  if (setup.accumulation) {
+    signal = await getAccumulationSignal(market,setup.accumulation)
     // Test
     // if (shoes.test ) {
     //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
@@ -311,7 +408,6 @@ async function checkEntry(params) { try {
       let enter = (await enterSignal(params))
       if (enter) {
         entrySignal = enter.signal
-        base.setEntrySignal(entrySignal)
         entrySignalTable.info('entry',entrySignal)
         entrySignal.time = new Date(entrySignal.timestamp).getTime()
         if (!mock) logger.info('ENTER SIGNAL',entrySignal)

@@ -138,6 +138,10 @@ function getEntrySignal() {
   return entrySignal
 }
 
+function setEntrySignal(v) {
+  entrySignal = v
+}
+
 function initEntrySignal() {
   entrySignal = {}
 
@@ -251,6 +255,7 @@ module.exports = {
   resetEntrySignal: resetEntrySignal,
   isFundingWindow: isFundingWindow,
   getEntrySignal: getEntrySignal,
+  setEntrySignal: setEntrySignal,
   getEntryExitOrders: getEntryExitOrders,
   exitTooLong: exitTooLong,
   exitFunding: exitFunding,
