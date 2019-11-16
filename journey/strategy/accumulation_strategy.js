@@ -105,17 +105,22 @@ function getBody(market) {
   return [avgBodies,bodyHighs]
 }
 
-async function getAccumulationSignal(market,{rsi}) { try {
-  var rsis = (market.rsis || await base.getRsi(market.closes,rsi.rsilength))
+async function getAccumulationSignal(market,{rsi,willy}) { try {
+  var rsis = (market.rsis || await base.getRsi(market.closes,rsi.rsiLength))
+  var willys = (market.willys || await base.getWilly(market,willy.willyLength))
   var [avgBodies,bodyHighs] = getBody(market)
   var last = rsis.length-1
   var [isWRsi,wrb1,wrt1,wrb2] = findW(rsis,last,rsis,rsis[last],rsis[last])
   var open = market.opens[last]
   var close = market.closes[last]
   var [isWPrice,wbottom1,wtop1,wbottom2] = findW(avgBodies,0,bodyHighs,open,close)
+  var [isWWilly,wwb1,wwt1,wwb2] = findW(willys,last,willys,willys[last],willys[last])
   if (isWRsi > 0 && isWPrice > 0) {
     debugger
   }
+  console.log('isWPrice',isWRsi)
+  console.log('isWRsi',isWPrice)
+  console.log('isWWilly',isWPrice)
   var condition = '-'
   // if (prsi > shortPrsi && rsi <= shortRsi ) {
   //   condition = 'SHORT'
@@ -283,7 +288,7 @@ async function getSignals(market,setup,walletBalance) { try {
       }
     }
   }
-  
+
   stopLoss = getRsiStopLoss(signal.condition, market, setup.rsi.stopLossLookBack)
 
   var quote = bitmex.getQuote()

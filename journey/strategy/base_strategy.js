@@ -57,16 +57,31 @@ function roundPrice(p) {
   return +((Math.round(p*roundPriceFactor)/roundPriceFactor).toFixed(2))
 }
 
-async function getRsi(data,length) { try {
+async function getRsi(closes,length) { try {
   var result = await talibExecute({
     name: "RSI",
-    inReal: data,
+    inReal: closes,
     startIdx: 0,
-    endIdx: data.length - 1,
+    endIdx: closes.length - 1,
     optInTimePeriod: length
   })
 
   return Array(length).fill(0).concat(result.result.outReal)
+} catch(e) {console.error(e.stack||e);debugger} }
+
+
+async function getWilly({highs,lows,closes},length) { try {
+  var result = await talibExecute({
+    name: "WILLR",
+    high: highs,
+    low: lows,
+    close: closes,
+    startIdx: 0,
+    endIdx: closes.length - 1,
+    optInTimePeriod: length
+  })
+
+  return Array(length-1).fill(0).concat(result.result.outReal)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function isFundingWindow(fundingTimestamp) {
@@ -251,6 +266,7 @@ module.exports = {
   highestBody: highestBody,
   lowestBody: lowestBody,
   getRsi: getRsi,
+  getWilly: getWilly,
   writeEntrySignal: writeEntrySignal,
   resetEntrySignal: resetEntrySignal,
   isFundingWindow: isFundingWindow,
