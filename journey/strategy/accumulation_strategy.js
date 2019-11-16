@@ -105,8 +105,8 @@ function getBody(market) {
   return [avgBodies,bodyHighs]
 }
 
-async function getAccumulationSignal(market,{rsilength}) { try {
-  var rsis = (market.rsis || await base.getRsi(market.closes,rsilength))
+async function getAccumulationSignal(market,{rsi}) { try {
+  var rsis = (market.rsis || await base.getRsi(market.closes,rsi.rsilength))
   var [avgBodies,bodyHighs] = getBody(market)
   var last = rsis.length-1
   var [isWRsi,wrb1,wrt1,wrb2] = findW(rsis,last,rsis,rsis[last],rsis[last])
@@ -267,15 +267,24 @@ async function getSignals(market,setup,walletBalance) { try {
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal, stopLoss, entryPrice, lossDistance
 
-  if (setup.accumulation) {
-    signal = await getAccumulationSignal(market,setup.accumulation)
-    // Test
-    // if (shoes.test ) {
-    //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
-    //   else if (signalCondition == 'L') signalCondition = 'LONG'
-    // }
-    stopLoss = getRsiStopLoss(signal.condition, market, setup.rsi.stopLossLookBack)
+  signal = await getAccumulationSignal(market,setup)
+  // Test
+  // if (shoes.test ) {
+  //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
+  //   else if (signalCondition == 'L') signalCondition = 'LONG'
+  // }
+
+  if (signal.condition == '-') {
+    return {
+      signal: signal,
+      orderSignal: {
+        timestamp: timestamp,
+        type: '-'
+      }
+    }
   }
+  
+  stopLoss = getRsiStopLoss(signal.condition, market, setup.rsi.stopLossLookBack)
 
   var quote = bitmex.getQuote()
   var XBTUSDRate = bitmex.getRate('XBTUSD')

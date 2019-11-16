@@ -170,15 +170,25 @@ async function getSignals(market,setup,walletBalance) { try {
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal, stopLoss, entryPrice, lossDistance
 
-  if (setup.rsi) {
-    signal = await getRsiSignal(market,setup.rsi)
-    // Test
-    if (shoes.test ) {
-      if (signal.condition == 'S' || signal.condition == '-') signal.condition = 'SHORT'
-      else if (signal.condition == 'L') signal.condition = 'LONG'
-    }
-    stopLoss = getRsiStopLoss(signal.condition, market, setup.rsi.stopLossLookBack)
+  signal = await getRsiSignal(market,setup.rsi)
+
+  // Test
+  if (shoes.test ) {
+    if (signal.condition == 'S' || signal.condition == '-') signal.condition = 'SHORT'
+    else if (signal.condition == 'L') signal.condition = 'LONG'
   }
+  
+  if (signal.condition == '-') {
+    return {
+      signal: signal,
+      orderSignal: {
+        timestamp: timestamp,
+        type: '-'
+      }
+    }
+  }
+
+  stopLoss = getRsiStopLoss(signal.condition, market, setup.rsi.stopLossLookBack)
 
   var quote = bitmex.getQuote()
   var XBTUSDRate = bitmex.getRate('XBTUSD')

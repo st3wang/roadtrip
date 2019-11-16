@@ -325,7 +325,7 @@ function createInterval(candleDelay) {
   var startsIn = ((interval*2)-now%(interval) + candleDelay) % interval
   var startsInSec = startsIn % 60000
   var startsInMin = (startsIn - startsInSec) / 60000
-  console.log('createInterval ' + candleDelay + ' starts in ' + startsInMin + ':' + Math.floor(startsInSec/1000) + ' minutes')
+  console.log('createInterval every ' + oneCandleMS + ' delay ' + candleDelay + ' starts in ' + startsInMin + ':' + Math.floor(startsInSec/1000) + ' minutes')
   setTimeout(_ => {
     next()
     setInterval(next,interval)
