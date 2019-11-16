@@ -350,7 +350,7 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
   return enter
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function orderEntry() { try {
+async function orderEntry(entrySignal) { try {
   let {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal)
   let existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders).filter(o => {
     return (new Date(o.timestamp).getTime() >= entrySignal.time)
@@ -391,7 +391,7 @@ async function checkEntry(params) { try {
       let {open,close} = await bitmex.getLastCandle()
       if ((entrySignal.type == 'LONG' && close > entrySignal.entryPrice && close > open) ||
         (entrySignal.type == 'SHORT' && close < entrySignal.entryPrice && close < open)) {
-          await orderEntry()
+          await orderEntry(entrySignal)
       }
       else {
         let cancel = cancelOrder(params)
@@ -408,6 +408,7 @@ async function checkEntry(params) { try {
       let enter = (await enterSignal(params))
       if (enter) {
         entrySignal = enter.signal
+        base.setEntrySignal(entrySignal)
         entrySignalTable.info('entry',entrySignal)
         entrySignal.time = new Date(entrySignal.timestamp).getTime()
         if (!mock) logger.info('ENTER SIGNAL',entrySignal)

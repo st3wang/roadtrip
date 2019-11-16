@@ -14,8 +14,8 @@ function getTimeNow() {
   return new Date().getTime()
 }
 
-async function getRsiSignal(market,{shortPrsi,shortRsi,longPrsi,longRsi,length}) { try {
-  var rsis = (market.rsis || await base.getRsi(market.closes,length))
+async function getRsiSignal(market,{shortPrsi,shortRsi,longPrsi,longRsi,rsiLength}) { try {
+  var rsis = (market.rsis || await base.getRsi(market.closes,rsiLength))
   var len = rsis.length
   var rsi = rsis[len - 1]
   var prsi = rsis[len - 2]
@@ -41,7 +41,7 @@ async function getRsiSignal(market,{shortPrsi,shortRsi,longPrsi,longRsi,length})
     shortRsi: shortRsi,
     longPrsi: longPrsi,
     longRsi: longRsi,
-    length:length,
+    rsiLength: rsiLength,
     closes: market.closes
   }
 } catch(e) {console.error(e.stack||e);debugger} }
@@ -259,7 +259,7 @@ async function orderEntry(entrySignal) { try {
     return (new Date(o.timestamp).getTime() >= entrySignal.time)
   })
   if (existingEntryOrders.length > 0) {
-    // logger.info('ENTRY ORDER EXISTS')
+    logger.info('ENTRY ORDER EXISTS')
   }
   else {
     if (!mock) logger.info('ENTER ORDER',entrySignal)
