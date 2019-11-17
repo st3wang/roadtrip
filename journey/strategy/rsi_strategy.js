@@ -1,6 +1,7 @@
 const base = require('./base_strategy.js')
 const bitmex = require('../bitmex')
 const shoes = require('../shoes')
+const winston = require('winston')
 
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
@@ -8,11 +9,87 @@ const oneCandleMS = setup.candle.interval*60000
 var mock
 if (shoes.mock) mock = require('../mock.js')
 
-var logger, exitCandleTime
+var exitCandleTime
+
+const colorizer = winston.format.colorize()
+
+const isoTimestamp = winston.format((info, opts) => {
+  info.timestamp = new Date(getTimeNow()).toISOString()
+  return info;
+})
 
 function getTimeNow() {
   return new Date().getTime()
 }
+
+function conditionColor(condition) {
+  return (condition == 'LONG' ? '\x1b[36m' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
+}
+
+const logger = winston.createLogger({
+  format: winston.format.label({label:'rsi'}),
+  transports: [
+    new winston.transports.Console({
+      level: shoes.log.level || 'info',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.prettyPrint(),
+        winston.format.printf(info => {
+          let splat = info[Symbol.for('splat')]
+          let {timestamp,level,message} = info
+          let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
+          let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
+          switch(message) {
+            case 'enterSignal': {
+              let {signal,orderSignal} = splat[0]
+              if (signal) {
+                if (signal.rsis) {
+                  let {condition,prsi=NaN,rsi=NaN} = signal
+                  line += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
+                }
+              }
+              if (orderSignal) {
+                let {type,entryPrice=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
+                line += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
+              }
+            } break
+            case 'ENTER SIGNAL': 
+            case 'ENTER ORDER': {
+              let {orderQtyUSD,entryPrice} = splat[0]
+              line =  (orderQtyUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+orderQtyUSD+' '+entryPrice
+            } break
+            default: {
+              line += (splat ? JSON.stringify(splat) : '')
+            }
+          }
+          switch(level) {
+            case 'error': {
+              line = '\x1b[31m' + line + '\x1b[39m'
+            } break
+            case 'warn': {
+              line = '\x1b[33m' + line + '\x1b[39m'
+            } break
+          }
+          return prefix+line
+        })
+      ),
+    }),
+    new winston.transports.File({filename:global.logDir+'/'+'combined.log',
+      level:'debug',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.json()
+      ),
+    }),
+    new winston.transports.File({filename:global.logDir+'/'+'warn.log',
+      level:'warn',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.json()
+      ),
+    })
+  ]
+})
 
 async function getRsiSignal(market,{shortPrsi,shortRsi,longPrsi,longRsi,rsiLength}) { try {
   var rsis = (market.rsis || await base.getRsi(market.closes,rsiLength))
@@ -424,11 +501,10 @@ function getEntryExitOrders(entrySignal) {
   return base.getEntryExitOrders(entrySignal)
 }
 
-async function init(_logger, _entrySignalTable) {
+async function init(_entrySignalTable) {
   var now = getTimeNow()
   exitCandleTime = now - (now % oneCandleMS)
-  base.init(_logger, _entrySignalTable)
-  logger = _logger
+  base.init()
   entrySignalTable = _entrySignalTable
 
   if (mock) {

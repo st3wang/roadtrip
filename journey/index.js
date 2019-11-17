@@ -37,10 +37,6 @@ function getTimeNow() {
 
 var lastCheckPositionTime = getTimeNow()
 
-function conditionColor(condition) {
-  return (condition == 'LONG' ? '\x1b[36m' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
-}
-
 const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
@@ -84,28 +80,6 @@ const logger = winston.createLogger({
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
-            case 'enterSignal': {
-              let {signal,orderSignal} = splat[0]
-              if (signal) {
-                if (signal.rsis) {
-                  let {condition,prsi=NaN,rsi=NaN} = signal
-                  line += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
-                }
-              }
-              if (orderSignal) {
-                let {type,entryPrice=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
-                line += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
-              }
-            } break
-            case 'ENTER SIGNAL': 
-            case 'ENTER ORDER': {
-              let {orderQtyUSD,entryPrice} = splat[0]
-              line =  (orderQtyUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+orderQtyUSD+' '+entryPrice
-            } break
-            // case 'EXIT ORDER': {
-            //   let {side,price} = splat[0].exitOrders[0]
-            //   line = (side>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+size+' '+price
-            // } break
             default: {
               line += (splat ? JSON.stringify(splat) : '')
             }
@@ -345,7 +319,7 @@ async function init() { try {
     createInterval = mock.createInterval
   }
 
-  await strategy.init(logger,entrySignalTable)
+  await strategy.init(entrySignalTable)
   await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
   if (mock) {

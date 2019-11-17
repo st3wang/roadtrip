@@ -18,7 +18,7 @@ var cutOffTimeForLargeTrade = 59*60000
 var mock
 if (shoes.mock) mock = require('../mock.js')
 
-var logger, entrySignal
+var entrySignal
 var roundPriceFactor = 1/setup.candle.tick
 
 function getTimeNow() {
@@ -251,9 +251,7 @@ function writeEntrySignal(entrySignal) {
   return fs.writeFileSync(entrySignalFilePath,JSON.stringify(entrySignal,null,2),writeFileOptions)
 }
 
-async function init(_logger) {
-  logger = _logger
-
+async function init() {
   initEntrySignal()
   if (mock) {
     getTimeNow = mock.getTimeNow

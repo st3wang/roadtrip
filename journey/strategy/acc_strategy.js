@@ -1,6 +1,7 @@
 const base = require('./base_strategy.js')
 const bitmex = require('../bitmex')
 const shoes = require('../shoes')
+const winston = require('winston')
 
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
@@ -8,11 +9,87 @@ const oneCandleMS = setup.candle.interval*60000
 var mock
 if (shoes.mock) mock = require('../mock.js')
 
-var logger, exitCandleTime
+var exitCandleTime
+
+const colorizer = winston.format.colorize()
+
+const isoTimestamp = winston.format((info, opts) => {
+  info.timestamp = new Date(getTimeNow()).toISOString()
+  return info;
+})
 
 function getTimeNow() {
   return new Date().getTime()
 }
+
+function conditionColor(condition) {
+  return (condition == 'LONG' ? '\x1b[36m' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
+}
+
+const logger = winston.createLogger({
+  format: winston.format.label({label:'acc'}),
+  transports: [
+    new winston.transports.Console({
+      level: shoes.log.level || 'info',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.prettyPrint(),
+        winston.format.printf(info => {
+          let splat = info[Symbol.for('splat')]
+          let {timestamp,level,message} = info
+          let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
+          let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
+          switch(message) {
+            case 'enterSignal': {
+              let {signal,orderSignal} = splat[0]
+              if (signal) {
+                if (signal.rsis) {
+                  let {condition,prsi=NaN,rsi=NaN} = signal
+                  line += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
+                }
+              }
+              if (orderSignal) {
+                let {type,entryPrice=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
+                line += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
+              }
+            } break
+            case 'ENTER SIGNAL': 
+            case 'ENTER ORDER': {
+              let {orderQtyUSD,entryPrice} = splat[0]
+              line =  (orderQtyUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+orderQtyUSD+' '+entryPrice
+            } break
+            default: {
+              line += (splat ? JSON.stringify(splat) : '')
+            }
+          }
+          switch(level) {
+            case 'error': {
+              line = '\x1b[31m' + line + '\x1b[39m'
+            } break
+            case 'warn': {
+              line = '\x1b[33m' + line + '\x1b[39m'
+            } break
+          }
+          return prefix+line
+        })
+      ),
+    }),
+    new winston.transports.File({filename:global.logDir+'/'+'combined.log',
+      level:'debug',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.json()
+      ),
+    }),
+    new winston.transports.File({filename:global.logDir+'/'+'warn.log',
+      level:'warn',
+      format: winston.format.combine(
+        isoTimestamp(),
+        winston.format.json()
+      ),
+    })
+  ]
+})
 
 function findBottom(v,start) {
   var stop = Math.max(start - 30,0)
@@ -76,10 +153,10 @@ function findM(v,start,confirmValue,confirmOpen,confirmClose) {
   return [result,top1,bottom1,top2]
 }
 
-var W3 = [2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,
-  9,8,7,6,5,6,7,8,7,6,7,8,9]
-var M3 = [2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,
-  5,6,7,9,8,6,7,8,7,6,5,4,3]
+// var W3 = [2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,
+//   9,8,7,6,5,6,7,8,7,6,7,8,9]
+// var M3 = [2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,
+//   5,6,7,9,8,6,7,8,7,6,5,4,3]
 
 // var resultW0 = findW(M3,M3.length-1,M3,7,8)
 // var resultW1 = findW(W3,W3.length-1,W3,6,7)
@@ -115,27 +192,18 @@ async function getAccumulationSignal(market,{rsi,willy}) { try {
   var close = market.closes[last]
   var [isWPrice,wbottom1,wtop1,wbottom2] = findW(avgBodies,0,bodyHighs,open,close)
   var [isWWilly,wwb1,wwt1,wwb2] = findW(willys,last,willys,willys[last],willys[last])
-  if (isWRsi > 0 && isWPrice > 0) {
-    debugger
-  }
+
   console.log('isWPrice',isWRsi)
   console.log('isWRsi',isWPrice)
   console.log('isWWilly',isWPrice)
   var condition = '-'
-  // if (prsi > shortPrsi && rsi <= shortRsi ) {
-  //   condition = 'SHORT'
-  // }
-  // else if (prsi < longPrsi && rsi >= longRsi ) {
-  //   condition = 'LONG'
-  // }
-  // else if (prsi > shortPrsi) {
-  //   condition = 'S'
-  // }
-  // else if (prsi < longPrsi) {
-  //   condition = 'L'
-  // }
+  if (isWPrice == 3 && isWWilly == 3 && isWRsi == 3) {
+    condition = 'LONG'
+  }
+// longStop = haLow[wbottom2]
+// shortStop = haHigh[mtop2]
   return {
-    condition: '-',
+    condition: condition,
     // prsi: Math.round(prsi*100)/100,
     // rsi: Math.round(rsi*100)/100,
     // rsis: rsis,
@@ -526,11 +594,10 @@ function getEntryExitOrders(entrySignal) {
   return base.getEntryExitOrders(entrySignal)
 }
 
-async function init(_logger, _entrySignalTable) {
+async function init(_entrySignalTable) {
   var now = getTimeNow()
   exitCandleTime = now - (now % oneCandleMS)
-  base.init(_logger, _entrySignalTable)
-  logger = _logger
+  base.init()
   entrySignalTable = _entrySignalTable
 
   if (mock) {
