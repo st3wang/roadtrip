@@ -24,16 +24,7 @@ var lastBid, lastAsk, lastQty, lastRates = {}
 
 var lastCandle, currentCandle
 
-const colorizer = winston.format.colorize();
-
-function getTimeNow() {
-  return new Date().getTime()
-}
-
-const isoTimestamp = winston.format((info, opts) => {
-  info.timestamp = new Date(getTimeNow()).toISOString()
-  return info;
-});
+const {getTimeNow, isoTimestamp, colorizer} = global
 
 function orderString({ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst}) {
   return ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
@@ -669,14 +660,14 @@ async function updateLeverage(leverage) { try {
 
 async function order(orders,cancelAllBeforeOrder) { try {
   if (!orders || orders.length == 0) {
-    return
+    return {statusText:'Order is empty'}
   }
 
   var valid = orders.reduce((a,c) => {
     return a && (c.price || c.stopPx)
   },true)
   if (!valid) {
-    return
+    return {statusText:'Order is missing price or stopPx'}
   }
 
   let response = await orderQueue({
@@ -1082,7 +1073,6 @@ async function init(sp,checkPositionCb) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 if (mock) {
-  getTimeNow = mock.getTimeNow
   authorize = mock.authorize
   getTradeBucketed = mock.getTradeBucketed
   getCurrentTradeBucketed = mock.getCurrentTradeBucketed

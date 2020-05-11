@@ -307,6 +307,49 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function testCandleDayFiles(startYmd,endYmd,interval) { try {
+  let symbol = 'XBTUSD',
+  ymd = startYmd,
+  allLows = [],
+  allHighs = [],
+  allCloses = [],
+  gapUp = 0,
+  eqUp = 0,
+  gapDown = 0,
+  eqDown = 0,
+  total = 0
+  while (ymd <= endYmd) {
+    let {lows,highs,closes} = await getTradeBucketed(interval,ymdHelper.getTime(ymd),symbol)
+    allLows = allLows.concat(lows)
+    allHighs = allHighs.concat(highs)
+    allCloses = allCloses.concat(closes)
+    ymd = ymdHelper.nextDay(ymd)
+  }
+
+  let len = allLows.length
+  for (let i = 1; i < len; i++) {
+    if (allLows[i] > allCloses[i-1]) {
+      gapUp++
+    }
+    if (allLows[i] == allCloses[i-1]) {
+      eqUp++
+    }
+    if (allHighs[i] < allCloses[i-1]) {
+      gapDown++
+    }
+    if (allHighs[i] == allCloses[i-1]) {
+      eqDown++
+    }
+    total++
+  }
+  console.log('total',total)
+  console.log('gapUp',gapUp,(gapUp/total)*100)
+  console.log('eqUp',eqUp,(eqUp/total)*100)
+  console.log('gapDown',gapDown,(gapUp/total)*100)
+  console.log('eqDown',eqDown,(eqDown/total)*100)
+  debugger
+} catch(e) {console.error(e.stack||e);debugger} }
+
 async function getTradeBucketed(interval,time,symbol) {
   var readPath = getCandleFile(symbol,interval,ymdHelper.YYYYMMDD(time))
   if (fs.existsSync(readPath)) {
@@ -421,6 +464,7 @@ async function readRsis(symbol,startTime,interval,length) {
 module.exports = {
   downloadTradeData: downloadTradeData,
   generateCandleDayFiles: generateCandleDayFiles,
+  testCandleDayFiles: testCandleDayFiles,
   generateRsiFiles: generateRsiFiles,
   getTradeBucketed: getTradeBucketed,
   readTradeDay: readTradeDay,

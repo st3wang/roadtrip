@@ -15,43 +15,10 @@ const fundingWindowTime = setup.candle.fundingWindow * oneCandleMS
 var cutOffTimeForAll = setup.candle.inTradeMax*60000
 var cutOffTimeForLargeTrade = 59*60000
 
-var mock
-if (shoes.mock) mock = require('../mock.js')
-
 var entrySignal
 var roundPriceFactor = 1/setup.candle.tick
 
-function getTimeNow() {
-  return new Date().getTime()
-}
-
-function lowestBody(market,length) {
-  var opens = market.opens, closes = market.closes, lows = market.lows
-  var lowest = 9999999
-  var start = market.closes.length - length
-  var end = market.closes.length
-  for (var i = start; i < end; i++) {
-    var weightedLow = (Math.min(opens[i],closes[i])+lows[i])/2
-    if (weightedLow < lowest) {
-      lowest = weightedLow
-    }
-  }
-  return lowest
-}
-
-function highestBody(market,length) {
-  var opens = market.opens, closes = market.closes, highs = market.highs
-  var highest = 0
-  var start = market.closes.length - length
-  var end = market.closes.length
-  for (var i = start; i < end; i++) {
-    var weightedHigh = (Math.max(opens[i],closes[i])+highs[i])/2
-    if (weightedHigh > highest) {
-      highest = weightedHigh
-    }
-  }
-  return highest
-}
+const {getTimeNow} = global
 
 function roundPrice(p) {
   return +((Math.round(p*roundPriceFactor)/roundPriceFactor).toFixed(2))
@@ -253,16 +220,11 @@ function writeEntrySignal(entrySignal) {
 
 async function init() {
   initEntrySignal()
-  if (mock) {
-    getTimeNow = mock.getTimeNow
-  }
 }
 
 module.exports = {
   init: init,
   roundPrice: roundPrice,
-  highestBody: highestBody,
-  lowestBody: lowestBody,
   getRsi: getRsi,
   getWilly: getWilly,
   writeEntrySignal: writeEntrySignal,

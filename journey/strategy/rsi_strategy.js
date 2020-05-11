@@ -2,7 +2,7 @@ const base = require('./base_strategy.js')
 const bitmex = require('../bitmex')
 const shoes = require('../shoes')
 const winston = require('winston')
-
+const candlestick = require('../candlestick')
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 
@@ -126,12 +126,12 @@ async function getRsiSignal(market,{shortPrsi,shortRsi,longPrsi,longRsi,rsiLengt
 function getRsiStopLoss(signalCondition,market,stopLossLookBack) {
   switch(signalCondition) {
     case 'SHORT':
-      return base.roundPrice(base.highestBody(market,stopLossLookBack))
+      return base.roundPrice(candlestick.highestBody(market,stopLossLookBack))
       // entryPrice = Math.max(quote.askPrice||0,close) // use askPrice or close to be a maker
       // entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
       break;
     case 'LONG':
-      return base.roundPrice(base.lowestBody(market,stopLossLookBack))
+      return base.roundPrice(candlestick.lowestBody(market,stopLossLookBack))
       // entryPrice = Math.min(quote.bidPrice||Infinity,close) // use bidPrice or close to be a maker
       // entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
       break;

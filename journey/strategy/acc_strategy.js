@@ -1,29 +1,20 @@
+const path = require('path')
+
 const base = require('./base_strategy.js')
 const bitmex = require('../bitmex')
 const shoes = require('../shoes')
 const winston = require('winston')
+const storage = require('../storage')
+const candlestick = require('../candlestick')
 
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 
-var mock
-if (shoes.mock) mock = require('../mock.js')
-
+const {getTimeNow, isoTimestamp, colorizer} = global
 var exitCandleTime
 
-const colorizer = winston.format.colorize()
-
-const isoTimestamp = winston.format((info, opts) => {
-  info.timestamp = new Date(getTimeNow()).toISOString()
-  return info;
-})
-
-function getTimeNow() {
-  return new Date().getTime()
-}
-
-function conditionColor(condition) {
-  return (condition == 'LONG' ? '\x1b[36m' : condition == 'SHORT' ? '\x1b[35m' : '') + condition + '\x1b[39m'
+function typeColor(type) {
+  return (type == 'LONG' ? '\x1b[36m' : type == 'SHORT' ? '\x1b[35m' : '') + type + '\x1b[39m'
 }
 
 const logger = winston.createLogger({
@@ -41,16 +32,10 @@ const logger = winston.createLogger({
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
             case 'enterSignal': {
-              let {signal,orderSignal} = splat[0]
+              let signal = splat[0]
               if (signal) {
-                if (signal.rsis) {
-                  let {condition,prsi=NaN,rsi=NaN} = signal
-                  line += conditionColor(condition)+' '+prsi.toFixed(1)+' '+rsi.toFixed(1)
-                }
-              }
-              if (orderSignal) {
-                let {type,entryPrice=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN} = orderSignal
-                line += ' '+conditionColor(type)+' '+entryPrice.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
+                let {condition,type='',entryPrice=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN} = signal
+                line += typeColor(condition)+' '+typeColor(type)+' '+entryPrice.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
               }
             } break
             case 'ENTER SIGNAL': 
@@ -91,147 +76,47 @@ const logger = winston.createLogger({
   ]
 })
 
-function findBottom(v,start) {
-  var stop = Math.max(start - 30,0)
-  for (var i = start; i > stop; i--) {
-      if (v[i-1] > v[i]) {
-        return i
-      }
-  }
-  return start
-}
-
-function findTop(v,start) {
-  var stop = Math.max(start - 30,0)
-  for (var i = start; i > stop; i--) {
-      if (v[i] > v[i-1]) {
-        return i
-      }
-  }
-  return start
-}
-
-function findW(v,start,confirmValue,confirmOpen,confirmClose) {
-  var bottom1 = findBottom(v,start)
-  var top1 = findTop(v,bottom1)
-  var bottom2 = findBottom(v,top1)
-  var result = 0
-  if (bottom1 < start && v[bottom1] >= v[bottom2]) {
-    if (confirmOpen <= confirmValue[top1]) {
-        if (confirmClose >= confirmValue[top1]) {
-          result = 3
-        }
-        else {
-          result = 1
-        }
-    }
-    else {
-      result = 2
-    }
-  }
-  return [result,bottom1,top1,bottom2]
-}
-
-function findM(v,start,confirmValue,confirmOpen,confirmClose) {
-  var top1 = findTop(v,start)
-  var bottom1 = findBottom(v,top1)
-  var top2 = findTop(v,bottom1)
-  var result = 0
-  if (top1 < start && v[top1] <= v[top2]) {
-    if (confirmOpen >= confirmValue[bottom1]) {
-        if (confirmClose <= confirmValue[bottom1]) {
-          result = 3
-        }
-        else {
-          result = 1
-        }
-    }
-    else {
-      result = 2
-    }
-  }
-  return [result,top1,bottom1,top2]
-}
-
-// var W3 = [2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,
-//   9,8,7,6,5,6,7,8,7,6,7,8,9]
-// var M3 = [2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,0,1,2,3,4,5,6,7,8,9,
-//   5,6,7,9,8,6,7,8,7,6,5,4,3]
-
-// var resultW0 = findW(M3,M3.length-1,M3,7,8)
-// var resultW1 = findW(W3,W3.length-1,W3,6,7)
-// var resultW2 = findW(W3,W3.length-1,W3,9,10)
-// var resultW3 = findW(W3,W3.length-1,W3,8,10)
-
-// var resultM0 = findM(W3,W3.length-1,W3,7,8)
-// var resultM1 = findM(M3,M3.length-1,M3,8,7)
-// var resultM2 = findM(M3,M3.length-1,M3,4,3)
-// var resultM3 = findM(M3,M3.length-1,M3,7,5)
-// debugger
-
-function getBody(market) {
-  var opens = market.opens
-  var closes = market.closes
-  var avgBodies = []
-  var bodyHighs = []
-  var len = opens.length
-  for (var i = 0; i < len; i++) {
-    avgBodies.push((opens[i] + closes[i])/2)
-    bodyHighs.push(Math.max(opens[i], closes[i]))
-  }
-  return [avgBodies,bodyHighs]
-}
-
 async function getAccumulationSignal(market,{rsi,willy}) { try {
-  var rsis = (market.rsis || await base.getRsi(market.closes,rsi.rsiLength))
-  var willys = (market.willys || await base.getWilly(market,willy.willyLength))
-  var [avgBodies,bodyHighs] = getBody(market)
-  var last = rsis.length-1
-  var [isWRsi,wrb1,wrt1,wrb2] = findW(rsis,last,rsis,rsis[last],rsis[last])
+  var last = market.closes.length-1
   var open = market.opens[last]
   var close = market.closes[last]
-  var [isWPrice,wbottom1,wtop1,wbottom2] = findW(avgBodies,0,bodyHighs,open,close)
-  var [isWWilly,wwb1,wwt1,wwb2] = findW(willys,last,willys,willys[last],willys[last])
+  var signal = {
+    condition: '-',
+    stopLoss: close
+  }
+  // var timeNow = getTimeNow()
+  // var bullRun = timeNow < 1516579200000 /*Date.parse('22 Jan 2018 00:00:00 GMT')*/ ||
+  //   (timeNow > 1554681600000 /*Date.parse('08 Apr 2019 00:00:00 GMT')*/ && timeNow < 1569801600000 /*Date.parse('30 Sep 2019 00:00:00 GMT')*/)
+  // if (!bullRun) return signal
+  
+  var rsis = (market.rsis || await base.getRsi(market.closes,rsi.rsiLength))
+  var [isWRsi,wrb1,wrt1,wrb2] = candlestick.findW(rsis,last,rsis,rsis[last-1],rsis[last])
+  var [isMRsi,mrt1,mrb1,mrt2] = candlestick.findM(rsis,last,rsis,rsis[last-1],rsis[last])
 
-  console.log('isWPrice',isWRsi)
-  console.log('isWRsi',isWPrice)
-  console.log('isWWilly',isWPrice)
-  var condition = '-'
-  if (isWPrice == 3 && isWWilly == 3 && isWRsi == 3) {
-    condition = 'LONG'
+  var [avgBodies,bodyHighs,bodyLows] = candlestick.getBody(market)
+  var [isWPrice,wbottom1,wtop1,wbottom2] = candlestick.findW(avgBodies,last,bodyHighs,open,close)
+  var [isMPrice,mtop1,mbottom1,mtop2] = candlestick.findM(avgBodies,last,bodyLows,open,close)
+
+  if (isWPrice == 3) {
+    signal.condition = 'LONG'
+    signal.stopLoss = market.lows[wbottom2]
   }
-// longStop = haLow[wbottom2]
-// shortStop = haHigh[mtop2]
-  return {
-    condition: condition,
-    // prsi: Math.round(prsi*100)/100,
-    // rsi: Math.round(rsi*100)/100,
-    // rsis: rsis,
-    // shortPrsi: shortPrsi,
-    // shortRsi: shortRsi,
-    // longPrsi: longPrsi,
-    // longRsi: longRsi,
-    // length:length,
-    // closes: market.closes
-  }
+  // if (isMPrice == 3 && isMRsi == 3) {
+  //   signal.condition = 'SHORT'
+  //   signal.stopLoss = close - (market.highs[mtop2] - close)*2
+  // }
+
+  // var timestamp = new Date(getTimeNow()).toISOString()
+  // if (timestamp.includes('T11')) {
+  //   signal.condition = 'LONG'
+  //   signal.stopLoss = base.roundPrice(close*0.98) //candlestick.lowestBody(market,24)
+  // }
+
+  return signal
 } catch(e) {console.error(e.stack||e);debugger} }
 
-function getRsiStopLoss(signalCondition,market,stopLossLookBack) {
-  switch(signalCondition) {
-    case 'SHORT':
-      return base.roundPrice(base.highestBody(market,stopLossLookBack))
-      // entryPrice = Math.max(quote.askPrice||0,close) // use askPrice or close to be a maker
-      // entryPrice = Math.min(entryPrice,stopLoss) // askPrice might already went up higher than stopLoss
-      break;
-    case 'LONG':
-      return base.roundPrice(base.lowestBody(market,stopLossLookBack))
-      // entryPrice = Math.min(quote.bidPrice||Infinity,close) // use bidPrice or close to be a maker
-      // entryPrice = Math.max(entryPrice,stopLoss) // bidPrice might already went down lower than stopLoss
-      break;
-  }
-}
-
-async function getOrder(setup,signalCondition,walletBalance,entryPrice,lossDistance,coinPairRate) {
+async function getOrder(setup,signal) {
+  var {walletBalance,entryPrice,lossDistance,coinPairRate} = signal
   var tick = setup.candle.tick
   var leverageMargin = walletBalance*0.000000008
   var profitDistance, takeProfit, stopMarketDistance, 
@@ -312,10 +197,10 @@ async function getOrder(setup,signalCondition,walletBalance,entryPrice,lossDista
   //   if (scaleInOrders.length <= 1) goodStopDistance = false
   // }
 
-  return {
+  return Object.assign({
     capitalBTC: capitalBTC,
     capitalUSD: capitalUSD,
-    type: (goodStopDistance ? signalCondition : '-'),
+    type: (goodStopDistance ? signal.condition : '-'),
     entryPrice: entryPrice,
     lossDistance: lossDistance,
     lossDistancePercent: lossDistance/entryPrice,
@@ -333,14 +218,14 @@ async function getOrder(setup,signalCondition,walletBalance,entryPrice,lossDista
     orderQtyUSD: orderQtyUSD,
     leverage: leverage,
     scaleInOrders: scaleInOrders
-  }
+  },signal)
 }
 
-async function getSignals(market,setup,walletBalance) { try {
+async function getSignal(market,setup,walletBalance) { try {
   var timestamp = new Date(getTimeNow()).toISOString()
-  var signal, stopLoss, entryPrice, lossDistance
-
-  signal = await getAccumulationSignal(market,setup)
+  var signal = await getAccumulationSignal(market,setup)
+  signal.timestamp = timestamp
+  
   // Test
   // if (shoes.test ) {
   //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
@@ -348,45 +233,21 @@ async function getSignals(market,setup,walletBalance) { try {
   // }
 
   if (signal.condition == '-') {
-    return {
-      signal: signal,
-      orderSignal: {
-        timestamp: timestamp,
-        type: '-'
-      }
-    }
+    return signal
   }
-
-  stopLoss = getRsiStopLoss(signal.condition, market, setup.rsi.stopLossLookBack)
 
   var quote = bitmex.getQuote()
   var XBTUSDRate = bitmex.getRate('XBTUSD')
-  var coinPairRate = quote.lastPrice/XBTUSDRate
-  walletBalance /= coinPairRate
-  
-  var lastIndex = market.closes.length - 1
-  var close = market.closes[lastIndex]
-
-  entryPrice = close
-  lossDistance = base.roundPrice(stopLoss - entryPrice)
-  if (!lossDistance || !walletBalance) {
-    return {
-      signal: signal,
-      orderSignal: {
-        timestamp: timestamp,
-        type: '-'
-      }
-    }
+  signal.coinPairRate = quote.lastPrice/XBTUSDRate
+  signal.walletBalance = walletBalance / signal.coinPairRate
+  signal.entryPrice = market.closes[market.closes.length - 1]
+  signal.lossDistance = base.roundPrice(signal.stopLoss - signal.entryPrice)
+  if (!signal.lossDistance || !signal.walletBalance) {
+    return signal
   }
 
-  var orderSignal = await getOrder(setup,signal.condition,walletBalance,entryPrice,lossDistance,coinPairRate)
-  orderSignal.stopLoss = stopLoss
-  orderSignal.timestamp = timestamp
-
-  return {
-    signal: signal,
-    orderSignal: orderSignal
-  }
+  var orderSignal = await getOrder(setup,signal)
+  return orderSignal
 } catch(e) {console.error(e.stack||e);debugger} }
 
 function cancelOrder(params) {
@@ -402,64 +263,68 @@ function cancelOrder(params) {
 }
 
 async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {
-  if (positionSize != 0) return
+  var enter, signal
+  // var candleTimeOffset = bitmex.getCandleTimeOffset()
 
-  var enter
-  let candleTimeOffset = bitmex.getCandleTimeOffset()
-
-  let signals, orderSignal
-
-  if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
+  // if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
     var market = await bitmex.getCurrentMarket()
-    signals = await getSignals(market,setup,walletBalance)
-    orderSignal = signals.orderSignal
+    signal = await getSignal(market,setup,walletBalance)
+    if (!shoes.mock) logger.debug('enterSignal',signal)
+  // }
 
-    if (!mock) logger.debug('enterSignal',signals)
-  }
-
-  if (orderSignal && (orderSignal.type == 'SHORT' || orderSignal.type == 'LONG') && 
-    orderSignal.entryPrice && orderSignal.orderQtyUSD) {
+  if (signal && (signal.type == 'SHORT' || signal.type == 'LONG') && 
+      signal.entryPrice && signal.orderQtyUSD) {
     if (base.isFundingWindow(fundingTimestamp) &&
-      ((orderSignal.orderQtyUSD > 0 && fundingRate > 0) || 
-      (orderSignal.orderQtyUSD < 0 && fundingRate < 0))) {
-        logger.info('Funding ' + orderSignal.type + ' will have to pay. Do not enter.')
+      ((signal.orderQtyUSD > 0 && fundingRate > 0) || 
+      (signal.orderQtyUSD < 0 && fundingRate < 0))) {
+        logger.info('Funding ' + signal.type + ' will have to pay. Do not enter.')
     }
     else {
-      if (!mock) logger.info('enterSignal',signals)
-      enter = {type:'Limit',price:orderSignal.entryPrice,size:orderSignal.positionSize,execInst:'ParticipateDoNotInitiate',signal:orderSignal}
+      enter = {signal:signal}
+      if (!shoes.mock) logger.info('enterSignal',enter)
     }
   }
   return enter
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function orderEntry(entrySignal) { try {
-  let {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal)
+  let {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
   let existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders).filter(o => {
     return (new Date(o.timestamp).getTime() >= entrySignal.time)
   })
   if (existingEntryOrders.length > 0) {
-    // logger.info('ENTRY ORDER EXISTS')
+    // logger.info('SAME ENTRY ORDER EXISTS')
   }
   else {
-    if (!mock) logger.info('ENTER ORDER',entrySignal)
+    if (!shoes.mock) logger.info('ENTER ORDER',entrySignal)
+    closeOrders = closeOrders.slice(0,1)
     let response = await bitmex.order(entryOrders.concat(closeOrders),true)
     if (response.status == 200) {
       base.writeEntrySignal(entrySignal)
       entrySignal.entryOrders = entryOrders
       entrySignal.closeOrders = closeOrders
-      entrySignal.takeProfitOrders = takeProfitOrders
+      // entrySignal.takeProfitOrders = takeProfitOrders
     }
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
+  let entrySignal = (await enterSignal(params))
+  if (entrySignal) {
+    await orderEntry(entrySignal)
+    base.setEntrySignal(entrySignal)
+    storage.writeEntrySignalTable(entrySignal)
+  }
+
+  return
+/*
   var {positionSize,signal} = params
   var newEntryOrders = bitmex.findOrders(/New/,signal.entryOrders)
 
   if (newEntryOrders.length > 0) {
     let cancel = cancelOrder(params)
     if (cancel) {
-      if (!mock) logger.info('CANCEL ORDER',cancel)
+      if (!shoes.mock) logger.info('CANCEL ORDER',cancel)
       await bitmex.cancelOrders(newEntryOrders)
       newEntryOrders = []
       resetEntrySignal()
@@ -478,7 +343,7 @@ async function checkEntry(params) { try {
       else {
         let cancel = cancelOrder(params)
         if (cancel) {
-          if (!mock) logger.info('CANCEL SIGNAL',cancel)
+          if (!shoes.mock) logger.info('CANCEL SIGNAL',cancel)
           resetEntrySignal()
         }
       }
@@ -493,18 +358,19 @@ async function checkEntry(params) { try {
         base.setEntrySignal(entrySignal)
         entrySignalTable.info('entry',entrySignal)
         entrySignal.time = new Date(entrySignal.timestamp).getTime()
-        if (!mock) logger.info('ENTER SIGNAL',entrySignal)
+        if (!shoes.mock) logger.info('ENTER SIGNAL',entrySignal)
         // await orderEntry()
       }
     }
   }
+  */
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkExit(params) { try {
   var {positionSize,bid,ask,lastPrice,signal} = params
   if (positionSize == 0 || !lastPrice) return
 
-  var {entryPrice,entryOrders,takeProfitOrders,closeOrders} = signal
+  var {signal:{entryPrice},entryOrders,takeProfitOrders,closeOrders} = signal
 
   var exit = base.exitTooLong(params) || base.exitFunding(params)
   if (exit) {
@@ -522,60 +388,59 @@ async function checkExit(params) { try {
       return existingExitOrders
     }
 
-    if (!mock) logger.info('CLOSE ORDER', exit)
+    if (!shoes.mock) logger.info('CLOSE ORDER', exit)
     var response = await bitmex.order(exitOrders,true)
     return response
   }
-  else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
-    let [takeProfitOrder,takeHalfProfitOrder] = takeProfitOrders
+  // else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
+  //   let [takeProfitOrder,takeHalfProfitOrder] = takeProfitOrders
   
-    let orders = []
-    let exitOrderQty = -bitmex.getCumQty(entryOrders,signal.timestamp)
-    let halfExitOrderQty = exitOrderQty/2
+  //   let orders = []
+  //   let exitOrderQty = -bitmex.getCumQty(entryOrders,signal.timestamp)
+  //   let halfExitOrderQty = exitOrderQty/2
   
-    // total takeProfit orderQty
-    takeProfitOrder.orderQty = Math.round(halfExitOrderQty)
-    takeHalfProfitOrder.orderQty = exitOrderQty - takeProfitOrder.orderQty
+  //   // total takeProfit orderQty
+  //   takeProfitOrder.orderQty = Math.round(halfExitOrderQty)
+  //   takeHalfProfitOrder.orderQty = exitOrderQty - takeProfitOrder.orderQty
   
-    // find orders based on the total qty
-    let takeProfitCumQty = bitmex.getCumQty([takeProfitOrder],signal.timestamp)
-    let takeHalfProfitCumQty = bitmex.getCumQty([takeHalfProfitOrder],signal.timestamp)
+  //   // find orders based on the total qty
+  //   let takeProfitCumQty = bitmex.getCumQty([takeProfitOrder],signal.timestamp)
+  //   let takeHalfProfitCumQty = bitmex.getCumQty([takeHalfProfitOrder],signal.timestamp)
   
-    // subtract filled qty
-    takeProfitOrder.orderQty -= takeProfitCumQty
-    takeHalfProfitOrder.orderQty -= takeHalfProfitCumQty
+  //   // subtract filled qty
+  //   takeProfitOrder.orderQty -= takeProfitCumQty
+  //   takeHalfProfitOrder.orderQty -= takeHalfProfitCumQty
   
-    // submit orders if there is any remaining qty
-    if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
-    if (takeHalfProfitOrder.orderQty != 0) orders.push(takeHalfProfitOrder)
+  //   // submit orders if there is any remaining qty
+  //   if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
+  //   if (takeHalfProfitOrder.orderQty != 0) orders.push(takeHalfProfitOrder)
 
-    let existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
-    if (existingTakeProfitOrders.length != orders.length) {
-      let tooSmall = bitmex.ordersTooSmall(orders) 
-      if (tooSmall.length > 0) {
-        if (orders.length > 1) {
-          orders[0].orderQty += orders[1].orderQty
-          orders.pop()
-          existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
-          if (existingTakeProfitOrders.length == 1) {
-            return
-          }
-        }
-        else {
-          logger.info('order tooSmall', orders)
-          return
-        }
-      }
-      return await bitmex.order(orders)
-    }
-  }
+  //   let existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
+  //   if (existingTakeProfitOrders.length != orders.length) {
+  //     let tooSmall = bitmex.ordersTooSmall(orders) 
+  //     if (tooSmall.length > 0) {
+  //       if (orders.length > 1) {
+  //         orders[0].orderQty += orders[1].orderQty
+  //         orders.pop()
+  //         existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
+  //         if (existingTakeProfitOrders.length == 1) {
+  //           return
+  //         }
+  //       }
+  //       else {
+  //         logger.info('order tooSmall', orders)
+  //         return
+  //       }
+  //     }
+  //     return await bitmex.order(orders)
+  //   }
+  // }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkPosition(params) {
-  if (params.positionSize == 0) {
-    await checkEntry(params)
-  }
-  else {
+  await checkEntry(params)
+  if (params.positionSize != 0) {
+    params.signal = base.getEntrySignal()
     await checkExit(params)
   }
 }
@@ -594,22 +459,24 @@ function getEntryExitOrders(entrySignal) {
   return base.getEntryExitOrders(entrySignal)
 }
 
-async function init(_entrySignalTable) {
+async function init() {
   var now = getTimeNow()
   exitCandleTime = now - (now % oneCandleMS)
   base.init()
-  entrySignalTable = _entrySignalTable
+}
 
-  if (mock) {
-    getTimeNow = mock.getTimeNow
-  }
+function getCacheTradePath(dirname,{symbol,startTime,endTime,candle:{interval},rsi:{rsiLength},willy:{willyLength}}) {
+  return path.resolve(dirname, 'data/bitmex/signal/'+symbol+'/'+interval+'-'+startTime+'-'+endTime+
+    rsiLength+willyLength+'.json').replace(/:/g,';')
 }
 
 module.exports = {
   init: init,
-  getSignals: getSignals,
+  // getSignals: getSignals,
   checkPosition: checkPosition,
   resetEntrySignal: resetEntrySignal,
   getEntrySignal: getEntrySignal,
-  getEntryExitOrders: getEntryExitOrders
+  getEntryExitOrders: getEntryExitOrders,
+  getCacheTradePath: getCacheTradePath
 }
+

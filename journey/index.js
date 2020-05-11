@@ -3,6 +3,7 @@ const fsR = require('fs-reverse')
 const { Writable } = require('stream');
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
+const bitmexdata = require('./bitmexdata')
 
 const winston = require('winston')
 const path = require('path')
@@ -10,8 +11,27 @@ const path = require('path')
 const shoes = require('./shoes')
 global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 
-var mock
-if (shoes.mock) mock = require('./mock.js')
+const colorizer = winston.format.colorize()
+global.colorizer = colorizer
+const isoTimestamp = winston.format((info, opts) => {
+  info.timestamp = new Date(getTimeNow()).toISOString()
+  return info;
+})
+global.isoTimestamp = isoTimestamp
+
+var mock, getTimeNow
+if (shoes.mock) {
+  mock = require('./mock.js')
+  global.getTimeNow = mock.getTimeNow
+}
+else {
+  global.getTimeNow = () => {
+    return new Date().getTime()
+  }
+}
+
+const storage = require('./storage')
+global.storage = storage
 
 const bitmex = require('./bitmex')
 const strategy = require('./strategy/' + shoes.strategy + '_strategy')
@@ -21,21 +41,9 @@ const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 
 global.bitmex = bitmex
+global.strategy = strategy
 
-const entrySignalTableFilePath = global.logDir + '/entry_signal_table.log'
-
-const colorizer = winston.format.colorize()
-
-const isoTimestamp = winston.format((info, opts) => {
-  info.timestamp = new Date(getTimeNow()).toISOString()
-  return info;
-})
-
-function getTimeNow() {
-  return new Date().getTime()
-}
-
-var lastCheckPositionTime = getTimeNow()
+var lastCheckPositionTime
 
 const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
@@ -113,18 +121,7 @@ const logger = winston.createLogger({
   ]
 })
 
-const entrySignalTable = winston.createLogger({
-  transports: [
-    new winston.transports.File({filename:entrySignalTableFilePath,
-      format: winston.format.combine(
-        isoTimestamp(),
-        winston.format.json()
-      ),
-    })
-  ]
-})
-
-logger.info('shoes', shoes)
+global.logger = logger
 
 async function checkPositionCallback(params) { try {
   params.signal = strategy.getEntrySignal()
@@ -167,12 +164,12 @@ async function checkPosition(params) { try {
 
 async function next() { try {
   var now = getTimeNow()
-  if (now-lastCheckPositionTime > 2500) {
+  // if (now-lastCheckPositionTime > 2500) {
     bitmex.getCurrentMarket() // to start a new candle if necessary
     bitmex.checkPositionParams.caller = 'interval'
     bitmex.checkPositionParams.signal = strategy.getEntrySignal()
     checkPosition(bitmex.checkPositionParams)
-  }
+  // }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getMarketJson(sp) { try {
@@ -183,59 +180,21 @@ async function getMarketJson(sp) { try {
   return JSON.stringify(market)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getTradeSignals({startTime,endTime}) { try {
-  return new Promise((resolve,reject) => {
-    var startTimeMs = new Date(startTime).getTime()
-    var endTimeMs = new Date(endTime).getTime()
-    var signals = []
-    var stream = fsR(entrySignalTableFilePath, {})
-    const outStream = new Writable({
-      write(chunk, encoding, callback) {
-        let str = chunk.toString()
-        if (str && str.length > 0) {
-          let signal = JSON.parse(str)
-          let signalTime = new Date(signal.timestamp).getTime()
-          if (signalTime >= startTimeMs && signalTime <= endTimeMs) {
-            var {entryOrders,closeOrders,takeProfitOrders} = strategy.getEntryExitOrders(signal)
-            signal.entryOrders = entryOrders
-            signal.closeOrders = closeOrders
-            signal.takeProfitOrders = takeProfitOrders
-            signals.unshift(signal)
-          }
-          else {
-            stream.destroy()
-            resolve(signals)
-          }
-        }
-        callback()
-      }
-    })
-    stream.pipe(outStream)
-    stream.on('finish', () => {
-      resolve(signals)
-    })
-    stream.on('end', () => {
-      resolve(signals)
-    })
-  })
-} catch(e) {logger.error(e.stack||e);debugger} }
-
 var gettingTradeJson = false
 
-async function getTradeJson(sp) { try {
+async function getTradeJson(sp,useCache) { try {
   console.time('getTradeJson')
-  var cachePath = getSignalPath(sp)
+  var cachePath = strategy.getCacheTradePath(__dirname,sp)
 
   if (mock) {
-    // if (fs.existsSync(cachePath)) {
-    //   console.timeEnd('getTradeJson')
-    //   return fs.readFileSync(cachePath,readFileOptions)
-    // }
+    if (useCache && fs.existsSync(cachePath)) {
+      console.timeEnd('getTradeJson')
+      return fs.readFileSync(cachePath,readFileOptions)
+    }
     if (gettingTradeJson) {
       return ''
     }
     gettingTradeJson = true
-    setup.rsi = sp.rsi
     await mock.init(sp)
     strategy.resetEntrySignal()
     await bitmex.init(sp,checkPositionCallback)
@@ -245,41 +204,94 @@ async function getTradeJson(sp) { try {
 
   var [orders,signals] = await Promise.all([
     bitmex.getOrders(sp),
-    getTradeSignals(sp)
+    storage.readEntrySignalTable(sp)
   ])
   orders = orders.filter(o => {
     return o.stopPx != 1
   })
-  var trades = []
+  var walletHistory = await bitmex.getWalletHistory()
+  var trades = [], ords = []
   var timeOffset = 1000 // bitmex time and server time are not the same
+  var walletBalance = walletHistory[0][1]
   signals.forEach((signal,i) => {
     let {timestamp} = signal
     let startTime = new Date(timestamp).getTime() - timeOffset
     let endTime = (signals[i+1] ? new Date(signals[i+1].timestamp) : new Date()).getTime() - timeOffset
-    signal.ords = orders.filter(({timestamp}) => {
+    ords[i] = orders.filter(({timestamp}) => {
       let t = new Date(timestamp).getTime()
       return (t >= startTime && t < endTime)
     })
   })
-  signals.forEach(({ords,timestamp,capitalBTC,type,orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,entryOrders,closeOrders,takeProfitOrders},i) => {
+  signals.forEach((s,i) => {
+    let previousTrade = trades[i-1] || {drawdown:0,drawdownPercent:0}
     let trade = {
-      timestamp, capitalBTC, type, orderQtyUSD, entryPrice, stopLoss, stopMarket, takeProfit, takeHalfProfit,
-      entryOrders: bitmex.findOrders(/.+/,entryOrders,ords),
-      closeOrders: bitmex.findOrders(/.+/,closeOrders,ords),
-      takeProfitOrders: bitmex.findOrders(/.+/,takeProfitOrders,ords),
+      signal: s,
+      entryOrders: bitmex.findOrders(/.+/,s.entryOrders,ords[i]),
+      closeOrders: bitmex.findOrders(/.+/,s.closeOrders,ords[i]),
+      takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
+      fee: 0, cost: 0, costPercent: '%', feePercent: '%', pnl:0, pnlPercent:'%',
+      drawdown: previousTrade.drawdown, drawdownPercent: previousTrade.drawdownPercent, 
+      walletBalance: walletBalance, walletBalancePercent:'%'
     }
     let foundOrders = trade.entryOrders.concat(trade.closeOrders).concat(trade.takeProfitOrders)
     trade.otherOrders = ords.filter((e) => {
       return foundOrders.indexOf(e) < 0
     })
     trades.push(trade)
+
+    let closeOrder = trade.closeOrders[0]
+    closeOrder.price = closeOrder.price || 0
+
+    let closeQty = trade.closeOrders[0].cumQty
+    let len = trades.length
+    let tradeIndex = len
+    while (closeQty > 0) {
+      tradeIndex--
+      closeQty -= trades[tradeIndex].entryOrders[0].cumQty
+    }
+    if (closeQty < 0) {
+      console.error('incorrect quantity')
+      debugger
+    }
+    for (;tradeIndex < len; tradeIndex++) {
+      let t = trades[tradeIndex]
+      let pt = trades[tradeIndex-1] || {drawdown:0}
+      let entryOrder = t.entryOrders[0]
+      if (entryOrder.ordStatus == 'Filled') {
+        let entryCost = mock.getCost(entryOrder)
+        let partialCloseOrder = t.closeOrders[0]
+        partialCloseOrder.cumQty = entryOrder.cumQty
+        partialCloseOrder.price = closeOrder.price
+        let closeCost = mock.getCost(partialCloseOrder)
+        t.fee = entryCost[2] + closeCost[2]
+        t.cost = Math.round((entryCost[0] + closeCost[0]) * 100000000)
+        t.pnl = (t.cost - t.fee)
+        t.drawdown = pt.drawdown + t.pnl
+        if (t.drawdown > 0) {
+          t.drawdown = 0
+        }
+        t.feePercent = (Math.round(-t.fee / walletBalance * 10000) / 100).toFixed(2)
+        t.costPercent = (Math.round(t.cost / walletBalance * 10000) / 100).toFixed(2)
+        t.pnlPercent = (Math.round(t.pnl / walletBalance * 10000) / 100).toFixed(2)
+        t.drawdownPercent = (Math.round(t.drawdown / walletBalance * 10000) / 100).toFixed(2)
+        walletBalance += t.pnl
+        t.walletBalance = walletBalance
+        t.walletBalancePercent = (walletBalance / walletHistory[0][1] * 100).toFixed(2)
+      }
+      else {
+        t.drawdown = pt.drawdown
+      }
+    }
   })
   
-  let walletHistory = await bitmex.getWalletHistory()
-  let tradeJSON = JSON.stringify({trades:trades,orders:orders,walletHistory:walletHistory})
-  fs.writeFileSync(cachePath,tradeJSON,writeFileOptions)
-
   console.timeEnd('getTradeJson')
+
+  let tradeObject = {trades:trades} //,orders:orders,walletHistory:walletHistory}
+  await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
+  debugger
+  // return tradeObject
+  let tradeJSON = JSON.stringify(tradeObject)
+  fs.writeFileSync(cachePath,tradeJSON,writeFileOptions)
   return tradeJSON
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -306,60 +318,59 @@ function createInterval(candleDelay) {
   },startsIn)
 }
 
-function getSignalPath({symbol,interval,startTime,endTime,rsi}) {
-  var {length,shortPrsi,shortRsi,longPrsi,longRsi} = rsi
-  return path.resolve(__dirname, 'data/bitmex/signal/'+symbol+'/'+interval+'-'+startTime+'-'+endTime+
-    length+shortPrsi+shortRsi+longPrsi+longRsi+'.json').replace(/:/g,';')
+async function updateData() {
+  console.time('updateData')
+  var start = 20200401
+  var end = 20200508
+  await bitmexdata.downloadTradeData(start,end)
+  // await bitmexdata.testCandleDayFiles(start,end,60)
+  // debugger
+  await bitmexdata.generateCandleDayFiles(start,end,60)
+  await bitmexdata.generateCandleDayFiles(start,end,1440)
+  console.timeEnd('updateData')
+  debugger
 }
 
 async function init() { try {
+  // await updateData()
+  // debugger
+  getTimeNow = global.getTimeNow
+  lastCheckPositionTime = getTimeNow()
+  logger.info('shoes', shoes)
+
   if (mock) {
-    getTimeNow = mock.getTimeNow
     next = mock.next
     createInterval = mock.createInterval
   }
 
-  await strategy.init(entrySignalTable)
+  await storage.init()
+  await strategy.init()
   await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
   if (mock) {
     var s = {
       symbol: 'XBTUSD',
-      interval: 5,
-      startTime: '2019-05-02T00:00:00.000Z',
-      endTime: '2019-05-17T00:00:00.000Z',
+      startTime: '2017-01-03T00:00:00.000Z',
+      endTime: '2020-05-09T00:00:00.000Z',
       rsi: {
-        length: 4,
-        shortPrsi: 65,
-        shortRsi: 55,  
-        longRsi: 55,
-        longPrsi: 50
+        rsiLength: 14
+      },
+      willy: {
+        willyLength: 14,
+      },
+      candle: {
+        interval: 60,
+        length: 24,
+        inTradeMax: 900,
+        fundingWindow: 5,
+        lookBack: 30,
+        tick: 0.5,
       },
     }
-    var tradeJSON = await getTradeJson(s)
-    var t = JSON.parse(tradeJSON)
+    var tradeJSON = await getTradeJson(s,false)
+    var tradeObject = JSON.parse(tradeJSON)
+    await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
     debugger
-    // for (var sprsi = 55; sprsi <= 75; sprsi+=5) {
-    //   for (var srsi = 50; srsi <= 70; srsi+=5) {
-    //     for (var lrsi = 30; lrsi <= 55; lrsi+=5) {
-    //       for (var lprsi = 25; lprsi <= 50; lprsi+=5) {
-    //         if (sprsi >= srsi && lrsi >= lprsi) {
-    //           s.rsi.shortPrsi = sprsi
-    //           s.rsi.shortRsi = srsi
-    //           s.rsi.longRsi = lrsi
-    //           s.rsi.longPrsi = lprsi
-    //           let tradeJSON = await getTradeJson(s)
-    //           let t = JSON.parse(tradeJSON)
-    //           let startBalance = t.walletHistory[0][1]
-    //           let endBalance = t.walletHistory[t.walletHistory.length-1][1]
-    //           let gain = endBalance-startBalance
-    //           console.log(sprsi,srsi,lrsi,lprsi,startBalance,endBalance,gain)
-    //           if (gain > 0) debugger
-    //         }
-    //       }
-    //     }
-    //   }
-    // }
   }
   else {
     await bitmex.init(setup,checkPositionCallback)
