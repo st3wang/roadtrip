@@ -133,7 +133,7 @@ function initEntrySignal() {
 
   var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)
   entrySignal = JSON.parse(entrySignalString)
-  entrySignal.time = new Date(entrySignal.timestamp).getTime()
+  entrySignal.time = new Date(entrySignal.signal.timestamp).getTime()
 
   var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal)
   entrySignal.entryOrders = entryOrders
