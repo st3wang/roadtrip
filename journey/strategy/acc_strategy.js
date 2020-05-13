@@ -40,7 +40,7 @@ const logger = winston.createLogger({
             } break
             case 'ENTER SIGNAL': 
             case 'ENTER ORDER': {
-              let {orderQtyUSD,entryPrice} = splat[0]
+              let {orderQtyUSD,entryPrice} = splat[0].signal
               line =  (orderQtyUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+orderQtyUSD+' '+entryPrice
             } break
             default: {

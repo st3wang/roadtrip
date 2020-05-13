@@ -59,7 +59,7 @@ const logger = winston.createLogger({
           let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
-            case 'checkPosition': {
+            case 'position': {
               let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal
               let lossDistancePercentString, positionSizeString, lastPriceString
@@ -124,15 +124,14 @@ const logger = winston.createLogger({
 global.logger = logger
 
 async function checkPositionCallback(params) { try {
-  params.signal = strategy.getEntrySignal()
-  return await checkPosition(params)
+  // params.signal = strategy.getEntrySignal()
+  // return await checkPosition(params)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 var checking = false, recheckWhenDone = false
 
 async function checkPosition(params) { try {
   const {walletBalance,lastPositionSize,positionSize,caller} = params
-  if (!mock) logger.info('checkPosition',params)
   switch(caller) {
     case 'position': {
       if (lastPositionSize == 0) {
@@ -162,13 +161,14 @@ async function checkPosition(params) { try {
   checking = false
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function next() { try {
+async function next(check) { try {
   var now = getTimeNow()
   // if (now-lastCheckPositionTime > 2500) {
     bitmex.getCurrentMarket() // to start a new candle if necessary
     bitmex.checkPositionParams.caller = 'interval'
     bitmex.checkPositionParams.signal = strategy.getEntrySignal()
-    checkPosition(bitmex.checkPositionParams)
+    if (!mock) logger.info('position',bitmex.checkPositionParams)
+    if (check) checkPosition(bitmex.checkPositionParams)
   // }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -313,7 +313,7 @@ function createInterval(candleDelay) {
   var startsInMin = (startsIn - startsInSec) / 60000
   console.log('createInterval every ' + oneCandleMS + ' delay ' + candleDelay + ' starts in ' + startsInMin + ':' + Math.floor(startsInSec/1000) + ' minutes')
   setTimeout(_ => {
-    next()
+    next(true)
     setInterval(next,interval)
   },startsIn)
 }
@@ -375,23 +375,11 @@ async function init() { try {
   else {
     await bitmex.init(setup,checkPositionCallback)
     next()
-    createInterval(6000*2**0)
-    createInterval(6000*2**1)
+    createInterval(6000*2**0) // 6s after candle close
+    // createInterval(6000*2**1) // 12s
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 init()
 
-// var lineReader = require('readline').createInterface({
-//   input: require('fs').createReadStream('combined.log')
-// })
 
-// lineReader.on('line', (line) => {
-//   var json = JSON.parse(line)
-//   var {timestamp,url,signal} = json
-//   if (signal && timestamp.indexOf('09T11:16:') > 0) {
-//     console.log(json)
-//     console.log(json.message)
-//     debugger
-//   }
-// })
