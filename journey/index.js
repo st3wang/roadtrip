@@ -124,8 +124,13 @@ const logger = winston.createLogger({
 global.logger = logger
 
 async function checkPositionCallback(params) { try {
-  // params.signal = strategy.getEntrySignal()
-  // return await checkPosition(params)
+  if (mock) {
+    var timestamp = new Date(getTimeNow()).toISOString()
+    if (timestamp.includes('06.000Z')) {
+      params.signal = strategy.getEntrySignal()
+      return await checkPosition(params)
+    }
+  }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 var checking = false, recheckWhenDone = false
@@ -161,14 +166,14 @@ async function checkPosition(params) { try {
   checking = false
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function next(check) { try {
+async function next(logOnly) { try {
   var now = getTimeNow()
   // if (now-lastCheckPositionTime > 2500) {
     bitmex.getCurrentMarket() // to start a new candle if necessary
     bitmex.checkPositionParams.caller = 'interval'
     bitmex.checkPositionParams.signal = strategy.getEntrySignal()
     if (!mock) logger.info('position',bitmex.checkPositionParams)
-    if (check) checkPosition(bitmex.checkPositionParams)
+    if (!logOnly) checkPosition(bitmex.checkPositionParams)
   // }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -240,6 +245,7 @@ async function getTradeJson(sp,useCache) { try {
     trades.push(trade)
 
     let closeOrder = trade.closeOrders[0]
+    if (!closeOrder) debugger
     closeOrder.price = closeOrder.price || 0
 
     let closeQty = trade.closeOrders[0].cumQty
@@ -313,7 +319,7 @@ function createInterval(candleDelay) {
   var startsInMin = (startsIn - startsInSec) / 60000
   console.log('createInterval every ' + oneCandleMS + ' delay ' + candleDelay + ' starts in ' + startsInMin + ':' + Math.floor(startsInSec/1000) + ' minutes')
   setTimeout(_ => {
-    next(true)
+    next()
     setInterval(next,interval)
   },startsIn)
 }
@@ -321,7 +327,7 @@ function createInterval(candleDelay) {
 async function updateData() {
   console.time('updateData')
   var start = 20200401
-  var end = 20200508
+  var end = 20200513
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   // debugger
@@ -331,9 +337,34 @@ async function updateData() {
   debugger
 }
 
+async function readLog() {
+  return new Promise((resolve,reject) => {
+    var lineReader = require('readline').createInterface({
+      input: require('fs').createReadStream('combined.log')
+    })
+  
+    lineReader.on('line', (line) => {
+      if (line && line.length) {
+        var json = JSON.parse(line)
+        var {timestamp,message,condition,riskAmountBTC} = json
+        if (timestamp.includes('2020-05-13T16')
+        // && message == 'position'
+          ) {
+            console.log(json)
+          // console.log(json.timestamp, json.condition, json.type, json.entryPrice)
+        }
+      }
+      else {
+        debugger
+        resolve()
+      }
+    })
+  })
+}
+
 async function init() { try {
+  // await readLog()
   // await updateData()
-  // debugger
   getTimeNow = global.getTimeNow
   lastCheckPositionTime = getTimeNow()
   logger.info('shoes', shoes)
@@ -350,8 +381,8 @@ async function init() { try {
   if (mock) {
     var s = {
       symbol: 'XBTUSD',
-      startTime: '2017-01-03T00:00:00.000Z',
-      endTime: '2020-05-09T00:00:00.000Z',
+      startTime: '2020-05-10T00:00:00.000Z',
+      endTime: '2020-05-13T23:00:00.000Z',
       rsi: {
         rsiLength: 14
       },
@@ -374,12 +405,11 @@ async function init() { try {
   }
   else {
     await bitmex.init(setup,checkPositionCallback)
-    next()
+    next(true)
     createInterval(6000*2**0) // 6s after candle close
     // createInterval(6000*2**1) // 12s
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 init()
-
 

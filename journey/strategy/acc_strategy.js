@@ -262,17 +262,17 @@ function cancelOrder(params) {
   || base.exitTarget(cancelParams) || base.exitStop(cancelParams))
 }
 
-async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {
-  var enter, signal
+async function getEnterSignal({positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {
+  var signal
   // var candleTimeOffset = bitmex.getCandleTimeOffset()
 
   // if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
     var market = await bitmex.getCurrentMarket()
     signal = await getSignal(market,setup,walletBalance)
-    if (!shoes.mock) logger.debug('enterSignal',signal)
+    if (!shoes.mock) logger.info('enterSignal',signal)
   // }
 
-  if (signal && (signal.type == 'SHORT' || signal.type == 'LONG') && 
+  if ((signal.type == 'SHORT' || signal.type == 'LONG') && 
       signal.entryPrice && signal.orderQtyUSD) {
     if (base.isFundingWindow(fundingTimestamp) &&
       ((signal.orderQtyUSD > 0 && fundingRate > 0) || 
@@ -280,11 +280,10 @@ async function enterSignal({positionSize,fundingTimestamp,fundingRate,walletBala
         logger.info('Funding ' + signal.type + ' will have to pay. Do not enter.')
     }
     else {
-      enter = {signal:signal}
-      if (!shoes.mock) logger.info('enterSignal',enter)
+      return {signal:signal}
     }
   }
-  return enter
+  return undefined
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function orderEntry(entrySignal) { try {
@@ -293,7 +292,7 @@ async function orderEntry(entrySignal) { try {
     return (new Date(o.timestamp).getTime() >= entrySignal.time)
   })
   if (existingEntryOrders.length > 0) {
-    // logger.info('SAME ENTRY ORDER EXISTS')
+    logger.info('SAME ENTRY ORDER EXISTS')
   }
   else {
     if (!shoes.mock) logger.info('ENTER ORDER',entrySignal)
@@ -309,61 +308,12 @@ async function orderEntry(entrySignal) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
-  let entrySignal = (await enterSignal(params))
+  let entrySignal = (await getEnterSignal(params))
   if (entrySignal) {
     await orderEntry(entrySignal)
     base.setEntrySignal(entrySignal)
     storage.writeEntrySignalTable(entrySignal)
   }
-
-  return
-/*
-  var {positionSize,signal} = params
-  var newEntryOrders = bitmex.findOrders(/New/,signal.entryOrders)
-
-  if (newEntryOrders.length > 0) {
-    let cancel = cancelOrder(params)
-    if (cancel) {
-      if (!shoes.mock) logger.info('CANCEL ORDER',cancel)
-      await bitmex.cancelOrders(newEntryOrders)
-      newEntryOrders = []
-      resetEntrySignal()
-    }
-  }
-
-  var entrySignal = getEntrySignal()
-  if (entrySignal.timestamp) {
-    let now = getTimeNow()
-    if (now > (entrySignal.time + oneCandleMS)) {
-      let {open,close} = await bitmex.getLastCandle()
-      if ((entrySignal.type == 'LONG' && close > entrySignal.entryPrice && close > open) ||
-        (entrySignal.type == 'SHORT' && close < entrySignal.entryPrice && close < open)) {
-          await orderEntry(entrySignal)
-      }
-      else {
-        let cancel = cancelOrder(params)
-        if (cancel) {
-          if (!shoes.mock) logger.info('CANCEL SIGNAL',cancel)
-          resetEntrySignal()
-        }
-      }
-    }
-  }
-  else {
-    let now = getTimeNow()
-    if (!exitCandleTime || now > (exitCandleTime + oneCandleMS)) {
-      let enter = (await enterSignal(params))
-      if (enter) {
-        entrySignal = enter.signal
-        base.setEntrySignal(entrySignal)
-        entrySignalTable.info('entry',entrySignal)
-        entrySignal.time = new Date(entrySignal.timestamp).getTime()
-        if (!shoes.mock) logger.info('ENTER SIGNAL',entrySignal)
-        // await orderEntry()
-      }
-    }
-  }
-  */
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkExit(params) { try {
@@ -472,7 +422,6 @@ function getCacheTradePath(dirname,{symbol,startTime,endTime,candle:{interval},r
 
 module.exports = {
   init: init,
-  // getSignals: getSignals,
   checkPosition: checkPosition,
   resetEntrySignal: resetEntrySignal,
   getEntrySignal: getEntrySignal,
