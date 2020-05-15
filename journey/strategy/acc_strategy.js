@@ -232,15 +232,22 @@ async function getSignal(market,setup,walletBalance) { try {
   //   else if (signalCondition == 'L') signalCondition = 'LONG'
   // }
 
-  if (signal.condition == '-') {
-    return signal
+  var quote = bitmex.getQuote()
+  var close = market.closes[market.closes.length - 1]
+  switch(signal.condition) {
+    case '-':
+      return signal
+    case 'LONG':
+      signal.entryPrice = Math.min(close,quote.bidPrice)
+      break
+    case 'SHORT':
+      signal.entryPrice = Math.max(close,quote.askPrice)
+      break
   }
 
-  var quote = bitmex.getQuote()
   var XBTUSDRate = bitmex.getRate('XBTUSD')
   signal.coinPairRate = quote.lastPrice/XBTUSDRate
   signal.walletBalance = walletBalance / signal.coinPairRate
-  signal.entryPrice = market.closes[market.closes.length - 1]
   signal.lossDistance = base.roundPrice(signal.stopLoss - signal.entryPrice)
   if (!signal.lossDistance || !signal.walletBalance) {
     return signal
