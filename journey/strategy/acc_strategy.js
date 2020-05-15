@@ -31,14 +31,13 @@ const logger = winston.createLogger({
           let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
-            case 'enterSignal': {
+            case 'ENTER SIGNAL': {
               let signal = splat[0]
               if (signal) {
-                let {condition,type='',entryPrice=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN} = signal
-                line += typeColor(condition)+' '+typeColor(type)+' '+entryPrice.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)
+                let {condition,type='',entryPrice=NaN,stopLoss=NaN,orderQtyUSD,lossDistance=NaN,riskAmountUSD=NaN,reason=''} = signal
+                line += typeColor(condition)+' '+typeColor(type)+' '+entryPrice.toFixed(1)+' '+stopLoss.toFixed(1)+' '+orderQtyUSD+' '+lossDistance.toFixed(1)+' '+riskAmountUSD.toFixed(4)+' '+reason
               }
             } break
-            case 'ENTER SIGNAL': 
             case 'ENTER ORDER': {
               let {orderQtyUSD,entryPrice} = splat[0].signal
               line =  (orderQtyUSD>0?'\x1b[36m':'\x1b[35m')+line+'\x1b[39m'+orderQtyUSD+' '+entryPrice
@@ -197,10 +196,10 @@ async function getOrder(setup,signal) {
   //   if (scaleInOrders.length <= 1) goodStopDistance = false
   // }
 
-  return Object.assign({
+  var order = Object.assign({
     capitalBTC: capitalBTC,
     capitalUSD: capitalUSD,
-    type: (goodStopDistance ? signal.condition : '-'),
+    type: signal.condition,
     entryPrice: entryPrice,
     lossDistance: lossDistance,
     lossDistancePercent: lossDistance/entryPrice,
@@ -219,29 +218,48 @@ async function getOrder(setup,signal) {
     leverage: leverage,
     scaleInOrders: scaleInOrders
   },signal)
+
+  if (!goodStopDistance) {
+    order.type = '-'
+    order.reason = 'not good stop distance. ' + JSON.stringify({
+      absLossDistancePercent: absLossDistancePercent,
+      minStopLoss: minStopLoss,
+      maxStopLoss: maxStopLoss
+    })
+  }
+
+  return order
 }
 
 async function getSignal(market,setup,walletBalance) { try {
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal = await getAccumulationSignal(market,setup)
   signal.timestamp = timestamp
-  
-  // Test
-  // if (shoes.test ) {
-  //   if (signalCondition == 'S' || signalCondition == '-') signalCondition = 'SHORT'
-  //   else if (signalCondition == 'L') signalCondition = 'LONG'
-  // }
 
   var quote = bitmex.getQuote()
   var close = market.closes[market.closes.length - 1]
+
+  // signal.condition = 'TEST'
   switch(signal.condition) {
+    case 'TEST':
+      signal.condition = 'LONG'
+      signal.entryPrice = close + 200
+      break
     case '-':
       return signal
     case 'LONG':
       signal.entryPrice = Math.min(close,quote.bidPrice)
+      if (signal.entryPrice <= signal.stopLoss) {
+        signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
+        return signal
+      }
       break
     case 'SHORT':
       signal.entryPrice = Math.max(close,quote.askPrice)
+      if (signal.entryPrice >= signal.stopLoss) {
+        signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
+        return signal
+      }
       break
   }
 
@@ -276,7 +294,7 @@ async function getEnterSignal({positionSize,fundingTimestamp,fundingRate,walletB
   // if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
     var market = await bitmex.getCurrentMarket()
     signal = await getSignal(market,setup,walletBalance)
-    if (!shoes.mock) logger.info('enterSignal',signal)
+    if (!shoes.mock) logger.info('ENTER SIGNAL',signal)
   // }
 
   if ((signal.type == 'SHORT' || signal.type == 'LONG') && 
