@@ -9,7 +9,7 @@ const oneCandleEndMs = oneCandleMs-1
 const oneDayMS = 24*60*60000
 
 var mock
-if (shoes.mock) mock = require('./mock.js')
+if (shoes.setup.startTime) mock = require('./mock.js')
 
 var client, checkPositionCallback, checkPositionParams = {}
 var marketCache, marketWithCurrentCandleCache
@@ -524,7 +524,7 @@ async function getCurrentMarket() { try {
   }
   else {
     let now = getTimeNow()
-    let length = Math.max(setup.candle.length,setup.candle.lookBack)
+    let length = setup.candle.length
     let startTime = new Date(now-length*setup.candle.interval*60000).toISOString()
     let endTime = new Date(now).toISOString()
     marketCache = await getTradeBucketed({

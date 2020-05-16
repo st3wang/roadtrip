@@ -7,7 +7,7 @@ const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 
 var mock
-if (shoes.mock) mock = require('../mock.js')
+if (shoes.setup.startTime) mock = require('./mock.js')
 
 var exitCandleTime
 

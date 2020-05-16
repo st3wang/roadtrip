@@ -16,7 +16,7 @@ var cutOffTimeForAll = setup.candle.inTradeMax*60000
 var cutOffTimeForLargeTrade = 59*60000
 
 var mock
-if (shoes.mock) mock = require('./mock.js')
+if (shoes.setup.startTime) mock = require('./mock.js')
 
 var logger, entrySignalTable, entrySignal, exitCandleTime
 var roundPriceFactor

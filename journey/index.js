@@ -20,7 +20,7 @@ const isoTimestamp = winston.format((info, opts) => {
 global.isoTimestamp = isoTimestamp
 
 var mock, getTimeNow
-if (shoes.mock) {
+if (shoes.setup.startTime) {
   mock = require('./mock.js')
   global.getTimeNow = mock.getTimeNow
 }
@@ -381,26 +381,7 @@ async function init() { try {
   await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
   if (mock) {
-    var s = {
-      symbol: 'XBTUSD',
-      startTime: '2019-01-01T00:00:00.000Z',
-      endTime: '2020-05-15T23:00:00.000Z',
-      rsi: {
-        rsiLength: 14
-      },
-      willy: {
-        willyLength: 14,
-      },
-      candle: {
-        interval: 60,
-        length: 24,
-        inTradeMax: 900,
-        fundingWindow: 5,
-        lookBack: 30,
-        tick: 0.5,
-      },
-    }
-    var tradeJSON = await getTradeJson(s,false)
+    var tradeJSON = await getTradeJson(setup,false)
     var tradeObject = JSON.parse(tradeJSON)
     await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
     debugger

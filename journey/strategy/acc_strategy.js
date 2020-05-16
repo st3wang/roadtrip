@@ -10,6 +10,8 @@ const candlestick = require('../candlestick')
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 
+if (shoes.setup.startTime) mock = require('../mock.js')
+
 const {getTimeNow, isoTimestamp, colorizer} = global
 var exitCandleTime
 
@@ -307,7 +309,7 @@ async function orderEntry(entrySignal) { try {
     logger.info('SAME ENTRY ORDER EXISTS')
   }
   else {
-    if (!shoes.mock) logger.info('ENTER ORDER',entrySignal)
+    if (!mock) logger.info('ENTER ORDER',entrySignal)
     closeOrders = closeOrders.slice(0,1)
     let response = await bitmex.order(entryOrders.concat(closeOrders),true)
     if (response.status == 200) {
@@ -322,7 +324,7 @@ async function orderEntry(entrySignal) { try {
 async function checkEntry(params) { try {
   var signal = await getSignal(setup,params)
 
-  if (!shoes.mock) logger.info('ENTER SIGNAL',signal)
+  if (!mock) logger.info('ENTER SIGNAL',signal)
 
   if ((signal.type == 'SHORT' || signal.type == 'LONG') && 
   signal.entryPrice && signal.orderQtyUSD) {
@@ -355,7 +357,7 @@ async function checkExit(params) { try {
       return existingExitOrders
     }
 
-    if (!shoes.mock) logger.info('CLOSE ORDER', exit)
+    if (!mock) logger.info('CLOSE ORDER', exit)
     var response = await bitmex.order(exitOrders,true)
     return response
   }
