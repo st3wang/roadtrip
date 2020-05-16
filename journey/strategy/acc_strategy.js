@@ -98,8 +98,9 @@ async function getAccumulationSignal(market,{rsi,willy}) { try {
 
   if (isWPrice == 3 && isWRsi == 3) {
     signal.condition = 'LONG'
-    // signal.stopLoss = Math.min(...market.lows)
-    signal.stopLoss = market.lows[wbottom2]
+    // signal.stopLoss = market.lows[wbottom2]
+    signal.stopLoss = Math.min(...market.lows)
+    // signal.stopLoss = Math.min(...(market.lows.slice(6,market.lows.length-1)))
   }
   // if (isMPrice == 3 && isMRsi == 3) {
   //   signal.condition = 'SHORT'
@@ -232,7 +233,8 @@ async function getOrder(setup,signal) {
   return order
 }
 
-async function getSignal(market,setup,{positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {
+async function getSignal(setup,{positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {    var market = await bitmex.getCurrentMarket()
+  var market = await bitmex.getCurrentMarket()
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal = await getAccumulationSignal(market,setup)
   signal.timestamp = timestamp
@@ -296,23 +298,6 @@ function cancelOrder(params) {
   || base.exitTarget(cancelParams) || base.exitStop(cancelParams))
 }
 
-async function getEnterSignal(params) { try {
-  var signal
-  // var candleTimeOffset = bitmex.getCandleTimeOffset()
-
-  // if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
-    var market = await bitmex.getCurrentMarket()
-    signal = await getSignal(market,setup,params)
-    if (!shoes.mock) logger.info('ENTER SIGNAL',signal)
-  // }
-
-  if ((signal.type == 'SHORT' || signal.type == 'LONG') && 
-      signal.entryPrice && signal.orderQtyUSD) {
-    return {signal:signal}
-  }
-  return undefined
-} catch(e) {logger.error(e.stack||e);debugger} }
-
 async function orderEntry(entrySignal) { try {
   let {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
   let existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders).filter(o => {
@@ -335,8 +320,13 @@ async function orderEntry(entrySignal) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
-  let entrySignal = (await getEnterSignal(params))
-  if (entrySignal) {
+  var signal = await getSignal(setup,params)
+
+  if (!shoes.mock) logger.info('ENTER SIGNAL',signal)
+
+  if ((signal.type == 'SHORT' || signal.type == 'LONG') && 
+  signal.entryPrice && signal.orderQtyUSD) {
+    var entrySignal = {signal:signal}
     await orderEntry(entrySignal)
     base.setEntrySignal(entrySignal)
     storage.writeEntrySignalTable(entrySignal)

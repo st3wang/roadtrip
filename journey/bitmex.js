@@ -1041,10 +1041,10 @@ async function initOrders() { try {
 
   var newOrders = await getNewOrders()
   if (newOrders.length == 0) {
-    // Order stream will not work without an open order.
+    // Order websocket stream will time out when there is no open order.
     // It's okay to leave this dummy stop market around.
     // It will get canceled later.
-    console.log('Adding dummy stop market')
+    console.log('Adding dummy stop market to activate order websocket stream')
     await orderBulk([{
       stopPx: 1,
       side: 'Sell',

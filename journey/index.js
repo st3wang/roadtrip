@@ -279,7 +279,7 @@ async function getTradeJson(sp,useCache) { try {
         t.feePercent = (Math.round(-t.fee / walletBalance * 10000) / 100).toFixed(2)
         t.costPercent = (Math.round(t.cost / walletBalance * 10000) / 100).toFixed(2)
         t.pnlPercent = (Math.round(t.pnl / walletBalance * 10000) / 100).toFixed(2)
-        t.drawdownPercent = (Math.round(t.drawdown / walletBalance * 10000) / 100).toFixed(2)
+        t.drawdownPercent = (Math.round(t.drawdown / (walletBalance-t.drawdown) * 10000) / 100).toFixed(2)
         walletBalance += t.pnl
         t.walletBalance = walletBalance
         t.walletBalancePercent = (walletBalance / walletHistory[0][1] * 100).toFixed(2)
