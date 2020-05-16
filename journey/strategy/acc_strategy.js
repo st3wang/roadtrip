@@ -90,14 +90,15 @@ async function getAccumulationSignal(market,{rsi,willy}) { try {
   
   var rsis = (market.rsis || await base.getRsi(market.closes,rsi.rsiLength))
   var [isWRsi,wrb1,wrt1,wrb2] = candlestick.findW(rsis,last,rsis,rsis[last-1],rsis[last])
-  var [isMRsi,mrt1,mrb1,mrt2] = candlestick.findM(rsis,last,rsis,rsis[last-1],rsis[last])
+  // var [isMRsi,mrt1,mrb1,mrt2] = candlestick.findM(rsis,last,rsis,rsis[last-1],rsis[last])
 
   var [avgBodies,bodyHighs,bodyLows] = candlestick.getBody(market)
   var [isWPrice,wbottom1,wtop1,wbottom2] = candlestick.findW(avgBodies,last,bodyHighs,open,close)
-  var [isMPrice,mtop1,mbottom1,mtop2] = candlestick.findM(avgBodies,last,bodyLows,open,close)
+  // var [isMPrice,mtop1,mbottom1,mtop2] = candlestick.findM(avgBodies,last,bodyLows,open,close)
 
-  if (isWPrice == 3) {
+  if (isWPrice == 3 && isWRsi == 3) {
     signal.condition = 'LONG'
+    // signal.stopLoss = Math.min(...market.lows)
     signal.stopLoss = market.lows[wbottom2]
   }
   // if (isMPrice == 3 && isMRsi == 3) {
@@ -231,7 +232,7 @@ async function getOrder(setup,signal) {
   return order
 }
 
-async function getSignal(market,setup,walletBalance) { try {
+async function getSignal(market,setup,{positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal = await getAccumulationSignal(market,setup)
   signal.timestamp = timestamp
@@ -253,11 +254,19 @@ async function getSignal(market,setup,walletBalance) { try {
         signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
         return signal
       }
+      else if (base.isFundingWindow(fundingTimestamp) && fundingRate > 0) {
+        signal.reason = 'Will have to pay funding.'
+        return signal
+      }
       break
     case 'SHORT':
       signal.entryPrice = Math.max(close,quote.askPrice)
       if (signal.entryPrice >= signal.stopLoss) {
         signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
+        return signal
+      }
+      else if (base.isFundingWindow(fundingTimestamp) && fundingRate < 0) {
+        signal.reason = 'Will have to pay funding.'
         return signal
       }
       break
@@ -287,26 +296,19 @@ function cancelOrder(params) {
   || base.exitTarget(cancelParams) || base.exitStop(cancelParams))
 }
 
-async function getEnterSignal({positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {
+async function getEnterSignal(params) { try {
   var signal
   // var candleTimeOffset = bitmex.getCandleTimeOffset()
 
   // if (candleTimeOffset >= 5000 && candleTimeOffset <= 15000) {
     var market = await bitmex.getCurrentMarket()
-    signal = await getSignal(market,setup,walletBalance)
+    signal = await getSignal(market,setup,params)
     if (!shoes.mock) logger.info('ENTER SIGNAL',signal)
   // }
 
   if ((signal.type == 'SHORT' || signal.type == 'LONG') && 
       signal.entryPrice && signal.orderQtyUSD) {
-    if (base.isFundingWindow(fundingTimestamp) &&
-      ((signal.orderQtyUSD > 0 && fundingRate > 0) || 
-      (signal.orderQtyUSD < 0 && fundingRate < 0))) {
-        logger.info('Funding ' + signal.type + ' will have to pay. Do not enter.')
-    }
-    else {
-      return {signal:signal}
-    }
+    return {signal:signal}
   }
   return undefined
 } catch(e) {logger.error(e.stack||e);debugger} }
