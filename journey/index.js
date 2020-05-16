@@ -327,7 +327,7 @@ function createInterval(candleDelay) {
 async function updateData() {
   console.time('updateData')
   var start = 20200401
-  var end = 20200513
+  var end = 20200515
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   // debugger
@@ -346,8 +346,10 @@ async function readLog() {
     lineReader.on('line', (line) => {
       if (line && line.length) {
         var json = JSON.parse(line)
-        var {timestamp,message,condition,riskAmountBTC} = json
-        if (timestamp.includes('2020-05-13T16')
+        var {timestamp,message,condition,riskAmountBTC,price} = json
+        if (
+          price == 9781.5
+          //timestamp.includes('2020-05-13T16'
         // && message == 'position'
           ) {
             console.log(json)
@@ -381,8 +383,8 @@ async function init() { try {
   if (mock) {
     var s = {
       symbol: 'XBTUSD',
-      startTime: '2020-05-10T00:00:00.000Z',
-      endTime: '2020-05-13T23:00:00.000Z',
+      startTime: '2019-01-01T00:00:00.000Z',
+      endTime: '2020-05-15T23:00:00.000Z',
       rsi: {
         rsiLength: 14
       },

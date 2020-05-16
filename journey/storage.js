@@ -104,7 +104,7 @@ async function writeTradesCSV(writePath,trades) { try {
       t.drawdown + ',' +
       t.drawdownPercent + ','
   })
-  // console.log(outputString)
+  console.log(outputString)
   await writeFile(writePath,outputString,writeFileOptions)
   debugger
 } catch(e) {global.logger.error(e.stack||e);debugger} }
