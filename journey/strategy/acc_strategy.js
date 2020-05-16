@@ -10,6 +10,7 @@ const candlestick = require('../candlestick')
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 
+var mock
 if (shoes.setup.startTime) mock = require('../mock.js')
 
 const {getTimeNow, isoTimestamp, colorizer} = global
