@@ -214,10 +214,12 @@ async function getTradeJson(sp,useCache) { try {
   orders = orders.filter(o => {
     return o.stopPx != 1
   })
+  var firstEnterPrice = signals[0].signal.entryPrice
   var walletHistory = await bitmex.getWalletHistory()
   var trades = [], ords = []
   var timeOffset = 1000 // bitmex time and server time are not the same
   var walletBalance = walletHistory[0][1]
+  var walletBalanceUSD = walletBalance*firstEnterPrice/100000000
   signals.forEach((signal,i) => {
     let {timestamp} = signal
     let startTime = new Date(timestamp).getTime() - timeOffset
@@ -229,15 +231,19 @@ async function getTradeJson(sp,useCache) { try {
     })
   })
   signals.forEach((s,i) => {
-    let previousTrade = trades[i-1] || {drawdown:0,drawdownPercent:0}
+    let previousTrade = trades[i-1] || {drawdown:0,drawdownPercent:0,drawdownUSD:0,drawdownUSDPercent:0,wl:0,cwl:0,wins:0,losses:0,walletBalanceStart:0}
     let trade = {
       signal: s,
       entryOrders: bitmex.findOrders(/.+/,s.entryOrders,ords[i]),
       closeOrders: bitmex.findOrders(/.+/,s.closeOrders,ords[i]),
       takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
       fee: 0, cost: 0, costPercent: '%', feePercent: '%', pnl:0, pnlPercent:'%',
-      drawdown: previousTrade.drawdown, drawdownPercent: previousTrade.drawdownPercent, 
-      walletBalance: walletBalance, walletBalancePercent:'%'
+      drawdown: previousTrade.drawdown, drawdownPercent: previousTrade.drawdownPercent,
+      drawdownUSD: previousTrade.drawdownUSD, drawdownUSDPercent: previousTrade.drawdownUSDPercent,
+      wl: 0, /* continuous win or los */ cwl: previousTrade.cwl,
+      wins: previousTrade.wins, losses: previousTrade.losses, winsPercent: previousTrade.winsPercent,
+      walletBalance: walletBalance, walletBalancePercent:'%',
+      walletBalanceStart: previousTrade.walletBalanceStart, walletBalanceUSD: previousTrade.walletBalanceUSD
     }
     let foundOrders = trade.entryOrders.concat(trade.closeOrders).concat(trade.takeProfitOrders)
     trade.otherOrders = ords.filter((e) => {
@@ -262,7 +268,7 @@ async function getTradeJson(sp,useCache) { try {
     }
     for (;tradeIndex < len; tradeIndex++) {
       let t = trades[tradeIndex]
-      let pt = trades[tradeIndex-1] || {drawdown:0}
+      let pt = trades[tradeIndex-1] || {drawdown:0,wl:0,cwl:0,wins:0,losses:0}
       let entryOrder = t.entryOrders[0]
       if (entryOrder.ordStatus == 'Filled') {
         let entryCost = mock.getCost(entryOrder)
@@ -270,23 +276,39 @@ async function getTradeJson(sp,useCache) { try {
         partialCloseOrder.cumQty = entryOrder.cumQty
         partialCloseOrder.price = closeOrder.price
         let closeCost = mock.getCost(partialCloseOrder)
+        let lastPrice = (partialCloseOrder.price||entryOrder.price)
         t.fee = entryCost[2] + closeCost[2]
         t.cost = Math.round((entryCost[0] + closeCost[0]) * 100000000)
         t.pnl = (t.cost - t.fee)
+        t.wl = t.pnl / Math.abs(t.pnl)
+        t.cwl = t.wl + (t.wl == pt.wl ? pt.cwl : 0)
+        t.wins = pt.wins + (t.wl > 0 ? 1 : 0)
+        t.losses = pt.losses + (t.wl < 0 ? 1 : 0)
+        t.winsPercent = (Math.round(t.wins / (tradeIndex+1) * 10000) / 100).toFixed(2)
+        let pnlUSD = t.pnl*lastPrice/100000000
         t.drawdown = pt.drawdown + t.pnl
+        t.drawdownUSD = pt.drawdownUSD + pnlUSD
         if (t.drawdown > 0) {
           t.drawdown = 0
+          t.drawdownUSD = 0
         }
         t.feePercent = (Math.round(-t.fee / walletBalance * 10000) / 100).toFixed(2)
         t.costPercent = (Math.round(t.cost / walletBalance * 10000) / 100).toFixed(2)
         t.pnlPercent = (Math.round(t.pnl / walletBalance * 10000) / 100).toFixed(2)
         t.drawdownPercent = (Math.round(t.drawdown / (walletBalance-t.drawdown) * 10000) / 100).toFixed(2)
+        t.drawdownUSDPercent = (Math.round(t.drawdownUSD / (walletBalanceUSD-t.drawdownUSD) * 10000) / 100).toFixed(2)
         walletBalance += t.pnl
+        walletBalanceUSD += pnlUSD
         t.walletBalance = walletBalance
         t.walletBalancePercent = (walletBalance / walletHistory[0][1] * 100).toFixed(2)
+        t.walletBalanceStart = walletBalance*firstEnterPrice/100000000
+        t.walletBalanceUSD = walletBalanceUSD
       }
       else {
         t.drawdown = pt.drawdown
+        t.drawdownUSD = pt.drawdownUSD
+        t.wl = 0
+        t.cwl = pt.cwl
       }
     }
   })
@@ -328,7 +350,7 @@ function createInterval(candleDelay) {
 async function updateData() {
   console.time('updateData')
   var start = 20200401
-  var end = 20200515
+  var end = 20200516
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,60)

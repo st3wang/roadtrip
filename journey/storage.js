@@ -29,6 +29,7 @@ const entrySignalTable = winston.createLogger({
 var entrySignals = []
 
 function writeEntrySignalTable(entrySignal) { try {
+  if (!entrySignal.entryOrders[0]) debugger
   entrySignals.push(entrySignal)
   entrySignalTable.info('entry',entrySignal)
 } catch(e) {global.logger.error(e.stack||e);debugger} }
@@ -82,7 +83,7 @@ function cancelEntrySignal(order) { try {
 
 async function writeTradesCSV(writePath,trades) { try {
   var outputString =
-    'number,timestamp,cumQty,status,entry,exit,stop,cost,cost%,fee,fee%,pnl,pnl%,balance,balance%,dd,dd%'
+    'number,timestamp,cumQty,status,entry,exit,stop,cost,cost%,fee,fee%,pnl,pnl%,balance,balance%,bstart,busd,dd,dd%,ddusd,ddusd%,wl,cwl,wins,losses,winsPercent'
   trades.forEach((t,i) => {
     let entryOrder = t.entryOrders[0]
     let closeOrder = t.closeOrders[0]
@@ -101,8 +102,17 @@ async function writeTradesCSV(writePath,trades) { try {
       t.pnlPercent + ',' +
       t.walletBalance + ',' +
       t.walletBalancePercent + ',' +
+      t.walletBalanceStart + ',' +
+      t.walletBalanceUSD + ',' +
       t.drawdown + ',' +
-      t.drawdownPercent + ','
+      t.drawdownPercent + ',' +
+      t.drawdownUSD + ',' +
+      t.drawdownUSDPercent + ',' +
+      t.wl + ',' +
+      t.cwl + ',' +
+      t.wins + ',' +
+      t.losses + ',' +
+      t.winsPercent + ','
   })
   console.log(outputString)
   await writeFile(writePath,outputString,writeFileOptions)
