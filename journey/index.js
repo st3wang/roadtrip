@@ -61,7 +61,7 @@ const logger = winston.createLogger({
           switch(message) {
             case 'position': {
               let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
-              let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal
+              let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal || {}
               let lossDistancePercentString, positionSizeString, lastPriceString
               walletBalance /= 100000000
               if (positionSize > 0) {
@@ -126,10 +126,10 @@ global.logger = logger
 async function checkPositionCallback(params) { try {
   if (mock) {
     var timestamp = new Date(getTimeNow()).toISOString()
-    if (timestamp.includes('06.000Z')) {
+    // if (timestamp.includes('06.000Z')) {
       params.signal = strategy.getEntrySignal()
       return await checkPosition(params)
-    }
+    // }
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -222,7 +222,8 @@ async function getTradeJson(sp,useCache) { try {
     let {timestamp} = signal
     let startTime = new Date(timestamp).getTime() - timeOffset
     let endTime = (signals[i+1] ? new Date(signals[i+1].timestamp) : new Date()).getTime() - timeOffset
-    ords[i] = orders.filter(({timestamp}) => {
+    ords[i] = orders.filter((o) => {
+      let {timestamp} = o
       let t = new Date(timestamp).getTime()
       return (t >= startTime && t < endTime)
     })
@@ -330,7 +331,6 @@ async function updateData() {
   var end = 20200515
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
-  // debugger
   await bitmexdata.generateCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,1440)
   console.timeEnd('updateData')
@@ -388,9 +388,9 @@ async function init() { try {
   }
   else {
     await bitmex.init(setup,checkPositionCallback)
-    next(true)
+    next()
     createInterval(6000*2**0) // 6s after candle close
-    // createInterval(6000*2**1) // 12s
+    createInterval(6000*2**1) // 12s
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 

@@ -78,7 +78,7 @@ const logger = winston.createLogger({
   ]
 })
 
-async function getAccumulationSignal(market,{rsi,willy}) { try {
+async function getAccumulationSignal(market,{rsi}) { try {
   var last = market.closes.length-1
   var open = market.opens[last]
   var close = market.closes[last]
@@ -239,6 +239,7 @@ async function getOrder(setup,signal) {
 async function getSignal(setup,{positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {    var market = await bitmex.getCurrentMarket()
   var market = await bitmex.getCurrentMarket()
   var timestamp = new Date(getTimeNow()).toISOString()
+  var currentCandle = await bitmex.getCurrentCandle()
   var signal = await getAccumulationSignal(market,setup)
   signal.timestamp = timestamp
 
@@ -259,10 +260,14 @@ async function getSignal(setup,{positionSize,fundingTimestamp,fundingRate,wallet
         signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
         return signal
       }
-      else if (base.isFundingWindow(fundingTimestamp) && fundingRate > 0) {
-        signal.reason = 'Will have to pay funding.'
+      else if (currentCandle.low <= signal.stopLoss) {
+        signal.reason = 'currentCandle.low <= stopLoss ' + JSON.stringify(currentCandle)
         return signal
       }
+      // else if (base.isFundingWindow(fundingTimestamp) && fundingRate > 0) {
+      //   signal.reason = 'Will have to pay funding.'
+      //   return signal
+      // }
       break
     case 'SHORT':
       signal.entryPrice = Math.max(close,quote.askPrice)
@@ -270,10 +275,14 @@ async function getSignal(setup,{positionSize,fundingTimestamp,fundingRate,wallet
         signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
         return signal
       }
-      else if (base.isFundingWindow(fundingTimestamp) && fundingRate < 0) {
-        signal.reason = 'Will have to pay funding.'
+      else if (currentCandle.high >= signal.stopLoss) {
+        signal.reason = 'currentCandle.high >= stopLoss ' + JSON.stringify(currentCandle)
         return signal
       }
+      // else if (base.isFundingWindow(fundingTimestamp) && fundingRate < 0) {
+      //   signal.reason = 'Will have to pay funding.'
+      //   return signal
+      // }
       break
   }
 
@@ -302,37 +311,55 @@ function cancelOrder(params) {
 }
 
 async function orderEntry(entrySignal) { try {
-  let {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
-  let existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders).filter(o => {
-    return (new Date(o.timestamp).getTime() >= entrySignal.time)
+  var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
+  var now = getTimeNow()
+  var existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders).filter(o => {
+    return (now < new Date(o.timestamp).getTime() + oneCandleMS)
+    // return (new Date(o.timestamp).getTime() >= entrySignal.time)
   })
   if (existingEntryOrders.length > 0) {
-    logger.info('SAME ENTRY ORDER EXISTS')
+    if (!mock) logger.info('SAME ENTRY ORDER EXISTS')
   }
   else {
     if (!mock) logger.info('ENTER ORDER',entrySignal)
     closeOrders = closeOrders.slice(0,1)
     let response = await bitmex.order(entryOrders.concat(closeOrders),true)
+    /*TODO: wait for order confirmations*/
     if (response.status == 200) {
-      base.writeEntrySignal(entrySignal)
       entrySignal.entryOrders = entryOrders
       entrySignal.closeOrders = closeOrders
       // entrySignal.takeProfitOrders = takeProfitOrders
+      base.setEntrySignal(entrySignal)
+      storage.writeEntrySignalTable(entrySignal)
     }
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
+  if (params.signal.signal) {
+    let existingSignalTime = new Date(params.signal.signal.timestamp).getTime()
+    let now = getTimeNow()
+    let ts = new Date(now).toISOString()
+    let st = existingSignalTime - existingSignalTime % oneCandleMS
+    let et = st + oneCandleMS - 1
+
+    if (now >= st && now <= et) {
+      // there is an existing signal
+      let entryOrders = bitmex.findOrders(/New|Fill/,params.signal.entryOrders)
+      if (entryOrders.length > 0) {
+        if (!mock) logger.info('EXISTING SIGNAL ENTRY ORDER EXISTS')
+        return
+      }
+    }
+  }
+
   var signal = await getSignal(setup,params)
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
-  if ((signal.type == 'SHORT' || signal.type == 'LONG') && 
-  signal.entryPrice && signal.orderQtyUSD) {
+  if ((signal.type == 'SHORT' || signal.type == 'LONG') && signal.entryPrice && signal.orderQtyUSD) {
     var entrySignal = {signal:signal}
     await orderEntry(entrySignal)
-    base.setEntrySignal(entrySignal)
-    storage.writeEntrySignalTable(entrySignal)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -435,9 +462,9 @@ async function init() {
   base.init()
 }
 
-function getCacheTradePath(dirname,{symbol,startTime,endTime,candle:{interval},rsi:{rsiLength},willy:{willyLength}}) {
+function getCacheTradePath(dirname,{symbol,startTime,endTime,candle:{interval},rsi:{rsiLength}}) {
   return path.resolve(dirname, 'data/bitmex/signal/'+symbol+'/'+interval+'-'+startTime+'-'+endTime+
-    rsiLength+willyLength+'.json').replace(/:/g,';')
+    rsiLength+'.json').replace(/:/g,';')
 }
 
 module.exports = {

@@ -214,10 +214,6 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
   return {entryOrders:entryOrders,closeOrders:closeOrders,takeProfitOrders:takeProfitOrders}
 }
 
-function writeEntrySignal(entrySignal) {
-  return fs.writeFileSync(entrySignalFilePath,JSON.stringify(entrySignal,null,2),writeFileOptions)
-}
-
 async function init() {
   initEntrySignal()
 }
@@ -227,7 +223,6 @@ module.exports = {
   roundPrice: roundPrice,
   getRsi: getRsi,
   getWilly: getWilly,
-  writeEntrySignal: writeEntrySignal,
   resetEntrySignal: resetEntrySignal,
   isFundingWindow: isFundingWindow,
   getEntrySignal: getEntrySignal,
