@@ -365,7 +365,7 @@ async function checkEntry(params) { try {
 
 async function checkExit(params) { try {
   var {positionSize,bid,ask,lastPrice,signal} = params
-  if (positionSize == 0 || !lastPrice) return
+  if (positionSize == 0 || !lastPrice || !signal || !signal.signal) return
 
   var {signal:{entryPrice},entryOrders,takeProfitOrders,closeOrders} = signal
 

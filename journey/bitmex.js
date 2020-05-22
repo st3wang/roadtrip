@@ -756,10 +756,11 @@ async function orderBulkRetry(ord) { try {
     response = await orderBulk(ord.orders) 
     count++
     waitTime *= 2
-    if (response.status == 503 && ord.cancelAllBeforeOrder) {
-      // retry overloaded status only with the entry order
-      retry = true
-    }
+
+    // retry overloaded status only with the entry order
+    retry = (response.status == 503 && ord.cancelAllBeforeOrder) 
+            && count < 8 && !ord.obsoleted
+
     // if cancelled retry with new quote 
     // this means the quote move to a better price before the order reaches bitmex server
     // switch (response.obj.ordStatus) {
@@ -788,7 +789,7 @@ async function orderBulkRetry(ord) { try {
     //   default:
     //     retry = false
     // }
-  } while(retry && count < 7 && !ord.obsoleted && await wait(waitTime))
+  } while(retry && await wait(waitTime))
   if (ord.obsoleted) {
     logger.info('orderBulkRetry obsoleted',ord)
   }

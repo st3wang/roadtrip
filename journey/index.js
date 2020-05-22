@@ -220,6 +220,7 @@ async function getTradeJson(sp,useCache) { try {
   var timeOffset = 1000 // bitmex time and server time are not the same
   var walletBalance = walletHistory[0][1]
   var walletBalanceUSD = walletBalance*firstEnterPrice/100000000
+  var groupid = 0
   signals.forEach((signal,i) => {
     let {timestamp} = signal
     let startTime = new Date(timestamp).getTime() - timeOffset
@@ -238,6 +239,7 @@ async function getTradeJson(sp,useCache) { try {
       closeOrders: bitmex.findOrders(/.+/,s.closeOrders,ords[i]),
       takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
       fee: 0, cost: 0, costPercent: '%', feePercent: '%', pnl:0, pnlPercent:'%',
+      group: 0, grouppnl: 0,
       drawdown: previousTrade.drawdown, drawdownPercent: previousTrade.drawdownPercent,
       drawdownUSD: previousTrade.drawdownUSD, drawdownUSDPercent: previousTrade.drawdownUSDPercent,
       wl: 0, /* continuous win or los */ cwl: previousTrade.cwl,
@@ -252,25 +254,34 @@ async function getTradeJson(sp,useCache) { try {
     trades.push(trade)
 
     let closeOrder = trade.closeOrders[0]
-    if (!closeOrder) debugger
+    if (!closeOrder) {
+      debugger
+      return
+    }
     closeOrder.price = closeOrder.price || 0
 
     let closeQty = trade.closeOrders[0].cumQty
     let len = trades.length
-    let tradeIndex = len
+    let startIndex = len
+    let startWalletBalance = walletBalance
     while (closeQty > 0) {
-      tradeIndex--
-      closeQty -= trades[tradeIndex].entryOrders[0].cumQty
+      startIndex--
+      closeQty -= trades[startIndex].entryOrders[0].cumQty
     }
     if (closeQty < 0) {
       console.error('incorrect quantity')
       debugger
     }
-    for (;tradeIndex < len; tradeIndex++) {
-      let t = trades[tradeIndex]
-      let pt = trades[tradeIndex-1] || {drawdown:0,wl:0,cwl:0,wins:0,losses:0}
+    else if (startIndex < len) {
+      startWalletBalance = trades[startIndex].walletBalance
+      groupid++
+    }
+    for (;startIndex < len; startIndex++) {
+      let t = trades[startIndex]
+      let pt = trades[startIndex-1] || {drawdown:0,wl:0,cwl:0,wins:0,losses:0}
       let entryOrder = t.entryOrders[0]
       if (entryOrder.ordStatus == 'Filled') {
+        t.group = groupid
         let entryCost = mock.getCost(entryOrder)
         let partialCloseOrder = t.closeOrders[0]
         partialCloseOrder.cumQty = entryOrder.cumQty
@@ -284,7 +295,7 @@ async function getTradeJson(sp,useCache) { try {
         t.cwl = t.wl + (t.wl == pt.wl ? pt.cwl : 0)
         t.wins = pt.wins + (t.wl > 0 ? 1 : 0)
         t.losses = pt.losses + (t.wl < 0 ? 1 : 0)
-        t.winsPercent = (Math.round(t.wins / (tradeIndex+1) * 10000) / 100).toFixed(2)
+        t.winsPercent = (Math.round(t.wins / (startIndex+1) * 10000) / 100).toFixed(2)
         let pnlUSD = t.pnl*lastPrice/100000000
         t.drawdown = pt.drawdown + t.pnl
         t.drawdownUSD = pt.drawdownUSD + pnlUSD
@@ -311,6 +322,7 @@ async function getTradeJson(sp,useCache) { try {
         t.cwl = pt.cwl
       }
     }
+    trade.grouppnl = walletBalance - startWalletBalance
   })
   
   console.timeEnd('getTradeJson')
@@ -350,7 +362,7 @@ function createInterval(candleDelay) {
 async function updateData() {
   console.time('updateData')
   var start = 20200401
-  var end = 20200516
+  var end = 20200517
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,60)
@@ -418,3 +430,9 @@ async function init() { try {
 
 init()
 
+/* TODO
+add hours in trade
+get orders
+test short
+reduce size
+*/

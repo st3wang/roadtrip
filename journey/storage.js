@@ -83,10 +83,11 @@ function cancelEntrySignal(order) { try {
 
 async function writeTradesCSV(writePath,trades) { try {
   var outputString =
-    'number,timestamp,cumQty,status,entry,exit,stop,cost,cost%,fee,fee%,pnl,pnl%,balance,balance%,bstart,busd,dd,dd%,ddusd,ddusd%,wl,cwl,wins,losses,winsPercent'
+    'number,timestamp,cumQty,status,entry,exit,stop,cost%,fee%,pnl%,wl,cwl,group,grouppnl,balance,balance%,bstart,busd,dd%,ddusd%,winsPercent'
+    // 'number,timestamp,cumQty,status,entry,exit,stop,cost,cost%,fee,fee%,pnl,pnl%,balance,balance%,bstart,busd,dd,dd%,ddusd,ddusd%,wl,cwl,wins,losses,winsPercent'
   trades.forEach((t,i) => {
-    let entryOrder = t.entryOrders[0]
-    let closeOrder = t.closeOrders[0]
+    let entryOrder = t.entryOrders[0] || {}
+    let closeOrder = t.closeOrders[0] || {}
     outputString += '\n' +
       ((i+1) + ',' + entryOrder.timestamp).replace('T',' ').replace('.000Z',',') +
       entryOrder.cumQty + ',' +  
@@ -94,24 +95,26 @@ async function writeTradesCSV(writePath,trades) { try {
       entryOrder.price + ',' +
       closeOrder.price + ',' +
       closeOrder.stopPx + ',' +
-      t.cost + ',' +
+      // t.cost + ',' +
       t.costPercent + ',' +
-      t.fee + ',' +
+      // t.fee + ',' +
       t.feePercent + ',' +
-      t.pnl + ',' +
+      // t.pnl + ',' +
       t.pnlPercent + ',' +
+      t.wl + ',' +
+      t.cwl + ',' +
+      t.group + ',' +
+      t.grouppnl + ',' +
+      // t.wins + ',' +
+      // t.losses + ',' +
       t.walletBalance + ',' +
       t.walletBalancePercent + ',' +
       t.walletBalanceStart + ',' +
       t.walletBalanceUSD + ',' +
-      t.drawdown + ',' +
+      // t.drawdown + ',' +
       t.drawdownPercent + ',' +
-      t.drawdownUSD + ',' +
+      // t.drawdownUSD + ',' +
       t.drawdownUSDPercent + ',' +
-      t.wl + ',' +
-      t.cwl + ',' +
-      t.wins + ',' +
-      t.losses + ',' +
       t.winsPercent + ','
   })
   console.log(outputString)
