@@ -183,6 +183,7 @@ async function pruneOrders(orders) { try {
 async function handleMargin(data) { try {
   lastMargin = data[0]
   checkPositionParams.walletBalance = lastMargin.walletBalance
+  checkPositionParams.grossLastValue = lastMargin.grossLastValue
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function handleOrder(orders) { try {

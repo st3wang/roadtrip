@@ -60,10 +60,14 @@ const logger = winston.createLogger({
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
             case 'position': {
-              let {caller,walletBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
+              let {caller,walletBalance,grossLastValue,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal || {}
-              let lossDistancePercentString, positionSizeString, lastPriceString
+              let grossLastValueString,pnlPercent,pnlPercentString,lossDistancePercentString, positionSizeString, lastPriceString
+              pnlPercent = Math.round(grossLastValue / walletBalance * 100) / 100
               walletBalance /= 100000000
+              grossLastValue /= 100000000
+              grossLastValueString = (grossLastValue >= walletBalance ? '\x1b[32m' : '\x1b[31m') + grossLastValue.toFixed(4) + '\x1b[39m'
+              pnlPercentString = (grossLastValue >= walletBalance ? '\x1b[32m+' : '\x1b[31m') + pnlPercent + '%\x1b[39m'
               if (positionSize > 0) {
                 positionSizeString = '\x1b[36m' + positionSize + '\x1b[39m'
                 lastPriceString = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
@@ -84,7 +88,7 @@ const logger = winston.createLogger({
               candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
               let payFunding = fundingRate*positionSize/lastPrice
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
-              line += caller + ' B:'+walletBalance.toFixed(4)+' P:'+positionSizeString+' L:'+lastPriceString+
+              line += caller + ' B:'+walletBalance.toFixed(4)+' G:'+grossLastValueString+' '+pnlPercentString+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
@@ -221,6 +225,7 @@ async function getTradeJson(sp,useCache) { try {
   var walletBalance = walletHistory[0][1]
   var walletBalanceUSD = walletBalance*firstEnterPrice/100000000
   var groupid = 0
+  let totalHoursInTrade = 0
   signals.forEach((signal,i) => {
     let {timestamp} = signal
     let startTime = new Date(timestamp).getTime() - timeOffset
@@ -236,8 +241,8 @@ async function getTradeJson(sp,useCache) { try {
     let trade = {
       signal: s,
       entryOrders: bitmex.findOrders(/.+/,s.entryOrders,ords[i]),
-      closeOrders: bitmex.findOrders(/.+/,s.closeOrders,ords[i]),
-      takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
+      closeOrders: ords[i].filter(o => {return o.ordType == 'Stop'}),
+      // takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
       fee: 0, cost: 0, costPercent: '%', feePercent: '%', pnl:0, pnlPercent:'%',
       group: 0, grouppnl: 0,
       drawdown: previousTrade.drawdown, drawdownPercent: previousTrade.drawdownPercent,
@@ -245,7 +250,8 @@ async function getTradeJson(sp,useCache) { try {
       wl: 0, /* continuous win or los */ cwl: previousTrade.cwl,
       wins: previousTrade.wins, losses: previousTrade.losses, winsPercent: previousTrade.winsPercent,
       walletBalance: walletBalance, walletBalancePercent:'%',
-      walletBalanceStart: previousTrade.walletBalanceStart, walletBalanceUSD: previousTrade.walletBalanceUSD
+      walletBalanceStart: previousTrade.walletBalanceStart, walletBalanceUSD: previousTrade.walletBalanceUSD,
+      hoursInTrade: 0, avgHoursInTrade: 0, avgGroupHoursInTrade: 0
     }
     let foundOrders = trade.entryOrders.concat(trade.closeOrders).concat(trade.takeProfitOrders)
     trade.otherOrders = ords.filter((e) => {
@@ -261,9 +267,13 @@ async function getTradeJson(sp,useCache) { try {
     closeOrder.price = closeOrder.price || 0
 
     let closeQty = trade.closeOrders[0].cumQty
+    let closeTimestamp = trade.closeOrders[0].timestamp
+    let closeTime = new Date(closeTimestamp).getTime()
     let len = trades.length
     let startIndex = len
     let startWalletBalance = walletBalance
+    let totalGroupHoursInTrade = 0
+    let groupLen = 1
     while (closeQty > 0) {
       startIndex--
       closeQty -= trades[startIndex].entryOrders[0].cumQty
@@ -275,6 +285,7 @@ async function getTradeJson(sp,useCache) { try {
     else if (startIndex < len) {
       startWalletBalance = trades[startIndex].walletBalance
       groupid++
+      groupLen = len - startIndex
     }
     for (;startIndex < len; startIndex++) {
       let t = trades[startIndex]
@@ -283,6 +294,7 @@ async function getTradeJson(sp,useCache) { try {
       if (entryOrder.ordStatus == 'Filled') {
         t.group = groupid
         let entryCost = mock.getCost(entryOrder)
+        let entryTime = new Date(entryOrder.timestamp).getTime()
         let partialCloseOrder = t.closeOrders[0]
         partialCloseOrder.cumQty = entryOrder.cumQty
         partialCloseOrder.price = closeOrder.price
@@ -314,6 +326,10 @@ async function getTradeJson(sp,useCache) { try {
         t.walletBalancePercent = (walletBalance / walletHistory[0][1] * 100).toFixed(2)
         t.walletBalanceStart = walletBalance*firstEnterPrice/100000000
         t.walletBalanceUSD = walletBalanceUSD
+        t.hoursInTrade = (closeTime - entryTime) / 3600000
+        totalHoursInTrade += t.hoursInTrade
+        totalGroupHoursInTrade += t.hoursInTrade
+        t.avgHoursInTrade = Math.round(totalHoursInTrade/(startIndex+1) * 10) / 10
       }
       else {
         t.drawdown = pt.drawdown
@@ -323,6 +339,7 @@ async function getTradeJson(sp,useCache) { try {
       }
     }
     trade.grouppnl = walletBalance - startWalletBalance
+    trade.avgGroupHoursInTrade = Math.round(totalGroupHoursInTrade/groupLen*10)/10
   })
   
   console.timeEnd('getTradeJson')
@@ -361,8 +378,8 @@ function createInterval(candleDelay) {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20200401
-  var end = 20200517
+  var start = 20200501
+  var end = 20200529
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,60)
@@ -416,8 +433,6 @@ async function init() { try {
 
   if (mock) {
     var tradeJSON = await getTradeJson(setup,false)
-    var tradeObject = JSON.parse(tradeJSON)
-    await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
     debugger
   }
   else {
@@ -431,8 +446,9 @@ async function init() { try {
 init()
 
 /* TODO
-add hours in trade
-get orders
+move stop loss 
+  - when it's winning
+  - every hour lookback 36
 test short
 reduce size
 */

@@ -149,7 +149,8 @@ function fillOrder(o,lastPrice) {
   o.transactTime = getISOTimeNow()
   o.timestamp = o.transactTime
   if (!o.price) {
-    o.price = o.stopPx//lastPrice
+    o.price = o.stopPx //+ (lastPrice < o.stopPx ? -2 : 2)
+    // o.price = o.stopPx//lastPrice
   }
   // var foreignNotional = (side == 'Buy' ? -orderQty : orderQty)
   // var homeNotional = -foreignNotional / o.price
@@ -389,6 +390,8 @@ async function orderAmendBulk(ords) {
     })
     if (ord) {
       ord.orderQty = Math.abs(o.orderQty)
+      ord.stopPx = o.stopPx
+      ord.price = o.price
       amendOrders.push(ord)
     }
   })

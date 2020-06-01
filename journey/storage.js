@@ -83,7 +83,7 @@ function cancelEntrySignal(order) { try {
 
 async function writeTradesCSV(writePath,trades) { try {
   var outputString =
-    'number,timestamp,cumQty,status,entry,exit,stop,cost%,fee%,pnl%,wl,cwl,group,grouppnl,balance,balance%,bstart,busd,dd%,ddusd%,winsPercent'
+    'number,timestamp,cumQty,status,entry,exit,stop,cost%,fee%,pnl%,wl,cwl,group,grouppnl,balance,balance%,bstart,busd,dd%,ddusd%,winsPercent,hoursInTrade,avgInTrade,avgGroupInTrade'
     // 'number,timestamp,cumQty,status,entry,exit,stop,cost,cost%,fee,fee%,pnl,pnl%,balance,balance%,bstart,busd,dd,dd%,ddusd,ddusd%,wl,cwl,wins,losses,winsPercent'
   trades.forEach((t,i) => {
     let entryOrder = t.entryOrders[0] || {}
@@ -115,11 +115,13 @@ async function writeTradesCSV(writePath,trades) { try {
       t.drawdownPercent + ',' +
       // t.drawdownUSD + ',' +
       t.drawdownUSDPercent + ',' +
-      t.winsPercent + ','
+      t.winsPercent + ',' +
+      t.hoursInTrade + ',' +
+      t.avgHoursInTrade + ',' +
+      t.avgGroupHoursInTrade + ','
   })
   console.log(outputString)
   await writeFile(writePath,outputString,writeFileOptions)
-  debugger
 } catch(e) {global.logger.error(e.stack||e);debugger} }
 
 async function init() {
