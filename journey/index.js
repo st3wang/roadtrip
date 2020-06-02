@@ -60,14 +60,14 @@ const logger = winston.createLogger({
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
             case 'position': {
-              let {caller,walletBalance,grossLastValue,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
+              let {caller,walletBalance,marginBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal || {}
-              let grossLastValueString,pnlPercent,pnlPercentString,lossDistancePercentString, positionSizeString, lastPriceString
-              pnlPercent = Math.round(grossLastValue / walletBalance * 100) / 100
+              let marginBalanceString,pnlPercent,pnlPercentString,lossDistancePercentString, positionSizeString, lastPriceString
+              pnlPercent = Math.round((marginBalance-walletBalance) / walletBalance * 10000) / 100
               walletBalance /= 100000000
-              grossLastValue /= 100000000
-              grossLastValueString = (grossLastValue >= walletBalance ? '\x1b[32m' : '\x1b[31m') + grossLastValue.toFixed(4) + '\x1b[39m'
-              pnlPercentString = (grossLastValue >= walletBalance ? '\x1b[32m+' : '\x1b[31m') + pnlPercent + '%\x1b[39m'
+              marginBalance /= 100000000
+              marginBalanceString = (marginBalance >= walletBalance ? '\x1b[32m' : '\x1b[31m') + marginBalance.toFixed(4) + '\x1b[39m'
+              pnlPercentString = (marginBalance >= walletBalance ? '\x1b[32m+' : '\x1b[31m') + pnlPercent + '%\x1b[39m'
               if (positionSize > 0) {
                 positionSizeString = '\x1b[36m' + positionSize + '\x1b[39m'
                 lastPriceString = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
@@ -88,7 +88,7 @@ const logger = winston.createLogger({
               candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
               let payFunding = fundingRate*positionSize/lastPrice
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
-              line += caller + ' B:'+walletBalance.toFixed(4)+' G:'+grossLastValueString+' '+pnlPercentString+' P:'+positionSizeString+' L:'+lastPriceString+
+              line += caller + ' B:'+walletBalance.toFixed(4)+' M:'+marginBalanceString+' '+pnlPercentString+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
