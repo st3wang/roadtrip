@@ -66,8 +66,8 @@ const logger = winston.createLogger({
               pnlPercent = Math.round((marginBalance-walletBalance) / walletBalance * 10000) / 100
               walletBalance /= 100000000
               marginBalance /= 100000000
-              marginBalanceString = (marginBalance >= walletBalance ? '\x1b[32m' : '\x1b[31m') + marginBalance.toFixed(4) + '\x1b[39m'
-              pnlPercentString = (marginBalance >= walletBalance ? '\x1b[32m+' : '\x1b[31m') + pnlPercent + '%\x1b[39m'
+              marginBalanceString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + marginBalance.toFixed(4) + '\x1b[39m'
+              pnlPercentString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + pnlPercent + '%\x1b[39m'
               if (positionSize > 0) {
                 positionSizeString = '\x1b[36m' + positionSize + '\x1b[39m'
                 lastPriceString = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
@@ -446,6 +446,7 @@ async function init() { try {
 init()
 
 /* TODO
+use marginBalance instead of walletBalance
 move stop loss 
   - when it's winning
   - every hour lookback 36
