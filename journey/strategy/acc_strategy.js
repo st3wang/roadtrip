@@ -107,7 +107,7 @@ async function getAccumulationSignal(market,{rsi}) { try {
   }
   // if (isMPrice == 3 && isMRsi == 3) {
   //   signal.condition = 'SHORT'
-  //   signal.stopLoss = close - (market.highs[mtop2] - close)*2
+  //   signal.stopLoss = Math.max(...market.highs)
   // }
 
   // var timestamp = new Date(getTimeNow()).toISOString()
@@ -120,9 +120,9 @@ async function getAccumulationSignal(market,{rsi}) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getOrder(setup,signal) {
-  var {walletBalance,entryPrice,lossDistance,coinPairRate} = signal
+  var {marginBalance,entryPrice,lossDistance,coinPairRate} = signal
   var tick = setup.candle.tick
-  var leverageMargin = walletBalance*0.000000008
+  var leverageMargin = marginBalance*0.000000008
   var profitDistance, takeProfit, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
@@ -148,7 +148,7 @@ async function getOrder(setup,signal) {
   stopMarketTrigger = entryPrice + (stopMarketDistance/4)
   lossDistancePercent = lossDistance/entryPrice
 
-  var capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + walletBalance/100000000
+  var capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + marginBalance/100000000
   var capitalUSD = capitalBTC * entryPrice
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
@@ -236,7 +236,7 @@ async function getOrder(setup,signal) {
   return order
 }
 
-async function getSignal(setup,{positionSize,fundingTimestamp,fundingRate,walletBalance}) { try {    var market = await bitmex.getCurrentMarket()
+async function getSignal(setup,{positionSize,fundingTimestamp,fundingRate,marginBalance}) { try {    var market = await bitmex.getCurrentMarket()
   var market = await bitmex.getCurrentMarket()
   var timestamp = new Date(getTimeNow()).toISOString()
   var currentCandle = await bitmex.getCurrentCandle()
@@ -288,9 +288,9 @@ async function getSignal(setup,{positionSize,fundingTimestamp,fundingRate,wallet
 
   var XBTUSDRate = bitmex.getRate('XBTUSD')
   signal.coinPairRate = quote.lastPrice/XBTUSDRate
-  signal.walletBalance = walletBalance / signal.coinPairRate
+  signal.marginBalance = marginBalance / signal.coinPairRate
   signal.lossDistance = base.roundPrice(signal.stopLoss - signal.entryPrice)
-  if (!signal.lossDistance || !signal.walletBalance) {
+  if (!signal.lossDistance || !signal.marginBalance) {
     return signal
   }
 
@@ -389,6 +389,15 @@ async function checkExit(params) { try {
     var response = await bitmex.order(exitOrders,true)
     return response
   }
+  // else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
+  //   let market = await bitmex.getCurrentMarket()
+  //   let newStopLoss = Math.min(...market.lows)
+  //   if (newStopLoss > closeOrders[0].stopPx) {
+  //     closeOrders[0].stopPx = newStopLoss
+  //     return await bitmex.order(closeOrders)
+  //   }
+  // }
+
   // else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
   //   let [takeProfitOrder,takeHalfProfitOrder] = takeProfitOrders
   

@@ -137,6 +137,7 @@ function updateLeverage() {
 
 async function nextMargin(cost,fee) {
   margin.walletBalance += (cost - fee)
+  margin.marginBalance = margin.walletBalance
   if (!margin.walletBalance) debugger
   walletHistory.push([getISOTimeNow(),margin.walletBalance,cost,fee])
   await handleMargin([margin])
@@ -445,7 +446,8 @@ async function init(sp) {
   setup = sp
   oneCandleMs = sp.interval * 60000
   margin = {
-    walletBalance: 100000000
+    walletBalance: 100000000,
+    marginBalance: 100000000
   }
   walletHistory = []
   orders = []

@@ -379,7 +379,7 @@ function createInterval(candleDelay) {
 async function updateData() {
   console.time('updateData')
   var start = 20200501
-  var end = 20200529
+  var end = 20200605
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,60)
