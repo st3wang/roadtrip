@@ -129,11 +129,11 @@ global.logger = logger
 
 async function checkPositionCallback(params) { try {
   if (mock) {
-    var timestamp = new Date(getTimeNow()).toISOString()
-    // if (timestamp.includes('06.000Z')) {
-      params.signal = strategy.getEntrySignal()
-      return await checkPosition(params)
-    // }
+    params.signal = strategy.getEntrySignal()
+    return await checkPosition(params)
+  }
+  else {
+    logger.info('position',params)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
