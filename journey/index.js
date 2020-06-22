@@ -133,7 +133,7 @@ async function checkPositionCallback(params) { try {
     return await checkPosition(params)
   }
   else {
-    param.signal = strategy.getEntrySignal()
+    params.signal = strategy.getEntrySignal()
     logger.info('position',params)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
