@@ -184,8 +184,9 @@ async function handleMargin(data) { try {
   lastMargin = data[0]
   checkPositionParams.walletBalance = lastMargin.walletBalance
   checkPositionParams.marginBalance = lastMargin.marginBalance
-  checkPositionParams.caller = 'margin'
-  await checkPositionCallback(checkPositionParams)
+  // check every tick
+  // checkPositionParams.caller = 'margin'
+  // await checkPositionCallback(checkPositionParams)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function handleOrder(orders) { try {
@@ -252,8 +253,8 @@ async function handleInstrument(data) { try {
     checkPositionParams.lastPrice = lastInstrument.lastPrice
     checkPositionParams.fundingTimestamp = lastInstrument.fundingTimestamp
     checkPositionParams.fundingRate = lastInstrument.fundingRate
-    checkPositionParams.caller = 'instrument'
-    await checkPositionCallback(checkPositionParams)
+    // checkPositionParams.caller = 'instrument'
+    // await checkPositionCallback(checkPositionParams)
   }
 
   lastBid = bid
