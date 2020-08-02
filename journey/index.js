@@ -120,7 +120,7 @@ const logger = winston.createLogger({
               candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
               let payFunding = fundingRate*positionSize/lastPrice
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
-              line += caller + ' B:'+walletBalance.toFixed(4)+' M:'+marginBalanceString+' '+pnlPercentString+' P:'+positionSizeString+' L:'+lastPriceString+
+              line += caller + ' B:'+walletBalance.toFixed(4)+' M:'+marginBalanceString+' S:'+stopBalanceString+' P:'+positionSizeString+' L:'+lastPriceString+
                 ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
                 ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
