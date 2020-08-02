@@ -184,6 +184,7 @@ async function handleMargin(data) { try {
   lastMargin = data[0]
   checkPositionParams.walletBalance = lastMargin.walletBalance
   checkPositionParams.marginBalance = lastMargin.marginBalance
+  checkPositionParams.unrealisedPnl = lastMargin.unrealisedPnl
   // check every tick
   // checkPositionParams.caller = 'margin'
   // await checkPositionCallback(checkPositionParams)

@@ -71,7 +71,7 @@ const logger = winston.createLogger({
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
             case 'position': {
-              let {caller,walletBalance,marginBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
+              let {caller,walletBalance,marginBalance,unrealisedPnl,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal || {}
               let marginBalanceString,marginPnlPercent,stopBalance,stopBalanceString,stopPnlPercent,lossDistancePercentString, positionSizeString, lastPriceString
               walletBalance /= 100000000
