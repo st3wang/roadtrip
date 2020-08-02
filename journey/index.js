@@ -45,6 +45,17 @@ global.strategy = strategy
 
 var lastCheckPositionTime
 
+const makerFee = -0.00025
+const takerFee = 0.00075
+function getCost({side,cumQty,price,execInst}) {
+  var foreignNotional = (side == 'Buy' ? -cumQty : cumQty)
+  var homeNotional = -foreignNotional / price
+  var coinPairRate = 1 //lastPrice/XBTUSDRate
+  var fee = execInst.indexOf('ParticipateDoNotInitiate') >= 0 ? makerFee : takerFee
+  var execComm = Math.round(Math.abs(homeNotional * coinPairRate) * fee * 100000000)
+  return [homeNotional,foreignNotional,execComm]
+}
+
 const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
@@ -60,14 +71,35 @@ const logger = winston.createLogger({
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
             case 'position': {
-              let {caller,walletBalance,marginBalance,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
+              let {caller,walletBalance,marginBalance,unrealisedPnl,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal || {}
-              let marginBalanceString,pnlPercent,pnlPercentString,lossDistancePercentString, positionSizeString, lastPriceString
-              pnlPercent = Math.round((marginBalance-walletBalance) / walletBalance * 10000) / 100
+              let marginBalanceString,marginPnlPercent,stopBalance,stopBalanceString,stopPnlPercent,lossDistancePercentString, positionSizeString, lastPriceString
               walletBalance /= 100000000
+              unrealisedPnl /= 100000000
               marginBalance /= 100000000
-              marginBalanceString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + marginBalance.toFixed(4) + '\x1b[39m'
-              pnlPercentString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + pnlPercent + '%\x1b[39m'
+              marginPnlPercent = Math.round((marginBalance-walletBalance) / walletBalance * 10000) / 100
+              marginBalanceString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + marginBalance.toFixed(4) + ' ' + marginPnlPercent + '%\x1b[39m'
+              
+              stopLoss = 10845.5
+              let lastCost = getCost({
+                side: 'Sell',
+                cumQty: -positionSize,
+                price: lastPrice,
+                execInst: 'Close,LastPrice'
+              })
+              // console.log('lastCost',lastCost)
+              let stopCost = getCost({
+                side: 'Sell',
+                cumQty: -positionSize,
+                price: stopLoss,
+                execInst: 'Close,LastPrice'
+              })
+              // console.log('stopCost',stopCost)
+              
+              stopBalance = walletBalance + unrealisedPnl + lastCost[0] - stopCost[0]
+              stopPnlPercent = Math.round((stopBalance-walletBalance) / walletBalance * 10000) / 100
+              stopBalanceString = (stopBalance > walletBalance ? '\x1b[32m' : (stopBalance < walletBalance ? '\x1b[31m' : '')) + stopBalance.toFixed(4) + ' ' + stopPnlPercent + '%\x1b[39m'
+              
               if (positionSize > 0) {
                 positionSizeString = '\x1b[36m' + positionSize + '\x1b[39m'
                 lastPriceString = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
