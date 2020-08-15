@@ -122,11 +122,10 @@ function getEntrySignal() {
 
 function setEntrySignal(v) {
   entrySignal = v
+  writeEntrySignal(v)
 }
 
-function initEntrySignal() {
-  entrySignal = {}
-
+function readEntrySignal() {
   if (!fs.existsSync(entrySignalFilePath)) {
     return
   }
@@ -141,6 +140,9 @@ function initEntrySignal() {
   entrySignal.takeProfitOrders = takeProfitOrders
 }
 
+function writeEntrySignal(signal) {
+  fs.writeFileSync(entrySignalFilePath,JSON.stringify(signal),writeFileOptions)
+}
 
 function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
   var entrySide, exitSide
@@ -215,7 +217,8 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
 }
 
 async function init() {
-  initEntrySignal()
+  entrySignal = {}
+  readEntrySignal()
 }
 
 module.exports = {
