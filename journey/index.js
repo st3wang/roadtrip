@@ -80,7 +80,6 @@ const logger = winston.createLogger({
               marginPnlPercent = Math.round((marginBalance-walletBalance) / walletBalance * 10000) / 100
               marginBalanceString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + marginBalance.toFixed(4) + ' ' + marginPnlPercent + '%\x1b[39m'
               
-              stopLoss = 10845.5
               let lastCost = getCost({
                 side: 'Sell',
                 cumQty: -positionSize,
