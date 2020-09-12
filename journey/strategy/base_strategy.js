@@ -4,6 +4,7 @@ const talib = require('talib')
 const talibExecute = util.promisify(talib.execute)
 const bitmex = require('../bitmex')
 const shoes = require('../shoes')
+const { v4 } = require('uuid')
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
@@ -144,7 +145,7 @@ function writeEntrySignal(signal) {
   fs.writeFileSync(entrySignalFilePath,JSON.stringify(signal),writeFileOptions)
 }
 
-function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
+function getEntryExitOrders({signal:{orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}}) {
   var entrySide, exitSide
   if (orderQtyUSD > 0) {
     entrySide = 'Buy'
@@ -201,17 +202,25 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
 
   var takeProfitOrders = [{
     price: takeProfit,
-    orderQty: orderQtyUSD/2,
-    side: exitSide,
-    ordType: 'Limit',
-    execInst: 'ParticipateDoNotInitiate,ReduceOnly'
-  },{
-    price: takeHalfProfit,
-    orderQty: orderQtyUSD/2,
+    orderQty: orderQtyUSD,
     side: exitSide,
     ordType: 'Limit',
     execInst: 'ParticipateDoNotInitiate,ReduceOnly'
   }]
+
+  // var takeProfitOrders = [{
+  //   price: takeProfit,
+  //   orderQty: orderQtyUSD/2,
+  //   side: exitSide,
+  //   ordType: 'Limit',
+  //   execInst: 'ParticipateDoNotInitiate,ReduceOnly'
+  // },{
+  //   price: takeHalfProfit,
+  //   orderQty: orderQtyUSD/2,
+  //   side: exitSide,
+  //   ordType: 'Limit',
+  //   execInst: 'ParticipateDoNotInitiate,ReduceOnly'
+  // }]
 
   return {entryOrders:entryOrders,closeOrders:closeOrders,takeProfitOrders:takeProfitOrders}
 }

@@ -127,21 +127,16 @@ async function getOrder(setup,signal) {
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
 
-  var {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitFactor,halfProfitFactor,
+  var {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitPercent,profitFactor,
     stopMarketFactor,scaleInFactor,scaleInLength,minOrderSizeBTC,minStopLoss,maxStopLoss} = setup.bankroll
   var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
 
   minOrderSizeBTC /= coinPairRate
   stopMarketDistance = base.roundPrice(lossDistance * stopMarketFactor)
   profitDistance = base.roundPrice(-lossDistance * profitFactor)
-  halfProfitDistance = base.roundPrice(-lossDistance * halfProfitFactor)
-  if (profitDistance == halfProfitDistance) {
-    profitDistance += tick*side
-  }
 
   stopMarket = base.roundPrice(entryPrice + stopMarketDistance)
   takeProfit = base.roundPrice(entryPrice + profitDistance)
-  takeHalfProfit = base.roundPrice(entryPrice + halfProfitDistance)
 
   stopLossTrigger = entryPrice + (lossDistance/2)
   takeProfitTrigger = entryPrice + (profitDistance/8)
@@ -209,9 +204,7 @@ async function getOrder(setup,signal) {
     lossDistance: lossDistance,
     lossDistancePercent: lossDistance/entryPrice,
     profitDistance: profitDistance,
-    halfProfitDistance: halfProfitDistance,
     takeProfit: takeProfit,
-    takeHalfProfit: takeHalfProfit,
     stopMarket: stopMarket,
     stopLossTrigger: stopLossTrigger,
     takeProfitTrigger: takeProfitTrigger,
@@ -328,7 +321,7 @@ async function orderEntry(entrySignal) { try {
     if (response.status == 200) {
       entrySignal.entryOrders = entryOrders
       entrySignal.closeOrders = closeOrders
-      // entrySignal.takeProfitOrders = takeProfitOrders
+      entrySignal.takeProfitOrders = takeProfitOrders
       base.setEntrySignal(entrySignal)
       storage.writeEntrySignalTable(entrySignal)
     }
@@ -336,8 +329,9 @@ async function orderEntry(entrySignal) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkEntry(params) { try {
-  if (params.signal.signal) {
-    let existingSignalTime = new Date(params.signal.signal.timestamp).getTime()
+  var existingSignal = params.signal.signal
+  if (existingSignal) {
+    let existingSignalTime = new Date(existingSignal.timestamp).getTime()
     let now = getTimeNow()
     let ts = new Date(now).toISOString()
     let st = existingSignalTime - existingSignalTime % oneCandleMS
@@ -398,49 +392,44 @@ async function checkExit(params) { try {
   //   }
   // }
 
-  // else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
-  //   let [takeProfitOrder,takeHalfProfitOrder] = takeProfitOrders
+  else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
+    let [takeProfitOrder] = takeProfitOrders
   
-  //   let orders = []
-  //   let exitOrderQty = -bitmex.getCumQty(entryOrders,signal.timestamp)
-  //   let halfExitOrderQty = exitOrderQty/2
+    let orders = []
   
-  //   // total takeProfit orderQty
-  //   takeProfitOrder.orderQty = Math.round(halfExitOrderQty)
-  //   takeHalfProfitOrder.orderQty = exitOrderQty - takeProfitOrder.orderQty
+    // total takeProfit orderQty
+    takeProfitOrder.orderQty = positionSize
   
-  //   // find orders based on the total qty
-  //   let takeProfitCumQty = bitmex.getCumQty([takeProfitOrder],signal.timestamp)
-  //   let takeHalfProfitCumQty = bitmex.getCumQty([takeHalfProfitOrder],signal.timestamp)
-  
-  //   // subtract filled qty
-  //   takeProfitOrder.orderQty -= takeProfitCumQty
-  //   takeHalfProfitOrder.orderQty -= takeHalfProfitCumQty
-  
-  //   // submit orders if there is any remaining qty
-  //   if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
-  //   if (takeHalfProfitOrder.orderQty != 0) orders.push(takeHalfProfitOrder)
+    // find orders based on the total qty
+    let takeProfitCumQty = bitmex.getCumQty([takeProfitOrder],signal.timestamp)
 
-  //   let existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
-  //   if (existingTakeProfitOrders.length != orders.length) {
-  //     let tooSmall = bitmex.ordersTooSmall(orders) 
-  //     if (tooSmall.length > 0) {
-  //       if (orders.length > 1) {
-  //         orders[0].orderQty += orders[1].orderQty
-  //         orders.pop()
-  //         existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
-  //         if (existingTakeProfitOrders.length == 1) {
-  //           return
-  //         }
-  //       }
-  //       else {
-  //         logger.info('order tooSmall', orders)
-  //         return
-  //       }
-  //     }
-  //     return await bitmex.order(orders)
-  //   }
-  // }
+    // subtract filled qty
+    takeProfitOrder.orderQty -= takeProfitCumQty
+
+    // submit orders if there is any remaining qty
+    if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
+
+    let existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
+    if (existingTakeProfitOrders.length != orders.length) {
+      let tooSmall = bitmex.ordersTooSmall(orders) 
+      if (tooSmall.length > 0) {
+        if (orders.length > 1) {
+          orders[0].orderQty += orders[1].orderQty
+          orders.pop()
+          existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
+          if (existingTakeProfitOrders.length == 1) {
+            return
+          }
+        }
+        else {
+          logger.info('order tooSmall', orders)
+          return
+        }
+      }
+      ///// check if price is higher use the current price
+      return await bitmex.order(orders,false)
+    }
+  }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkPosition(params) {

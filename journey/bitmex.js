@@ -749,7 +749,20 @@ async function orderQueue(ord) { try {
 
 async function orderBulkRetry(ord) { try {
   if (ord.cancelAllBeforeOrder) {
-    await cancelAll()
+    let execInstMap = ord.orders.map(o => {return o.execInst})
+    let cOrders = findOrders(/New/,lastOrders)
+    if (cOrders.length > 0) {
+      cOrders = cOrders.filter(o => {
+        return execInstMap.indexOf(o.execInst) >= 0
+      })
+      if (cOrders.length > 0) {
+        if (cOrders[0].execInst != 'ParticipateDoNotInitiate,ReduceOnly' ||
+            cOrders[0].price != ord.orders[0].price) {
+          await cancelOrders(cOrders)
+        }
+      }
+    }
+    // await cancelAll()
   }
   
   var retry = false,

@@ -274,7 +274,7 @@ async function getTradeJson(sp,useCache) { try {
       signal: s,
       entryOrders: bitmex.findOrders(/.+/,s.entryOrders,ords[i]),
       closeOrders: ords[i].filter(o => {return o.ordType == 'Stop'}),
-      // takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
+      takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
       fee: 0, cost: 0, costPercent: '%', feePercent: '%', pnl:0, pnlPercent:'%',
       group: 0, grouppnl: 0,
       drawdown: previousTrade.drawdown, drawdownPercent: previousTrade.drawdownPercent,
@@ -290,16 +290,30 @@ async function getTradeJson(sp,useCache) { try {
       return foundOrders.indexOf(e) < 0
     })
     trades.push(trade)
+    if (!trade.entryOrders[0]) debugger
 
     let closeOrder = trade.closeOrders[0]
     if (!closeOrder) {
       debugger
       return
     }
+    switch (closeOrder.ordStatus) {
+      case 'New':
+      case 'Canceled': {
+        if (trade.takeProfitOrders[0] && trade.takeProfitOrders[0].ordStatus != 'Canceled') {
+          closeOrder = trade.takeProfitOrders[0]
+        }
+      }
+      break;
+    }
+    // if (closeOrder.ordStatus !== 'Filled') {
+    //   debugger
+    //   return
+    // }
     closeOrder.price = closeOrder.price || 0
 
-    let closeQty = trade.closeOrders[0].cumQty
-    let closeTimestamp = trade.closeOrders[0].timestamp
+    let closeQty = closeOrder.cumQty
+    let closeTimestamp = closeOrder.timestamp
     let closeTime = new Date(closeTimestamp).getTime()
     let len = trades.length
     let startIndex = len
@@ -308,6 +322,8 @@ async function getTradeJson(sp,useCache) { try {
     let groupLen = 1
     while (closeQty > 0) {
       startIndex--
+      if (!trades[startIndex]) debugger
+      if (!trades[startIndex].entryOrders[0]) debugger
       closeQty -= trades[startIndex].entryOrders[0].cumQty
     }
     if (closeQty < 0) {
@@ -410,9 +426,9 @@ function createInterval(candleDelay) {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20200501
-  var end = 20200605
-  await bitmexdata.downloadTradeData(start,end)
+  var start = 20200901
+  var end = 202009011
+  // await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,1440)
@@ -479,9 +495,9 @@ init()
 
 /* TODO
 use marginBalance instead of walletBalance
+set take profit 1% in bear market
 move stop loss 
   - when it's winning
   - every hour lookback 36
-test short
 reduce size
 */
