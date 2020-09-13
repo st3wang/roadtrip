@@ -258,6 +258,7 @@ async function getTradeJson(sp,useCache) { try {
   var walletBalanceUSD = walletBalance*firstEnterPrice/100000000
   var groupid = 0
   let totalHoursInTrade = 0
+  
   signals.forEach((signal,i) => {
     let {timestamp} = signal
     let startTime = new Date(timestamp).getTime() - timeOffset
@@ -294,7 +295,7 @@ async function getTradeJson(sp,useCache) { try {
 
     let closeOrder = trade.closeOrders[0]
     if (!closeOrder) {
-      debugger
+      // debugger
       return
     }
     switch (closeOrder.ordStatus) {
@@ -327,6 +328,8 @@ async function getTradeJson(sp,useCache) { try {
       closeQty -= trades[startIndex].entryOrders[0].cumQty
     }
     if (closeQty < 0) {
+      orders 
+      signals
       console.error('incorrect quantity')
       debugger
     }
@@ -394,6 +397,7 @@ async function getTradeJson(sp,useCache) { try {
 
   let tradeObject = {trades:trades} //,orders:orders,walletHistory:walletHistory}
   await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
+  console.log('getTradeJson done')
   debugger
   // return tradeObject
   let tradeJSON = JSON.stringify(tradeObject)
