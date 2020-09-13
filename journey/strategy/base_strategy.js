@@ -135,7 +135,7 @@ function readEntrySignal() {
   entrySignal = JSON.parse(entrySignalString)
   entrySignal.time = new Date(entrySignal.signal.timestamp).getTime()
 
-  var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal)
+  var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
   entrySignal.entryOrders = entryOrders
   entrySignal.closeOrders = closeOrders
   entrySignal.takeProfitOrders = takeProfitOrders
@@ -145,7 +145,7 @@ function writeEntrySignal(signal) {
   fs.writeFileSync(entrySignalFilePath,JSON.stringify(signal),writeFileOptions)
 }
 
-function getEntryExitOrders({signal:{orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}}) {
+function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
   var entrySide, exitSide
   if (orderQtyUSD > 0) {
     entrySide = 'Buy'
@@ -192,7 +192,7 @@ function getEntryExitOrders({signal:{orderQtyUSD,entryPrice,stopLoss,stopMarket,
   //   ordType: 'StopLimit',
   //   execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
   // },
-  
+
   // {
   //   price: takeProfit - exitPriceOffset * 2,
   //   stopPx: takeProfit - exitPriceOffset,

@@ -466,8 +466,8 @@ function getEntrySignal() {
   return base.getEntrySignal()
 }
 
-function getEntryExitOrders(entrySignal) {
-  return base.getEntryExitOrders(entrySignal)
+function getEntryExitOrders(signal) {
+  return base.getEntryExitOrders(signal)
 }
 
 async function init() {
