@@ -956,7 +956,7 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
         case 'ParticipateDoNotInitiate': {
           // Entry orderQty may not be exact, depending on the margin. We can ignore similar entry orders with similar orderQty.
           return orders.find(({price, orderQty}) => {
-            return (price == p && orderQty >= (q*0.98) && orderQty <= (q*1.02))
+            return (p == 'any' || (price == p && orderQty >= (q*0.98) && orderQty <= (q*1.02)))
           })
         }
         case 'Close,ParticipateDoNotInitiate': {
@@ -1137,5 +1137,7 @@ module.exports = {
 
   order: order,
   cancelAll: cancelAll,
-  cancelOrders: cancelOrders
+  cancelOrders: cancelOrders,
+
+  lastOrders: lastOrders
 }
