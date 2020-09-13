@@ -824,12 +824,8 @@ async function orderBulk(orders) { try {
 
   var response
 
-  // Test amend on take profit orders
-  // ordType: 'Limit',
-  // execInst: 'Close,ParticipateDoNotInitiate'
-  if (orders[0].ordType == 'Limit' && 
-    (orders[0].execInst == 'ParticipateDoNotInitiate,ReduceOnly' ||
-    orders[0].execInst == 'Close,ParticipateDoNotInitiate')) {
+  if (orders[0].execInst == 'ParticipateDoNotInitiate,ReduceOnly' ||
+      orders[0].execInst == 'Close,LastPrice') {
     let ordersToAmend = findOrdersToAmend(orders)
     if (ordersToAmend.length == 0) {
       response = await orderNewBulk(orders)
@@ -983,7 +979,7 @@ function findOrder(status,{price:p,stopPx:spx,orderQty:q,execInst:e,ordType:t,si
     case 'StopLimit':
       return orders.find(({stopPx}) => {
         // Use stopPx for stop orders
-        return (stopPx == spx)
+        return (stopPx != 1 && (spx == 'any' || stopPx == spx))
       })
   }
 }
@@ -1011,7 +1007,12 @@ function findOrdersToAmend(orders) {
 
   orders.forEach(o => {
     var orderToAmend = openOrders.find(a => {
-      return (a.price == o.price)
+      if(o.execInst == 'Close,LastPrice') {
+        return (a.stopPx != 1 && (a.execInst == o.execInst && a.side == o.side && a.ordType && o.ordType))
+      }
+      else {
+        return (a.price == o.price)
+      } 
     })
     if (orderToAmend) {
       o.orderID = orderToAmend.orderID

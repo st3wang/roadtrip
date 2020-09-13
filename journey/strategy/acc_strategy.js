@@ -361,7 +361,7 @@ async function checkExit(params) { try {
   var {positionSize,bid,ask,lastPrice,signal} = params
   if (positionSize == 0 || !lastPrice || !signal || !signal.signal) return
 
-  var {signal:{entryPrice},entryOrders,takeProfitOrders,closeOrders} = signal
+  var {signal:{entryPrice,stopLoss,lossDistance},entryOrders,takeProfitOrders,closeOrders} = signal
 
   var exit = base.exitTooLong(params) || base.exitFunding(params)
   if (exit) {
@@ -373,25 +373,40 @@ async function checkExit(params) { try {
     }]
     exit.exitOrders = exitOrders
 
-    var existingExitOrders = bitmex.findOrders(/New/,exitOrders)
+    let existingExitOrders = bitmex.findOrders(/New/,exitOrders)
     if (existingExitOrders.length == 1) {
       // logger.debug('EXIT EXISTING ORDER',exit)
       return existingExitOrders
     }
 
     if (!mock) logger.info('CLOSE ORDER', exit)
-    var response = await bitmex.order(exitOrders,true)
+    let response = await bitmex.order(exitOrders,true)
     return response
   }
-  // else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
-  //   let market = await bitmex.getCurrentMarket()
-  //   let newStopLoss = Math.min(...market.lows)
-  //   if (newStopLoss > closeOrders[0].stopPx) {
-  //     closeOrders[0].stopPx = newStopLoss
-  //     return await bitmex.order(closeOrders)
-  //   }
-  // }
-
+  else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
+    // Use loss distance as next step
+    let closeOrder = bitmex.findOrders(/New/,[{
+      side: (positionSize < 0 ? 'Buy' : 'Sell'),
+      ordType: 'Stop',
+      execInst: 'Close,LastPrice',
+      stopPx: 'any'
+    }])[0]
+    let nextTarget = closeOrder.stopPx - lossDistance*2
+    if (lastPrice >= nextTarget) {
+      let newStopLoss = closeOrder.stopPx - lossDistance
+      closeOrder.stopPx = newStopLoss
+      return await bitmex.order([closeOrder])
+    }
+    /* Use lowest low as a new stop loss
+    let market = await bitmex.getCurrentMarket()
+    let newStopLoss = Math.min(...market.lows)
+    if (newStopLoss > closeOrders[0].stopPx) {
+      closeOrders[0].stopPx = newStopLoss
+      return await bitmex.order(closeOrders)
+    }
+    */
+  }
+/*
   else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
     let [takeProfitOrder] = takeProfitOrders
   
@@ -430,6 +445,7 @@ async function checkExit(params) { try {
       return await bitmex.order(orders,false)
     }
   }
+  */
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkPosition(params) {

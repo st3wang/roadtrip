@@ -192,13 +192,15 @@ function getEntryExitOrders({signal:{orderQtyUSD,entryPrice,stopLoss,stopMarket,
   //   ordType: 'StopLimit',
   //   execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
   // },
-  {
-    price: takeProfit - exitPriceOffset * 2,
-    stopPx: takeProfit - exitPriceOffset,
-    side: exitSide,
-    ordType: 'LimitIfTouched',
-    execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
-  }]
+  
+  // {
+  //   price: takeProfit - exitPriceOffset * 2,
+  //   stopPx: takeProfit - exitPriceOffset,
+  //   side: exitSide,
+  //   ordType: 'LimitIfTouched',
+  //   execInst: 'Close,LastPrice,ParticipateDoNotInitiate'
+  // }
+]
 
   var takeProfitOrders = [{
     price: takeProfit,
