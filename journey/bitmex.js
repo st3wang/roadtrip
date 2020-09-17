@@ -202,6 +202,9 @@ async function handleOrder(orders) { try {
       else {
         lastOrders.push(o)
       }
+      if (o.ordType == 'Stop' && o.execInst == 'Close,LastPrice' && o.ordStatus == 'New' && o.stopPx > 1) {
+        checkPositionParams.currentStopPx = o.stopPx
+      }
     }
     else {
       logger.error('handleOrder invalid order',o)
