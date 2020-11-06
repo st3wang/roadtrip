@@ -35,7 +35,7 @@ global.storage = storage
 
 const bitmex = require('./bitmex')
 const strategy = require('./strategy/' + shoes.strategy + '_strategy')
-const server = require('./server')
+// const server = require('./server')
 const candlestick = require('./candlestick')
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
@@ -482,7 +482,7 @@ async function init() { try {
 
   await storage.init()
   await strategy.init()
-  await server.init(getMarketJson,getTradeJson,getFundingCsv)
+  // await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
   if (mock) {
     var tradeJSON = await getTradeJson(setup,false)
