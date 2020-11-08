@@ -400,7 +400,7 @@ async function checkExit(params) { try {
     return response
   }
   /*
-  // move stop loss
+  // move stop loss. works in the side way market.
   else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
     // Use loss distance as next step
     let closeOrder = bitmex.findOrders(/New/,[{
