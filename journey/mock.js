@@ -148,7 +148,7 @@ function fillOrder(o,lastPrice) {
   o.cumQty = orderQty 
   o.ordStatus = 'Filled'
   o.transactTime = getISOTimeNow()
-  o.timestamp = o.transactTime
+  // o.timestamp = o.transactTime
   if (!o.price) {
     o.price = o.stopPx //+ (lastPrice < o.stopPx ? -2 : 2)
     // o.price = o.stopPx//lastPrice
@@ -513,5 +513,6 @@ module.exports = {
 
   next: next,
   createInterval: createInterval,
-  start: start
+  start: start,
+
 }

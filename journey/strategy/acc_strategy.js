@@ -399,7 +399,8 @@ async function checkExit(params) { try {
     let response = await bitmex.order(exitOrders,true)
     return response
   }
-  
+  /*
+  // move stop loss
   else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
     // Use loss distance as next step
     let closeOrder = bitmex.findOrders(/New/,[{
@@ -433,46 +434,6 @@ async function checkExit(params) { try {
     //   closeOrders[0].stopPx = newStopLoss
     //   return await bitmex.order(closeOrders)
     // }
-  }
-  
-/*
-  else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
-    let [takeProfitOrder] = takeProfitOrders
-  
-    let orders = []
-  
-    // total takeProfit orderQty
-    takeProfitOrder.orderQty = positionSize
-  
-    // find orders based on the total qty
-    let takeProfitCumQty = bitmex.getCumQty([takeProfitOrder],signal.timestamp)
-
-    // subtract filled qty
-    takeProfitOrder.orderQty -= takeProfitCumQty
-
-    // submit orders if there is any remaining qty
-    if (takeProfitOrder.orderQty != 0) orders.push(takeProfitOrder)
-
-    let existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
-    if (existingTakeProfitOrders.length != orders.length) {
-      let tooSmall = bitmex.ordersTooSmall(orders) 
-      if (tooSmall.length > 0) {
-        if (orders.length > 1) {
-          orders[0].orderQty += orders[1].orderQty
-          orders.pop()
-          existingTakeProfitOrders = bitmex.findOrders(/New/,orders)
-          if (existingTakeProfitOrders.length == 1) {
-            return
-          }
-        }
-        else {
-          logger.info('order tooSmall', orders)
-          return
-        }
-      }
-      ///// check if price is higher use the current price
-      return await bitmex.order(orders,false)
-    }
   }
   */
 } catch(e) {logger.error(e.stack||e);debugger} }
