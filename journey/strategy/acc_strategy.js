@@ -328,6 +328,22 @@ async function orderEntry(entrySignal) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
+function isBear() {
+  return false
+  const now = getTimeNow()
+  if (now >= 1515283200000 && now < 1517875200000) return true
+  if (now >= 1519257600000 && now < 1523577600000) return true
+  if (now >= 1524700800000 && now < 1530316800000) return true
+  if (now >= 1532563200000 && now < 1534896000000) return true
+  if (now >= 1537660800000 && now < 1546041600000) return true
+  if (now >= 1548720000000 && now < 1550534400000) return true
+  if (now >= 1559692800000 && now < 1560211200000) return true
+  if (now >= 1561680000000 && now < 1570492800000) return true
+  if (now >= 1582156800000 && now < 1586390400000) return true
+  if (now >= 1598400000000 && now < 1600128000000) return true
+  return false
+}
+
 async function checkEntry(params) { try {
   var existingSignal = params.signal.signal
   if (existingSignal) {
@@ -351,7 +367,7 @@ async function checkEntry(params) { try {
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
-  if ((signal.type == 'SHORT' || signal.type == 'LONG') && signal.entryPrice && signal.orderQtyUSD) {
+  if (!isBear() && (signal.type == 'SHORT' || signal.type == 'LONG') && signal.entryPrice && signal.orderQtyUSD) {
     var entrySignal = {signal:signal}
     await orderEntry(entrySignal)
   }
@@ -363,7 +379,7 @@ async function checkExit(params) { try {
 
   var {signal:{entryPrice,stopLoss,lossDistance},entryOrders,takeProfitOrders,closeOrders} = signal
 
-  var exit = base.exitTooLong(params) || base.exitFunding(params)
+  var exit = base.exitTooLong(params) || base.exitFunding(params) || isBear()
   if (exit) {
     let exitOrders = [{
       price: (positionSize < 0 ? bid : ask),

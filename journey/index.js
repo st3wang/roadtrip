@@ -431,9 +431,9 @@ function createInterval(candleDelay) {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20200901
-  var end = 202009011
-  // await bitmexdata.downloadTradeData(start,end)
+  var start = 20200701
+  var end = 20201106
+  await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,1440)
@@ -499,6 +499,8 @@ async function init() { try {
 init()
 
 /* TODO
+if the position != 0 the new stop lost must be more than current stop loss
+
 use marginBalance instead of walletBalance
 set take profit 1% in bear market
 move stop loss 
