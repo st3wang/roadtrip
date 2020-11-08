@@ -257,8 +257,10 @@ async function handleInstrument(data) { try {
     checkPositionParams.lastPrice = lastInstrument.lastPrice
     checkPositionParams.fundingTimestamp = lastInstrument.fundingTimestamp
     checkPositionParams.fundingRate = lastInstrument.fundingRate
-    // checkPositionParams.caller = 'instrument'
-    // await checkPositionCallback(checkPositionParams)
+    if (mock) {
+      checkPositionParams.caller = 'instrument'
+      await checkPositionCallback(checkPositionParams)
+    }
   }
 
   lastBid = bid

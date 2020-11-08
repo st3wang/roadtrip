@@ -178,12 +178,12 @@ async function checkPosition(params) { try {
     case 'position': {
       if (lastPositionSize == 0) {
         if (!mock) logger.info('ENTER POSITION', walletBalance)
-        // console.log(new Date(getTimeNow()).toISOString(),'ENTER POSITION', walletBalance)
       }
       else if (positionSize == 0) {
-        if (!mock) logger.info('EXIT POSITION', walletBalance)
-        // console.log(new Date(getTimeNow()).toISOString(),'EXIT POSITION', walletBalance)
-        strategy.resetEntrySignal()
+        if (!mock) {
+          logger.info('EXIT POSITION', walletBalance)
+          strategy.resetEntrySignal()
+        }
       }
     } break;
   }
@@ -499,6 +499,16 @@ async function init() { try {
 init()
 
 /* TODO
+fix incorrect quantity for mock 
+  // Use loss distance as next step
+  startTime: '2018-01-01T00:00:00.000Z',
+  endTime: '2020-11-06T23:00:00.000Z',
+
+get coinbase data
+  https://api.pro.coinbase.com/products/BTC-USD/candles?granularity=3600&start=2015-07-21T00:00:00Z&end=2015-07-21T23:00:00Z
+  analyze
+  use both bitmex and coinbase?
+
 if the position != 0 the new stop lost must be more than current stop loss
 
 use marginBalance instead of walletBalance
