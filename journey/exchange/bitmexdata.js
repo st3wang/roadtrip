@@ -2,6 +2,7 @@ const util = require('util')
 const fs = require('fs')
 const http 	= require('http')
 const gunzip = require('gunzip-file')
+const base = require('./basedata')
 
 const ymdHelper = require('../ymdHelper')
 const shoes = require('../shoes')
@@ -17,10 +18,9 @@ const csvStringify = require('csv-stringify')
 
 const tradeFilePath = 'data/bitmex/trade/YYYYMMDD.csv'
 const minTradeFilePath = 'data/bitmex/trade/min/YYYYMMDD.json'
-const candleFilePath = 'data/bitmex/candle/YYYYMMDD.json'
-const feedFilePath = 'data/bitmex/feed/YYYYMMDD.json'
 const rsiFilePath = 'data/bitmex/rsi/YYYYMMDD.json'
 
+const exchange = 'bitmex'
 const symbols = ['XBTUSD']
 
 const oneDayMs = 24*60*60000
@@ -31,14 +31,6 @@ function getCleanedTradeFile(ymd,symbol) {
 
 function getMinTradeFile(ymd,symbol) {
   return minTradeFilePath.replace('YYYYMMDD',symbol+'/'+ymd)
-}
-
-function getCandleFile(symbol,interval,ymd) {
-  return candleFilePath.replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
-}
-
-function getFeedFile(symbol,interval,ymd) {
-  return feedFilePath.replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
 }
 
 function getRsiFile(symbol,ymd,interval,length) {
@@ -140,6 +132,10 @@ function readAndParseForCandle(ymd,symbol) {
       .on('end', () => {
         resolve(data)});
   });
+}
+
+async function readFeedDay(symbol,interval,time) {
+  return await base.readFeedDay(exchange,symbol,interval,time)
 }
 
 function getGroups(trades,startTime,interval) {
@@ -250,25 +246,6 @@ async function getCandleDay(symbol,interval,ymd) { try {
   return candles
 } catch(e) {console.error(e.stack||e);debugger} }
 
-function getFeedDay({candles},interval,lastPrice) { try {
-  var feeds = [], len = candles.length, 
-      feedInterval = interval / 4 * 60000
-  for (var i = 0; i < len; i++) {
-    let {time:t,open,high,low,close} = candles[i]
-    let time = new Date(t).getTime()
-        openTime = time + 6000,
-        highTime = time + feedInterval,
-        lowTime = highTime + feedInterval,
-        closeTime = lowTime + feedInterval
-    feeds.push([openTime,1,1,open||lastPrice,new Date(openTime).toISOString()])
-    feeds.push([highTime,1,1,high||lastPrice,new Date(highTime).toISOString()])
-    feeds.push([lowTime,1,1,low||lastPrice,new Date(lowTime).toISOString()])
-    feeds.push([closeTime,1,1,close||lastPrice,new Date(closeTime).toISOString()])
-    lastPrice = (close||lastPrice)
-  }
-  return feeds
-} catch(e) {console.error(e.stack||e);debugger} }
-
 async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
   var len = symbols.length
   for (var i = 0; i < len; i++) {
@@ -276,27 +253,27 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
         ymd = startYmd,
         lastPrice
     while (ymd <= endYmd) {
-      let writeCandlePath = getCandleFile(symbol,interval,ymd)
+      let writeCandlePath = base.getCandleFile(exchange,symbol,interval,ymd)
       let candles, feeds
       if (fs.existsSync(writeCandlePath)) {
-        console.log('skip',writeCandlePath)
+        console.log('skip candle',writeCandlePath)
       }
       else {
-        candles = await getCandleDay(symbol,interval,ymd)
+        candles = await getCandleDay(exchange,symbol,interval,ymd)
         let candlesString = JSON.stringify(candles)
         await writeFile(writeCandlePath,candlesString,writeFileOptions)
-        console.log('done writing', writeCandlePath)
+        console.log('done writing candle', writeCandlePath)
       }
-      let writeFeedPath = getFeedFile(symbol,interval,ymd)
+      let writeFeedPath = base.getFeedFile(exchange,symbol,interval,ymd)
       // if (fs.existsSync(writeFeedPath)) {
-      //   console.log('skip',writeFeedPath)
+        // console.log('skip feed',writeFeedPath)
       // }
       // else {
         candles = candles || JSON.parse(fs.readFileSync(writeCandlePath,readFileOptions))
-        feeds = getFeedDay(candles,interval,lastPrice)
+        feeds = base.getFeedDay(candles,interval,lastPrice)
         let feedsString = JSON.stringify(feeds)
         await writeFile(writeFeedPath,feedsString,writeFileOptions)
-        console.log('done writing', writeFeedPath)
+        console.log('done writing feed', writeFeedPath)
         lastPrice = feeds[feeds.length-1][3]
       // }
       ymd = ymdHelper.nextDay(ymd)
@@ -348,7 +325,7 @@ async function testCandleDayFiles(startYmd,endYmd,interval) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getTradeBucketed(interval,time,symbol) {
-  var readPath = getCandleFile(symbol,interval,ymdHelper.YYYYMMDD(time))
+  var readPath = base.getCandleFile(exchange,symbol,interval,ymdHelper.YYYYMMDD(time))
   if (fs.existsSync(readPath)) {
     var str = fs.readFileSync(readPath,readFileOptions)
     var dayMarket = JSON.parse(str)
@@ -417,18 +394,6 @@ async function readTradeDay(time,symbol) {
     }
   })
 }
-
-async function readFeedDay(symbol,interval,time) { try {
-  var readPath = getFeedFile(symbol,interval,ymdHelper.YYYYMMDD(time))
-  if (fs.existsSync(readPath)) {
-    var str = fs.readFileSync(readPath,readFileOptions)
-    var feeds = JSON.parse(str)
-    return feeds
-  }
-  else {
-    return []
-  }
-} catch(e) {console.error(e.stack||e);debugger} }
 
 async function generateRsiFiles(symbol,startYmd,endYmd,interval,length) { try {
   var st = ymdHelper.getTime(startYmd)

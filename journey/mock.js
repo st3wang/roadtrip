@@ -1,4 +1,6 @@
 const bitmexdata = require('./exchange/bitmexdata')
+const coinbasedata = require('./exchange/coinbasedata')
+
 const uuid = require('uuid');
 const fs = require('fs')
 
@@ -17,7 +19,7 @@ var setup, startTimeMs, endTimeMs, XBTUSDRate
 
 var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
 
-var margin, walletHistory, orders, historyOrders, position, trades, currentTradeIndex
+var margin, walletHistory, orders, historyOrders, position, bitmextrades, coinbasetrades, currentTradeIndex
 var rsis
 
 const logger = winston.createLogger({
@@ -233,48 +235,50 @@ async function nextXBTUSDInstrument(trade) { try {
 
 async function readNextDayTrades() { try {
   var startTime, endTime
-  if (trades.length == 0) {
+  if (bitmextrades.length == 0) {
     startTime = startTimeMs
   }
   else {
-    let lastTradeTime = trades[trades.length-1][0]
+    let lastTradeTime = bitmextrades[bitmextrades.length-1][0]
     startTime = lastTradeTime - (lastTradeTime % oneDayMs) + oneDayMs
   }
   if (startTime > endTimeMs) {
+    bitmextrades = undefined
+    coinbasetrades = undefined
     return
   }
   endTime = startTime - (startTime % oneDayMs) + oneDayMs - 1
   if (endTime > endTimeMs) {
     endTime = endTimeMs
   }
-  trades = await bitmexdata.readFeedDay(setup.symbol,setup.candle.interval,startTime)
+  bitmextrades = await bitmexdata.readFeedDay(setup.symbol,setup.candle.interval,startTime)
+  coinbasetrades = await coinbasedata.readFeedDay(setup.symbol,setup.candle.interval,startTime)
   var filterStartTime = (startTime % oneDayMs) != 0
   var filterEndTime = (endTime % oneDayMs) != oneDayMs - 1
   if (filterStartTime && filterEndTime) {
-    trades = trades.filter(([time]) => (time >= startTime && time <= endTime))
+    bitmextrades = bitmextrades.filter(([time]) => (time >= startTime && time <= endTime))
   }
   else if (filterStartTime) {
-    trades = trades.filter(([time]) => (time >= startTime))
+    bitmextrades = bitmextrades.filter(([time]) => (time >= startTime))
   }
   else if (filterEndTime) {
-    trades = trades.filter(([time]) => (time <= endTime))
+    bitmextrades = bitmextrades.filter(([time]) => (time <= endTime))
   }
-  return trades
 } catch(e) {logger.error(e.stack||e); debugger} }
 
 async function nextInstrument() { try {
   currentTradeIndex++
-  var trade = trades[currentTradeIndex]
+  var bitmextrade = bitmextrades[currentTradeIndex]
 
-  if (!trade) {
+  if (!bitmextrade) {
     // console.timeEnd('readNextDayTrades')
     // console.time('readNextDayTrades')
-    trades = await readNextDayTrades()
-    if (trades && trades.length) {
+    await readNextDayTrades()
+    if (bitmextrades && bitmextrades.length) {
       currentTradeIndex = 0
-      trade = trades[0]
+      bitmextrade = bitmextrades[0]
       // if (setup.symbol != 'XBTUSD') {
-        nextXBTUSDInstrument(trade)
+        nextXBTUSDInstrument(bitmextrade)
       // }
     }
     else {
@@ -282,7 +286,7 @@ async function nextInstrument() { try {
     }
   }
 
-  const [time,side,size,price] = trade
+  const [time,side,size,price] = bitmextrade
   timeNow = time
   const instruments = [{
     symbol: shoes.symbol,
@@ -297,27 +301,6 @@ async function nextInstrument() { try {
     await handleInstrument(instruments)
   }
   else {
-    // let now = getTimeNow()
-    // let date = new Date(now)
-    // let ms = date.getMilliseconds()
-    // if (ms != 0) debugger
-    // if (now - lastIntervalTime != 60000) {
-    //   console.log('last', new Date(lastIntervalTime).toISOString())
-    //   console.log('now', new Date(now).toISOString())
-    //   let missing = new Date(now-60000).toISOString()
-    //   let found
-    //   for (let i = currentTradeIndex; i >=0; i--) {
-    //     if (trades[i][4] == missing) {
-    //       console.log('found trade', missing)
-    //       found = true
-    //       i = 0
-    //     }
-    //   }
-    //   if (!found) {
-    //     console.error('not found trade', missing)
-    //   }
-    // }
-    // lastIntervalTime = now
     await handleInterval(instruments)
   }
   return true
@@ -458,7 +441,7 @@ async function init(sp) {
     foreignNotional: 0,
     execComm: 0
   }
-  trades = []
+  bitmextrades = []
   currentTradeIndex = -1
   if (sp) {
     startTimeMs = new Date(sp.startTime).getTime()

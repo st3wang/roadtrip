@@ -5,7 +5,7 @@ const gunzip = require('gunzip-file')
 
 const ymdHelper = require('../ymdHelper')
 const shoes = require('../shoes')
-// const strategy = require('./strategy')
+const base = require('./basedata')
 
 const readFile = util.promisify(fs.readFile)
 const readFileOptions = {encoding:'utf-8', flag:'r'}
@@ -13,13 +13,15 @@ const writeFile = util.promisify(fs.writeFile)
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
 const candleFilePath = 'data/coinbase/candle/YYYYMMDD.json'
+const feedFilePath = 'data/bitmex/feed/YYYYMMDD.json'
 
+const exchange = 'coinbase'
 const symbols = ['BTC-USD']
 
 const oneDayMs = 24*60*60000
 
-function getCandleFile(symbol,interval,ymd) {
-  return candleFilePath.replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
+async function readFeedDay(symbol,interval,time) {
+  return await base.readFeedDay(exchange,symbol,interval,time)
 }
 
 async function getCandleDay(symbol,interval,ymd) { try {
@@ -78,37 +80,36 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
         ymd = startYmd,
         lastPrice
     while (ymd <= endYmd) {
-      let writeCandlePath = getCandleFile(symbol,interval,ymd)
+      let writeCandlePath = base.getCandleFile(exchange,symbol,interval,ymd)
       let candles, feeds
       if (fs.existsSync(writeCandlePath)) {
-        console.log('skip',writeCandlePath)
+        console.log('skip candle',writeCandlePath)
       }
       else {
         candles = await getCandleDay(symbol,interval,ymd)
         let candlesString = JSON.stringify(candles)
         await writeFile(writeCandlePath,candlesString,writeFileOptions)
-        console.log('done writing', writeCandlePath)
+        console.log('done writing candle', writeCandlePath)
         await new Promise(resolve => setTimeout(resolve, 1000))
       }
-      /* not writing feed file
-      let writeFeedPath = getFeedFile(symbol,interval,ymd)
-      // if (fs.existsSync(writeFeedPath)) {
-      //   console.log('skip',writeFeedPath)
-      // }
-      // else {
+      let writeFeedPath = base.getFeedFile(exchange,symbol,interval,ymd)
+      if (fs.existsSync(writeFeedPath)) {
+        console.log('skip feed',writeFeedPath)
+      }
+      else {
         candles = candles || JSON.parse(fs.readFileSync(writeCandlePath,readFileOptions))
-        feeds = getFeedDay(candles,interval,lastPrice)
+        feeds = base.getFeedDay(candles,interval,lastPrice)
         let feedsString = JSON.stringify(feeds)
         await writeFile(writeFeedPath,feedsString,writeFileOptions)
-        console.log('done writing', writeFeedPath)
+        console.log('done writing feed', writeFeedPath)
         lastPrice = feeds[feeds.length-1][3]
-      // }
-      */
+      }
       ymd = ymdHelper.nextDay(ymd)
     }
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
 module.exports = {
-  generateCandleDayFiles: generateCandleDayFiles
+  generateCandleDayFiles: generateCandleDayFiles,
+  readFeedDay: readFeedDay
 }
