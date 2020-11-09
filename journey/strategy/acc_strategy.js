@@ -1,7 +1,8 @@
 const path = require('path')
 
 const base = require('./base_strategy.js')
-const bitmex = require('../bitmex')
+const bitmex = require('../exchange/bitmex')
+const coinbase = require('../exchange/coinbase')
 const shoes = require('../shoes')
 const winston = require('winston')
 const storage = require('../storage')
@@ -230,7 +231,23 @@ async function getOrder(setup,signal) {
 }
 
 async function getSignal(setup,params) {
-  return await getExchangeSignal(setup,params,bitmex)
+  const bitmexSignal = await getExchangeSignal(setup,params,bitmex)
+  return bitmexSignal
+  /*
+  if ((bitmexSignal.type == 'SHORT' || bitmexSignal.type == 'LONG') && bitmexSignal.entryPrice && bitmexSignal.orderQtyUSD) {
+    return bitmexSignal
+  }
+  else {
+    const coinbaseSignal = await getExchangeSignal(setup,params,coinbase)
+    if ((coinbaseSignal.type == 'SHORT' || coinbaseSignal.type == 'LONG') && coinbaseSignal.entryPrice && coinbaseSignal.orderQtyUSD) {
+      debugger
+      return coinbaseSignal
+    }
+    else {
+      return bitmexSignal
+    }
+  }
+  */
 } 
 
 async function getExchangeSignal(setup, {positionSize,fundingTimestamp,fundingRate,marginBalance}, exchange) { try {

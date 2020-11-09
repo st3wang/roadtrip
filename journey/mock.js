@@ -1,4 +1,4 @@
-const bitmexdata = require('./bitmexdata')
+const bitmexdata = require('./exchange/bitmexdata')
 const uuid = require('uuid');
 const fs = require('fs')
 

@@ -3,8 +3,8 @@ const fs = require('fs')
 const http 	= require('http')
 const gunzip = require('gunzip-file')
 
-const ymdHelper = require('./ymdHelper')
-const shoes = require('./shoes')
+const ymdHelper = require('../ymdHelper')
+const shoes = require('../shoes')
 // const strategy = require('./strategy')
 
 const readFile = util.promisify(fs.readFile)
@@ -283,9 +283,6 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
       }
       else {
         candles = await getCandleDay(symbol,interval,ymd)
-        // if (candles.opens.length != 96 || candles.highs.length != 96 || candles.lows.length != 96 || candles.closes.length != 96 || candles.candles.length != 96) {
-        //   debugger
-        // }
         let candlesString = JSON.stringify(candles)
         await writeFile(writeCandlePath,candlesString,writeFileOptions)
         console.log('done writing', writeCandlePath)

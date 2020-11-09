@@ -3,7 +3,8 @@ const fsR = require('fs-reverse')
 const { Writable } = require('stream');
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
-const bitmexdata = require('./bitmexdata')
+const bitmexdata = require('./exchange/bitmexdata')
+const coinbasedata = require('./exchange/coinbasedata')
 
 const winston = require('winston')
 const path = require('path')
@@ -33,7 +34,7 @@ else {
 const storage = require('./storage')
 global.storage = storage
 
-const bitmex = require('./bitmex')
+const bitmex = require('./exchange/bitmex')
 const strategy = require('./strategy/' + shoes.strategy + '_strategy')
 // const server = require('./server')
 const candlestick = require('./candlestick')
@@ -432,11 +433,14 @@ function createInterval(candleDelay) {
 async function updateData() {
   console.time('updateData')
   var start = 20200701
-  var end = 20201106
+  var end = 20201107
+  // console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,1440)
+  console.log('updateData coinbase')
+  // await coinbasedata.generateCandleDayFiles(start,end,60)
   console.timeEnd('updateData')
   debugger
 }

@@ -1,15 +1,15 @@
-const BitMEXAPIKeyAuthorization = require('./lib/BitMEXAPIKeyAuthorization')
+const BitMEXAPIKeyAuthorization = require('../lib/BitMEXAPIKeyAuthorization')
 const SwaggerClient = require("swagger-client")
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 const winston = require('winston')
-const shoes = require('./shoes')
+const shoes = require('../shoes')
 const {symbol,account,setup} = shoes
 const oneCandleMs = setup.candle.interval*60000
 const oneCandleEndMs = oneCandleMs-1
 const oneDayMS = 24*60*60000
 
 var mock
-if (shoes.setup.startTime) mock = require('./mock.js')
+if (shoes.setup.startTime) mock = require('../mock.js')
 
 var client, checkPositionCallback, checkPositionParams = {}
 var marketCache, marketWithCurrentCandleCache
