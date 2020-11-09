@@ -229,10 +229,14 @@ async function getOrder(setup,signal) {
   return order
 }
 
-async function getSignal(setup,{positionSize,fundingTimestamp,fundingRate,marginBalance}) { try {    var market = await bitmex.getCurrentMarket()
-  var market = await bitmex.getCurrentMarket()
+async function getSignal(setup,params) {
+  return await getExchangeSignal(setup,params,bitmex)
+} 
+
+async function getExchangeSignal(setup, {positionSize,fundingTimestamp,fundingRate,marginBalance}, exchange) { try {
+  var market = await exchange.getCurrentMarket()
+  var currentCandle = await exchange.getCurrentCandle()
   var timestamp = new Date(getTimeNow()).toISOString()
-  var currentCandle = await bitmex.getCurrentCandle()
   var signal = await getAccumulationSignal(market,setup)
   signal.timestamp = timestamp
 
@@ -400,7 +404,7 @@ async function checkExit(params) { try {
     return response
   }
   /*
-  // move stop loss. works in the side way market.
+  // move stop loss. it reduced draw down in the side way market. see Test 4
   else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
     // Use loss distance as next step
     let closeOrder = bitmex.findOrders(/New/,[{
