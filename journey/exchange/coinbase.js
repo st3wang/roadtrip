@@ -1,4 +1,4 @@
-
+const coinbasedata = require('./coinbasedata')
 const winston = require('winston')
 const shoes = require('../shoes')
 const {symbol,account,setup} = shoes
@@ -14,11 +14,19 @@ var currentCandle
 const {getTimeNow, isoTimestamp, colorizer} = global
 
 async function getCurrentMarket() { try {
+  const now = getTimeNow()
+  const length = setup.candle.length
+  const startTime = new Date(now-length*oneCandleMs).toISOString().substr(0,14)+'00:00.000Z'
+  const endTime = new Date(now-oneCandleMs).toISOString().substr(0,14)+'00:00.000Z'
+  var marketCache
+  if (mock) {
+    marketCache = await coinbasedata.readMarket('BTC-USD',60,startTime,endTime)
+  }
+  else {
+    marketCache = await coinbasedata.getMarket('BTC-USD',60,startTime,endTime)
+  }
+  return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
-
-async function getCurrentCandle() {
-  return currentCandle
-}
 
 async function init(sp,checkPositionCb) { try {
 
@@ -27,5 +35,4 @@ async function init(sp,checkPositionCb) { try {
 module.exports = {
   init: init,
   getCurrentMarket: getCurrentMarket,
-  getCurrentCandle : getCurrentCandle
 }

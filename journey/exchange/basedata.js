@@ -25,6 +25,15 @@ function getFeedFile(exchange,symbol,interval,ymd) {
   return feedFilePath.replace('exchange',exchange).replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
 }
 
+async function readCandleDay(exchange,interval,time,symbol) {
+  var readPath = getCandleFile(exchange,symbol,interval,ymdHelper.YYYYMMDD(time))
+  if (fs.existsSync(readPath)) {
+    var str = fs.readFileSync(readPath,readFileOptions)
+    var dayMarket = JSON.parse(str)
+    return dayMarket
+  }
+}
+
 async function readFeedDay(exchange,symbol,interval,time) { try {
   var readPath = getFeedFile(exchange,symbol,interval,ymdHelper.YYYYMMDD(time))
   if (fs.existsSync(readPath)) {
@@ -36,6 +45,39 @@ async function readFeedDay(exchange,symbol,interval,time) { try {
     return []
   }
 } catch(e) {console.error(e.stack||e);debugger} }
+
+async function readMarket(exchange,symbol,interval,st,et) { try {
+  oneCandleMs = interval * 60000
+  var startTime = new Date(st).getTime()
+  var endTime = new Date(et).getTime()
+  var startDayTime = startTime - (startTime % oneDayMs) 
+  var marketBuffer = {
+    opens: [],
+    highs: [],
+    lows: [],
+    closes: [],
+    candles: []
+  }
+  for (; startDayTime < endTime; startDayTime += oneDayMs) {
+    endDayTime = startDayTime + oneDayMs - 1
+    let {opens,highs,lows,closes,candles} = await readCandleDay(exchange,interval,startDayTime,symbol)
+    marketBuffer.opens.push(...opens)
+    marketBuffer.highs.push(...highs)
+    marketBuffer.lows.push(...lows)
+    marketBuffer.closes.push(...closes)
+    marketBuffer.candles.push(...candles)
+  }
+  var startIndex = startTime % (oneDayMs) / oneCandleMs
+  var endIndex = startIndex + (endTime - startTime) / oneCandleMs
+  var market = {
+    opens: marketBuffer.opens.slice(startIndex,endIndex),
+    highs: marketBuffer.highs.slice(startIndex,endIndex),
+    lows: marketBuffer.lows.slice(startIndex,endIndex),
+    closes: marketBuffer.closes.slice(startIndex,endIndex),
+    candles: marketBuffer.candles.slice(startIndex,endIndex),
+  }
+  return market
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 function getFeedDay({candles},interval,lastPrice) { try {
   var feeds = [], len = candles.length, 
@@ -60,5 +102,7 @@ module.exports = {
   getCandleFile: getCandleFile,
   getFeedFile: getFeedFile,
   getFeedDay: getFeedDay,
-  readFeedDay: readFeedDay
+  readCandleDay: readCandleDay,
+  readFeedDay: readFeedDay,
+  readMarket: readMarket
 }

@@ -432,15 +432,15 @@ function createInterval(candleDelay) {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20200701
-  var end = 20201107
+  var start = 20200721
+  var end = 20201108
   // console.log('updateData bitmex')
-  await bitmexdata.downloadTradeData(start,end)
+  // await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
-  await bitmexdata.generateCandleDayFiles(start,end,60)
-  await bitmexdata.generateCandleDayFiles(start,end,1440)
+  // await bitmexdata.generateCandleDayFiles(start,end,60)
+  // await bitmexdata.generateCandleDayFiles(start,end,1440)
   console.log('updateData coinbase')
-  // await coinbasedata.generateCandleDayFiles(start,end,60)
+  await coinbasedata.generateCandleDayFiles(start,end,60)
   console.timeEnd('updateData')
   debugger
 }

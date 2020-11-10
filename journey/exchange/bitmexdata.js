@@ -259,7 +259,7 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
         console.log('skip candle',writeCandlePath)
       }
       else {
-        candles = await getCandleDay(exchange,symbol,interval,ymd)
+        candles = await getCandleDay(symbol,interval,ymd)
         let candlesString = JSON.stringify(candles)
         await writeFile(writeCandlePath,candlesString,writeFileOptions)
         console.log('done writing candle', writeCandlePath)
@@ -293,7 +293,7 @@ async function testCandleDayFiles(startYmd,endYmd,interval) { try {
   eqDown = 0,
   total = 0
   while (ymd <= endYmd) {
-    let {lows,highs,closes} = await getTradeBucketed(interval,ymdHelper.getTime(ymd),symbol)
+    let {lows,highs,closes} = await readCandleDay(interval,ymdHelper.getTime(ymd),symbol)
     allLows = allLows.concat(lows)
     allHighs = allHighs.concat(highs)
     allCloses = allCloses.concat(closes)
@@ -324,13 +324,12 @@ async function testCandleDayFiles(startYmd,endYmd,interval) { try {
   debugger
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function getTradeBucketed(interval,time,symbol) {
-  var readPath = base.getCandleFile(exchange,symbol,interval,ymdHelper.YYYYMMDD(time))
-  if (fs.existsSync(readPath)) {
-    var str = fs.readFileSync(readPath,readFileOptions)
-    var dayMarket = JSON.parse(str)
-    return dayMarket
-  }
+async function readMarket(symbol,interval,st,et) { try {
+  return await base.readMarket(exchange,symbol,interval,st,et)
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function readCandleDay(interval,time,symbol) {
+  return await base.readCandleDay(exchange,interval,time,symbol)
 }
 
 async function readTradeDay(time,symbol) {
@@ -400,7 +399,7 @@ async function generateRsiFiles(symbol,startYmd,endYmd,interval,length) { try {
   var et = ymdHelper.getTime(endYmd)
   var closes = []
   for (var time = st; time <= et; time += oneDayMs) {
-    var dayMarket = await getTradeBucketed(interval,time,symbol)
+    var dayMarket = await readCandleDay(interval,time,symbol)
     closes.push(...dayMarket.closes)
   }
   var rsis = await strategy.getRsi(closes,length)
@@ -428,7 +427,8 @@ module.exports = {
   generateCandleDayFiles: generateCandleDayFiles,
   testCandleDayFiles: testCandleDayFiles,
   generateRsiFiles: generateRsiFiles,
-  getTradeBucketed: getTradeBucketed,
+  readCandleDay: readCandleDay,
   readTradeDay: readTradeDay,
-  readFeedDay: readFeedDay
+  readFeedDay: readFeedDay,
+  readMarket: readMarket
 }

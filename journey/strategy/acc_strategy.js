@@ -233,26 +233,23 @@ async function getOrder(setup,signal) {
 async function getSignal(setup,params) {
   const bitmexSignal = await getExchangeSignal(setup,params,bitmex)
   return bitmexSignal
-  /*
   if ((bitmexSignal.type == 'SHORT' || bitmexSignal.type == 'LONG') && bitmexSignal.entryPrice && bitmexSignal.orderQtyUSD) {
     return bitmexSignal
   }
   else {
     const coinbaseSignal = await getExchangeSignal(setup,params,coinbase)
     if ((coinbaseSignal.type == 'SHORT' || coinbaseSignal.type == 'LONG') && coinbaseSignal.entryPrice && coinbaseSignal.orderQtyUSD) {
-      debugger
       return coinbaseSignal
     }
     else {
       return bitmexSignal
     }
   }
-  */
 } 
 
 async function getExchangeSignal(setup, {positionSize,fundingTimestamp,fundingRate,marginBalance}, exchange) { try {
   var market = await exchange.getCurrentMarket()
-  var currentCandle = await exchange.getCurrentCandle()
+  var currentCandle = await bitmex.getCurrentCandle()
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal = await getAccumulationSignal(market,setup)
   signal.timestamp = timestamp
@@ -352,6 +349,8 @@ async function orderEntry(entrySignal) { try {
 function isBear() {
   return false
   const now = getTimeNow()
+  if (now >= 1483660800000 && now < 1484697600000) return true
+
   if (now >= 1515283200000 && now < 1517875200000) return true
   if (now >= 1519257600000 && now < 1523577600000) return true
   if (now >= 1524700800000 && now < 1530316800000) return true

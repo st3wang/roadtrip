@@ -81,37 +81,8 @@ function authorize() {
 
 }
 
-async function getTradeBucketed({symbol,interval,startTime:st,endTime:et}) { try {
-  oneCandleMs = interval * 60000
-  var startTime = new Date(st).getTime()
-  var endTime = new Date(et).getTime()
-  var startDayTime = startTime - (startTime % oneDayMs) 
-  var marketBuffer = {
-    opens: [],
-    highs: [],
-    lows: [],
-    closes: [],
-    candles: []
-  }
-  for (; startDayTime < endTime; startDayTime += oneDayMs) {
-    endDayTime = startDayTime + oneDayMs - 1
-    let {opens,highs,lows,closes,candles} = await bitmexdata.getTradeBucketed(interval,startDayTime,symbol)
-    marketBuffer.opens.push(...opens)
-    marketBuffer.highs.push(...highs)
-    marketBuffer.lows.push(...lows)
-    marketBuffer.closes.push(...closes)
-    marketBuffer.candles.push(...candles)
-  }
-  var startIndex = startTime % (oneDayMs) / oneCandleMs
-  var endIndex = startIndex + (endTime - startTime) / oneCandleMs
-  var market = {
-    opens: marketBuffer.opens.slice(startIndex,endIndex),
-    highs: marketBuffer.highs.slice(startIndex,endIndex),
-    lows: marketBuffer.lows.slice(startIndex,endIndex),
-    closes: marketBuffer.closes.slice(startIndex,endIndex),
-    candles: marketBuffer.candles.slice(startIndex,endIndex),
-  }
-  return market
+async function getTradeBucketed({symbol,interval,startTime,endTime}) { try {
+  return await bitmexdata.readMarket(symbol,interval,startTime,endTime)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getCurrentTradeBucketed(interval) { try {

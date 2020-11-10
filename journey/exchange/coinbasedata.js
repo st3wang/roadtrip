@@ -24,16 +24,18 @@ async function readFeedDay(symbol,interval,time) {
   return await base.readFeedDay(exchange,symbol,interval,time)
 }
 
-async function getCandleDay(symbol,interval,ymd) { try {
-  console.log('getCandleDay',symbol,interval,ymd)
+async function readMarket(symbol,interval,st,et) { try {
+  return await base.readMarket(exchange,symbol,interval,st,et)
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function getMarket(symbol,interval,start,end) {
   return new Promise((resolve,reject) => {
-    const yyyy_mm_dd = ymdHelper.YYYY_MM_DD(ymd)
     const options = {
       hostname: 'api.pro.coinbase.com',
       path: '/products/' + symbol + 
         '/candles?granularity=' + (interval*60) + 
-        '&start=' + yyyy_mm_dd + 'T00:00:00.000Z' + 
-        '&end=' + yyyy_mm_dd + 'T23:00:00Z',
+        '&start=' + start +
+        '&end=' + end,
       headers: {
         'User-Agent': 'Mozilla/5.0',
       }
@@ -64,6 +66,12 @@ async function getCandleDay(symbol,interval,ymd) { try {
       }
     )
   })
+}
+
+async function getCandleDay(symbol,interval,ymd) { try {
+  console.log('getCandleDay',symbol,interval,ymd)
+  const yyyy_mm_dd = ymdHelper.YYYY_MM_DD(ymd)
+  return await getMarket(symbol,interval,yyyy_mm_dd+'T00:00:00.000Z',yyyy_mm_dd+'T23:00:00Z')
 } catch(e) {console.error(e.stack||e);debugger} }
 /*
 0 time bucket start time
@@ -111,5 +119,7 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
 
 module.exports = {
   generateCandleDayFiles: generateCandleDayFiles,
-  readFeedDay: readFeedDay
+  readFeedDay: readFeedDay,
+  readMarket: readMarket,
+  getMarket: getMarket
 }

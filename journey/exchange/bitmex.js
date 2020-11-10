@@ -535,7 +535,7 @@ async function getCurrentMarket() { try {
   else {
     let now = getTimeNow()
     let length = setup.candle.length
-    let startTime = new Date(now-length*setup.candle.interval*60000).toISOString()
+    let startTime = new Date(now-length*oneCandleMs).toISOString()
     let endTime = new Date(now).toISOString()
     marketCache = await getTradeBucketed({
       symbol: symbol,
