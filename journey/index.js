@@ -6,6 +6,7 @@ const writeFileOptions = {encoding:'utf-8', flag:'w'}
 const bitmexdata = require('./exchange/bitmexdata')
 const coinbasedata = require('./exchange/coinbasedata')
 const bitstampdata = require('./exchange/bitstampdata')
+const binancedata = require('./exchange/binancedata')
 
 const winston = require('winston')
 const path = require('path')
@@ -431,23 +432,6 @@ function createInterval(candleDelay) {
   },startsIn)
 }
 
-async function updateData() {
-  console.time('updateData')
-  var start = 20200101
-  var end = 20201109
-  // console.log('updateData bitmex')
-  await bitmexdata.downloadTradeData(start,end)
-  // await bitmexdata.testCandleDayFiles(start,end,60)
-  await bitmexdata.generateCandleDayFiles(start,end,60)
-  // await bitmexdata.generateCandleDayFiles(start,end,1440)
-  console.log('updateData coinbase')
-  await coinbasedata.generateCandleDayFiles(start,end,60)
-  console.log('updateData bitstamp')
-  await bitstampdata.generateCandleDayFiles(start,end,60)
-  console.timeEnd('updateData')
-  debugger
-}
-
 async function readLog() {
   return new Promise((resolve,reject) => {
     var lineReader = require('readline').createInterface({
@@ -473,6 +457,25 @@ async function readLog() {
       }
     })
   })
+}
+
+async function updateData() {
+  console.time('updateData')
+  var start = 20170101
+  var end = 20201109
+  // console.log('updateData bitmex')
+  // await bitmexdata.downloadTradeData(start,end)
+  // await bitmexdata.testCandleDayFiles(start,end,60)
+  // await bitmexdata.generateCandleDayFiles(start,end,60)
+  // await bitmexdata.generateCandleDayFiles(start,end,1440)
+  // console.log('updateData coinbase')
+  // await coinbasedata.generateCandleDayFiles(start,end,60)
+  // console.log('updateData bitstamp')
+  // await bitstampdata.generateCandleDayFiles(start,end,60)
+  console.log('updateData binance')
+  await binancedata.generateCandleDayFiles(start,end,60)
+  console.timeEnd('updateData')
+  debugger
 }
 
 async function init() { try {

@@ -5,6 +5,7 @@ const base = require('./base_strategy.js')
 const bitmex = require('../exchange/bitmex')
 const coinbase = require('../exchange/coinbase')
 const bitstamp = require('../exchange/bitstamp')
+const binance = require('../exchange/binance')
 
 const shoes = require('../shoes')
 const winston = require('winston')
@@ -238,27 +239,36 @@ async function getSignal(setup,params) {
   const bitmexSignal = await getExchangeSignal(bitmex,setup,params)
   // return bitmexSignal
   if (bitmexSignal.entryPrice) {
-    console.log('bitmexSignal')
+    // console.log('bitmexSignal')
     return bitmexSignal
   }
 
   const coinbaseSignal = await getExchangeSignal(coinbase,setup,params,bitmexSignal.stopLoss)
   if (coinbaseSignal.entryPrice) {
-    console.log('coinbaseSignal')
+    // console.log('coinbaseSignal')
     return coinbaseSignal
   }
 
   const bitstampSignal = await getExchangeSignal(bitstamp,setup,params,bitmexSignal.stopLoss)
   if (bitstampSignal.entryPrice) {
-    console.log('bitstampSignal')
+    // console.log('bitstampSignal')
     return bitstampSignal
   }
+
+  // const binanceSignal = await getExchangeSignal(binance,setup,params,bitmexSignal.stopLoss)
+  // if (binanceSignal.entryPrice) {
+  //   console.log('binanceSignal')
+  //   return binanceSignal
+  // }
 
   return bitmexSignal
 } 
 
 async function getExchangeSignal(exchange, setup, {positionSize,fundingTimestamp,fundingRate,marginBalance}, overrideStopLoss) { try {
   var market = await exchange.getCurrentMarket()
+  if (!market || !market.candles || !market.candles.length) {
+    return {}
+  }
   var currentCandle = await bitmex.getCurrentCandle()
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal = await getAccumulationSignal(market,setup)
