@@ -49,7 +49,7 @@ async function readFeedDay(exchange,symbol,interval,time) { try {
 async function readMarket(exchange,symbol,interval,st,et) { try {
   oneCandleMs = interval * 60000
   var startTime = new Date(st).getTime()
-  var endTime = new Date(et).getTime()
+  var endTime = new Date(et).getTime() + oneCandleMs
   var startDayTime = startTime - (startTime % oneDayMs) 
   var marketBuffer = {
     opens: [],

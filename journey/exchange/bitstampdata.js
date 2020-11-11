@@ -11,8 +11,8 @@ const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFile = util.promisify(fs.writeFile)
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
-const exchange = 'coinbase'
-const symbols = ['BTC-USD']
+const exchange = 'bitstamp'
+const symbols = ['btcusd']
 
 async function readFeedDay(symbol,interval,time) {
   return await base.readFeedDay(exchange,symbol,interval,time)
@@ -24,18 +24,18 @@ async function readMarket(symbol,interval,st,et) { try {
 
 async function getMarket(symbol,interval,start,end) {
   return new Promise((resolve,reject) => {
+    const step = interval * 60
+    const startTime = new Date(start).getTime()/1000
+    const endTime = new Date(end).getTime()/1000
+    const limit = ((endTime - startTime) / step) + 1
     const options = {
-      hostname: 'api.pro.coinbase.com',
-      path: '/products/' + symbol + 
-        '/candles?granularity=' + (interval*60) + 
-        '&start=' + start +
-        '&end=' + end,
-      headers: {
-        'User-Agent': 'Mozilla/5.0',
-      }
+      hostname: 'www.bitstamp.net',
+      path: '/api/v2/ohlc/' + symbol + 
+        '/?step=' + step + 
+        '&limit=' + limit +
+        '&start=' + startTime
     }
 
-    process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
     https.get(options, function(response) {
         let data = ''
         response.on('data', (chunk) => {data += chunk})
@@ -43,16 +43,22 @@ async function getMarket(symbol,interval,start,end) {
           let candles = {
             opens: [], highs: [], lows: [], closes: [], candles: []
           }
-          let value = JSON.parse(data).reverse()
+          let value = JSON.parse(data).data.ohlc
           value.forEach(v => {
-            candles.opens.push(v[3])
-            candles.highs.push(v[2])
-            candles.lows.push(v[1])
-            candles.closes.push(v[4])
+            v.open = parseFloat(v.open)
+            v.high = parseFloat(v.high)
+            v.low = parseFloat(v.low)
+            v.close = parseFloat(v.close)
+            v.volume = parseFloat(v.volume)
+            v.timestamp = parseFloat(v.timestamp)
+            candles.opens.push(v.open)
+            candles.highs.push(v.high)
+            candles.lows.push(v.low)
+            candles.closes.push(v.close)
             candles.candles.push({
-              time: new Date(v[0]*1000).toISOString(),
-              volume: v[5],
-              open: v[3], high: v[2], low: v[1], close: v[4]
+              time: new Date(v.timestamp*1000).toISOString(),
+              volume: v.volume,
+              open: v.open, high: v.high, low: v.low, close: v.close
             })
           })
           resolve(candles)
@@ -85,7 +91,7 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
         let candlesString = JSON.stringify(candles)
         await writeFile(writeCandlePath,candlesString,writeFileOptions)
         console.log('done writing candle', writeCandlePath)
-        await new Promise(resolve => setTimeout(resolve, 1000))
+        await new Promise(resolve => setTimeout(resolve, 200))
       }
       let writeFeedPath = base.getFeedFile(exchange,symbol,interval,ymd)
       if (fs.existsSync(writeFeedPath)) {

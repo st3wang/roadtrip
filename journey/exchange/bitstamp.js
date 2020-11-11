@@ -1,4 +1,4 @@
-const coinbasedata = require('./coinbasedata')
+const bitstampdata = require('./bitstampdata')
 const winston = require('winston')
 const shoes = require('../shoes')
 const {symbol,account,setup} = shoes
@@ -16,10 +16,10 @@ async function getCurrentMarket() { try {
   const endTime = new Date(now-oneCandleMs).toISOString().substr(0,14)+'00:00.000Z'
   var marketCache
   if (mock) {
-    marketCache = await coinbasedata.readMarket('BTC-USD',60,startTime,endTime)
+    marketCache = await bitstampdata.readMarket('btcusd',60,startTime,endTime)
   }
   else {
-    marketCache = await coinbasedata.getMarket('BTC-USD',60,startTime,endTime)
+    marketCache = await bitstampdata.getMarket('btcusd',60,startTime,endTime)
   }
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }

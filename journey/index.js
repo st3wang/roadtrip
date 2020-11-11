@@ -5,6 +5,7 @@ const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 const bitmexdata = require('./exchange/bitmexdata')
 const coinbasedata = require('./exchange/coinbasedata')
+const bitstampdata = require('./exchange/bitstampdata')
 
 const winston = require('winston')
 const path = require('path')
@@ -432,15 +433,17 @@ function createInterval(candleDelay) {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20200721
-  var end = 20201108
+  var start = 20200101
+  var end = 20201109
   // console.log('updateData bitmex')
-  // await bitmexdata.downloadTradeData(start,end)
+  await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
-  // await bitmexdata.generateCandleDayFiles(start,end,60)
+  await bitmexdata.generateCandleDayFiles(start,end,60)
   // await bitmexdata.generateCandleDayFiles(start,end,1440)
   console.log('updateData coinbase')
   await coinbasedata.generateCandleDayFiles(start,end,60)
+  console.log('updateData bitstamp')
+  await bitstampdata.generateCandleDayFiles(start,end,60)
   console.timeEnd('updateData')
   debugger
 }

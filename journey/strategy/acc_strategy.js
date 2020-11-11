@@ -1,8 +1,11 @@
 const path = require('path')
 
 const base = require('./base_strategy.js')
+
 const bitmex = require('../exchange/bitmex')
 const coinbase = require('../exchange/coinbase')
+const bitstamp = require('../exchange/bitstamp')
+
 const shoes = require('../shoes')
 const winston = require('winston')
 const storage = require('../storage')
@@ -100,11 +103,12 @@ async function getAccumulationSignal(market,{rsi}) { try {
   var [isWPrice,wbottom1,wtop1,wbottom2] = candlestick.findW(avgBodies,last,bodyHighs,open,close)
   // var [isMPrice,mtop1,mbottom1,mtop2] = candlestick.findM(avgBodies,last,bodyLows,open,close)
 
+  // signal.stopLoss = market.lows[wbottom2]
+  signal.stopLoss = Math.min(...market.lows)
+  // signal.stopLoss = Math.min(...(market.lows.slice(6,market.lows.length-1)))
+
   if (isWPrice == 3 && isWRsi == 3) {
     signal.condition = 'LONG'
-    // signal.stopLoss = market.lows[wbottom2]
-    signal.stopLoss = Math.min(...market.lows)
-    // signal.stopLoss = Math.min(...(market.lows.slice(6,market.lows.length-1)))
   }
   // if (isMPrice == 3 && isMRsi == 3) {
   //   signal.condition = 'SHORT'
@@ -231,38 +235,42 @@ async function getOrder(setup,signal) {
 }
 
 async function getSignal(setup,params) {
-  const bitmexSignal = await getExchangeSignal(setup,params,bitmex)
-  return bitmexSignal
-  if ((bitmexSignal.type == 'SHORT' || bitmexSignal.type == 'LONG') && bitmexSignal.entryPrice && bitmexSignal.orderQtyUSD) {
+  const bitmexSignal = await getExchangeSignal(bitmex,setup,params)
+  // return bitmexSignal
+  if (bitmexSignal.entryPrice) {
+    console.log('bitmexSignal')
     return bitmexSignal
   }
-  else {
-    const coinbaseSignal = await getExchangeSignal(setup,params,coinbase)
-    if ((coinbaseSignal.type == 'SHORT' || coinbaseSignal.type == 'LONG') && coinbaseSignal.entryPrice && coinbaseSignal.orderQtyUSD) {
-      return coinbaseSignal
-    }
-    else {
-      return bitmexSignal
-    }
+
+  const coinbaseSignal = await getExchangeSignal(coinbase,setup,params,bitmexSignal.stopLoss)
+  if (coinbaseSignal.entryPrice) {
+    console.log('coinbaseSignal')
+    return coinbaseSignal
   }
+
+  const bitstampSignal = await getExchangeSignal(bitstamp,setup,params,bitmexSignal.stopLoss)
+  if (bitstampSignal.entryPrice) {
+    console.log('bitstampSignal')
+    return bitstampSignal
+  }
+
+  return bitmexSignal
 } 
 
-async function getExchangeSignal(setup, {positionSize,fundingTimestamp,fundingRate,marginBalance}, exchange) { try {
+async function getExchangeSignal(exchange, setup, {positionSize,fundingTimestamp,fundingRate,marginBalance}, overrideStopLoss) { try {
   var market = await exchange.getCurrentMarket()
   var currentCandle = await bitmex.getCurrentCandle()
   var timestamp = new Date(getTimeNow()).toISOString()
   var signal = await getAccumulationSignal(market,setup)
   signal.timestamp = timestamp
+  if (overrideStopLoss) {
+    signal.stopLoss = overrideStopLoss
+  }
 
   var quote = bitmex.getQuote()
   var close = market.closes[market.closes.length - 1]
 
-  // signal.condition = 'TEST'
   switch(signal.condition) {
-    case 'TEST':
-      signal.condition = 'LONG'
-      signal.entryPrice = close + 200
-      break
     case '-':
       return signal
     case 'LONG':
