@@ -236,6 +236,7 @@ async function getOrder(setup,signal) {
 }
 
 async function getSignal(setup,params) {
+  console.log('===== getSignal =====', new Date(getTimeNow()).toISOString())
   console.log('bitmexSignal')
   const bitmexSignal = await getExchangeSignal(bitmex,setup,params)
   // return bitmexSignal

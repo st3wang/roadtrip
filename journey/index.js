@@ -504,8 +504,7 @@ async function init() { try {
     next()
     createInterval(6000*2**0) // 6s after candle close
     createInterval(6000*2**1) // 12s
-    createInterval(6000*2**2) // 24s
-    createInterval(6000*2**3) // 48s
+    createInterval(6000*2**3) // 48s for bitstamp
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 

@@ -551,13 +551,13 @@ async function getCurrentMarket() { try {
       endTime: endTime
     })
     lastCandle = marketCache.candles[marketCache.candles.length-1]
-    console.log('now',new Date(now).toISOString())
-    console.log('startTime',startTime)
-    console.log('endTime',endTime)
+    // console.log('now',new Date(now).toISOString())
+    // console.log('startTime',startTime)
+    // console.log('endTime',endTime)
   }
-  console.log(marketCache.candles.length)
-  console.log(marketCache.candles[0].time)
-  console.log(marketCache.candles[marketCache.candles.length-1].time)
+  // console.log(marketCache.candles.length)
+  // console.log(marketCache.candles[0].time)
+  // console.log(marketCache.candles[marketCache.candles.length-1].time)
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
