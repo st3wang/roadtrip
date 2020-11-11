@@ -236,6 +236,7 @@ async function getOrder(setup,signal) {
 }
 
 async function getSignal(setup,params) {
+  console.log('bitmexSignal')
   const bitmexSignal = await getExchangeSignal(bitmex,setup,params)
   // return bitmexSignal
   if (bitmexSignal.entryPrice) {
@@ -243,23 +244,26 @@ async function getSignal(setup,params) {
     return bitmexSignal
   }
 
+  console.log('coinbaseSignal')
   const coinbaseSignal = await getExchangeSignal(coinbase,setup,params,bitmexSignal.stopLoss)
   if (coinbaseSignal.entryPrice) {
     // console.log('coinbaseSignal')
     return coinbaseSignal
   }
 
+  console.log('bitstampSignal')
   const bitstampSignal = await getExchangeSignal(bitstamp,setup,params,bitmexSignal.stopLoss)
   if (bitstampSignal.entryPrice) {
     // console.log('bitstampSignal')
     return bitstampSignal
   }
 
-  // const binanceSignal = await getExchangeSignal(binance,setup,params,bitmexSignal.stopLoss)
-  // if (binanceSignal.entryPrice) {
-  //   console.log('binanceSignal')
-  //   return binanceSignal
-  // }
+  console.log('binanceSignal')
+  const binanceSignal = await getExchangeSignal(binance,setup,params,bitmexSignal.stopLoss)
+  if (binanceSignal.entryPrice) {
+    console.log('binanceSignal')
+    return binanceSignal
+  }
 
   return bitmexSignal
 } 
@@ -267,7 +271,11 @@ async function getSignal(setup,params) {
 async function getExchangeSignal(exchange, setup, {positionSize,fundingTimestamp,fundingRate,marginBalance}, overrideStopLoss) { try {
   var market = await exchange.getCurrentMarket()
   if (!market || !market.candles || !market.candles.length) {
+    console.log('no market', market)
     return {}
+  }
+  else {
+    console.log('got market', market.candles.length)
   }
   var currentCandle = await bitmex.getCurrentCandle()
   var timestamp = new Date(getTimeNow()).toISOString()

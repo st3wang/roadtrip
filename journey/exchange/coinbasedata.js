@@ -35,7 +35,6 @@ async function getMarket(symbol,interval,start,end) {
       }
     }
 
-    process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
     https.get(options, function(response) {
         let data = ''
         response.on('data', (chunk) => {data += chunk})

@@ -13,6 +13,7 @@ const path = require('path')
 
 const shoes = require('./shoes')
 global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
+process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 
 const colorizer = winston.format.colorize()
 global.colorizer = colorizer
@@ -509,6 +510,7 @@ async function init() { try {
 init()
 
 /* TODO
+fix bitmex got market.candle.length 35 with live data
 get coinbase data
   https://api.pro.coinbase.com/products/BTC-USD/candles?granularity=3600&start=2015-07-21T00:00:00Z&end=2015-07-21T23:00:00Z
   analyze
