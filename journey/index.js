@@ -469,10 +469,10 @@ async function updateData() {
   // await bitmexdata.testCandleDayFiles(start,end,60)
   // await bitmexdata.generateCandleDayFiles(start,end,60)
   // await bitmexdata.generateCandleDayFiles(start,end,1440)
-  // console.log('updateData coinbase')
-  // await coinbasedata.generateCandleDayFiles(start,end,60)
-  // console.log('updateData bitstamp')
-  // await bitstampdata.generateCandleDayFiles(start,end,60)
+  console.log('updateData coinbase')
+  await coinbasedata.generateCandleDayFiles(start,end,60)
+  console.log('updateData bitstamp')
+  await bitstampdata.generateCandleDayFiles(start,end,60)
   console.log('updateData binance')
   await binancedata.generateCandleDayFiles(start,end,60)
   console.timeEnd('updateData')
@@ -504,6 +504,8 @@ async function init() { try {
     next()
     createInterval(6000*2**0) // 6s after candle close
     createInterval(6000*2**1) // 12s
+    createInterval(6000*2**2) // 24s
+    createInterval(6000*2**3) // 48s
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
