@@ -14,8 +14,16 @@ if (shoes.setup.startTime) mock = require('../mock.js')
 var client, checkPositionCallback, checkPositionParams = {}
 var marketCache, marketWithCurrentCandleCache
 var binSize = 1
-if (setup.candle.interval >= 5) {
+var binSizeString = '1m'
+var bitMexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
+if (setup.candle.interval >= 60) {
+  binSize = 60
+  binSizeString = '1h'
+  bitMexOffset = 0
+}
+else if (setup.candle.interval >= 5) {
   binSize = 5
+  binSizeString = '5m'
 }
 
 var ws
@@ -413,7 +421,6 @@ function getPageTimes({interval,startTime,endTime}) {
   var endTimeMs = new Date(endTime).getTime()
   var length = (endTimeMs - startTimeMs) / (interval*60000)
   var offset = (length * interval * 60000) + (endTimeMs % (interval * 60000))
-  var bitMexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
   offset -= bitMexOffset
   var totalMinutes = interval*length
   var maxPageSize = binSize*100
@@ -421,17 +428,17 @@ function getPageTimes({interval,startTime,endTime}) {
   var pages = []
   if (offset > pageIncrement) {
     var end = pageIncrement - bitMexOffset
-    for (; offset > end; offset-=pageIncrement) {
+    for (; offset >= end; offset-=pageIncrement) {
       pages.push({
         startTime: new Date(endTimeMs - offset).toISOString(),
-        endTime: new Date(endTimeMs - (offset-pageIncrement+1)).toISOString()
+        endTime: new Date(endTimeMs - (offset-pageIncrement)).toISOString()
       })
     }
   }
   else {
     pages.push({
       startTime: new Date(endTimeMs - offset).toISOString(),
-      endTime: new Date(endTimeMs - (offset-(length*interval*60000)+1)).toISOString()
+      endTime: new Date(endTimeMs - (offset-(length*interval*60000))).toISOString()
     })
   }
   return pages
@@ -439,7 +446,7 @@ function getPageTimes({interval,startTime,endTime}) {
 
 function toCandle(group) {
   var open = group[0].open
-  let timeMs = new Date(group[0].timestamp).getTime()-(binSize*60000)
+  let timeMs = new Date(group[0].timestamp).getTime()
   let candle = {
     time: new Date(timeMs).toISOString(),
     startTimeMs: timeMs,
@@ -466,7 +473,7 @@ async function getCurrentTradeBucketed(interval) { try {
   let now = getTimeNow()
   let candleTimeOffset = now % (interval*60000)
   let startTime = new Date(now - candleTimeOffset + 60000).toISOString()
-  let response = await client.Trade.Trade_getBucketed({symbol:symbol, binSize:'1m', 
+  let response = await client.Trade.Trade_getBucketed({symbol:symbol, binSize:binSizeString, 
     startTime:startTime
   })
   var buckets = JSON.parse(response.data.toString());
@@ -491,7 +498,7 @@ async function getTradeBucketed(sp) { try {
   }
   let pages = getPageTimes(sp)
   getTradeBucketedRequesting = Promise.all(pages.map(async (page,i) => {
-    let response = await client.Trade.Trade_getBucketed({symbol: symbol, binSize: binSize+'m', 
+    let response = await client.Trade.Trade_getBucketed({symbol: symbol, binSize: '1h', 
       startTime:page.startTime,endTime:page.endTime})
     page.buckets = JSON.parse(response.data.toString());
   }))
@@ -544,7 +551,13 @@ async function getCurrentMarket() { try {
       endTime: endTime
     })
     lastCandle = marketCache.candles[marketCache.candles.length-1]
+    console.log('now',new Date(now).toISOString())
+    console.log('startTime',startTime)
+    console.log('endTime',endTime)
   }
+  console.log(marketCache.candles.length)
+  console.log(marketCache.candles[0].time)
+  console.log(marketCache.candles[marketCache.candles.length-1].time)
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
