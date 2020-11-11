@@ -270,8 +270,8 @@ async function getSignal(setup,params) {
 
 async function getExchangeSignal(exchange, setup, {positionSize,fundingTimestamp,fundingRate,marginBalance}, overrideStopLoss) { try {
   var market = await exchange.getCurrentMarket()
-  if (!market || !market.candles || !market.candles.length) {
-    console.log('no market', market)
+  if (!market || !market.candles || market.candles.length != setup.candle.length) {
+    console.log('invalid market', (market && market.candles) ? market.candles.length : market)
     return {}
   }
   else {
