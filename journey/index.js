@@ -7,6 +7,7 @@ const bitmexdata = require('./exchange/bitmexdata')
 const coinbasedata = require('./exchange/coinbasedata')
 const bitstampdata = require('./exchange/bitstampdata')
 const binancedata = require('./exchange/binancedata')
+const bitfinexdata = require('./exchange/bitfinexdata')
 
 const winston = require('winston')
 const path = require('path')
@@ -462,7 +463,7 @@ async function readLog() {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20170101
+  var start = 20150101
   var end = 20201109
   // console.log('updateData bitmex')
   // await bitmexdata.downloadTradeData(start,end)
@@ -470,11 +471,13 @@ async function updateData() {
   // await bitmexdata.generateCandleDayFiles(start,end,60)
   // await bitmexdata.generateCandleDayFiles(start,end,1440)
   console.log('updateData coinbase')
-  await coinbasedata.generateCandleDayFiles(start,end,60)
-  console.log('updateData bitstamp')
-  await bitstampdata.generateCandleDayFiles(start,end,60)
-  console.log('updateData binance')
-  await binancedata.generateCandleDayFiles(start,end,60)
+  // await coinbasedata.generateCandleDayFiles(start,end,60)
+  // console.log('updateData bitstamp')
+  // await bitstampdata.generateCandleDayFiles(start,end,60)
+  // console.log('updateData binance')
+  // await binancedata.generateCandleDayFiles(start,end,60)
+  console.log('updateData bitfinex')
+  await bitfinexdata.generateCandleDayFiles(start,end,60)
   console.timeEnd('updateData')
   debugger
 }

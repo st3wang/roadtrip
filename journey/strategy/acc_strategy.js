@@ -6,6 +6,7 @@ const bitmex = require('../exchange/bitmex')
 const coinbase = require('../exchange/coinbase')
 const bitstamp = require('../exchange/bitstamp')
 const binance = require('../exchange/binance')
+const bitfinex = require('../exchange/bitfinex')
 
 const shoes = require('../shoes')
 const winston = require('winston')
@@ -241,29 +242,31 @@ async function getSignal(setup,params) {
   const bitmexSignal = await getExchangeSignal(bitmex,setup,params)
   // return bitmexSignal
   if (bitmexSignal.entryPrice) {
-    // console.log('bitmexSignal')
     return bitmexSignal
   }
 
   console.log('coinbaseSignal')
   const coinbaseSignal = await getExchangeSignal(coinbase,setup,params,bitmexSignal.stopLoss)
   if (coinbaseSignal.entryPrice) {
-    // console.log('coinbaseSignal')
     return coinbaseSignal
   }
 
   console.log('bitstampSignal')
   const bitstampSignal = await getExchangeSignal(bitstamp,setup,params,bitmexSignal.stopLoss)
   if (bitstampSignal.entryPrice) {
-    // console.log('bitstampSignal')
     return bitstampSignal
   }
 
   console.log('binanceSignal')
   const binanceSignal = await getExchangeSignal(binance,setup,params,bitmexSignal.stopLoss)
   if (binanceSignal.entryPrice) {
-    console.log('binanceSignal')
     return binanceSignal
+  }
+
+  console.log('bitfinexSignal')
+  const bitfinexSignal = await getExchangeSignal(bitfinex,setup,params,bitmexSignal.stopLoss)
+  if (bitfinexSignal.entryPrice) {
+    return bitfinexSignal
   }
 
   return bitmexSignal
