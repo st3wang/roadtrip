@@ -98,18 +98,18 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
         console.log('done writing candle', writeCandlePath)
         await new Promise(resolve => setTimeout(resolve, 200))
       }
-      // let writeFeedPath = base.getFeedFile(exchange,symbol,interval,ymd)
-      // if (fs.existsSync(writeFeedPath)) {
-      //   console.log('skip feed',writeFeedPath)
-      // }
-      // else {
-      //   candles = candles || JSON.parse(fs.readFileSync(writeCandlePath,readFileOptions))
-      //   feeds = base.getFeedDay(candles,interval,lastPrice)
-      //   let feedsString = JSON.stringify(feeds)
-      //   await writeFile(writeFeedPath,feedsString,writeFileOptions)
-      //   console.log('done writing feed', writeFeedPath)
-      //   lastPrice = feeds[feeds.length-1][3]
-      // }
+      let writeFeedPath = base.getFeedFile(exchange,symbol,interval,ymd)
+      if (fs.existsSync(writeFeedPath)) {
+        console.log('skip feed',writeFeedPath)
+      }
+      else {
+        candles = candles || JSON.parse(fs.readFileSync(writeCandlePath,readFileOptions))
+        feeds = base.getFeedDay(candles,interval,lastPrice)
+        let feedsString = JSON.stringify(feeds)
+        await writeFile(writeFeedPath,feedsString,writeFileOptions)
+        console.log('done writing feed', writeFeedPath)
+        lastPrice = feeds[feeds.length-1][3]
+      }
       ymd = ymdHelper.nextDay(ymd)
     }
   }

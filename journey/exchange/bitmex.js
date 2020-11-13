@@ -565,34 +565,6 @@ async function getCurrentMarket() { try {
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getCurrentMarketWithCurrentCandle() { try {
-  appendCandleLastPrice()
-  if (marketWithCurrentCandleCache) {
-    let lastIndex = marketWithCurrentCandleCache.candles.length - 1
-    marketWithCurrentCandleCache.candles[lastIndex] = currentCandle
-    marketWithCurrentCandleCache.opens[lastIndex] = currentCandle.open
-    marketWithCurrentCandleCache.highs[lastIndex] = currentCandle.high
-    marketWithCurrentCandleCache.lows[lastIndex] = currentCandle.low
-    marketWithCurrentCandleCache.closes[lastIndex] = currentCandle.close
-  }
-  else {
-    var market = await getCurrentMarket()
-    var candles = market.candles.slice(1)
-    var opens = market.opens.slice(1)
-    var highs = market.highs.slice(1)
-    var lows = market.lows.slice(1)
-    var closes = market.closes.slice(1)
-  
-    candles.push(currentCandle)
-    opens.push(currentCandle.open)
-    highs.push(currentCandle.high)
-    lows.push(currentCandle.low)
-    closes.push(currentCandle.close)
-    marketWithCurrentCandleCache = {candles: candles, opens: opens, highs: highs, lows: lows, closes: closes}
-  }
-  return marketWithCurrentCandleCache
-} catch(e) {logger.error(e.stack||e);debugger} }
-
 async function getWalletHistory() { try {
   return []
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
@@ -1135,7 +1107,6 @@ module.exports = {
   init: init,
   getMarket: getMarket,
   getCurrentMarket: getCurrentMarket,
-  getCurrentMarketWithCurrentCandle: getCurrentMarketWithCurrentCandle,
   getPosition: getPosition,
   getInstrument: getInstrument,
   getQuote: getQuote,
@@ -1147,9 +1118,6 @@ module.exports = {
   getNextFunding: getNextFunding,
   getRate: getRate,
 
-  // findNewLimitOrders: findNewLimitOrders,
-  // findNewOrFilledOrder: findNewOrFilledOrder,
-  // findNewOrFilledOrders: findNewOrFilledOrders,
   findOrders: findOrders,
   getCumQty: getCumQty,
   ordersTooSmall: ordersTooSmall,

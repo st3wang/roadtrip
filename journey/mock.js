@@ -1,5 +1,9 @@
 const bitmexdata = require('./exchange/bitmexdata')
 const coinbasedata = require('./exchange/coinbasedata')
+const bitstampdata = require('./exchange/bitstampdata')
+const binancedata = require('./exchange/binancedata')
+const bitfinexdata = require('./exchange/bitfinexdata')
+
 const basedata = require('./exchange/basedata')
 
 const uuid = require('uuid');
@@ -20,7 +24,7 @@ var setup, startTimeMs, endTimeMs, XBTUSDRate
 
 var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
 
-var margin, walletHistory, orders, historyOrders, position, bitmextrades, coinbasetrades, currentTradeIndex
+var margin, walletHistory, orders, historyOrders, position, bitmextrades, currentTradeIndex
 var rsis
 
 var getAccumulationSignalFn
@@ -218,7 +222,6 @@ async function readNextDayTrades() { try {
   }
   if (startTime > endTimeMs) {
     bitmextrades = undefined
-    coinbasetrades = undefined
     return
   }
   endTime = startTime - (startTime % oneDayMs) + oneDayMs - 1
@@ -226,7 +229,13 @@ async function readNextDayTrades() { try {
     endTime = endTimeMs
   }
   bitmextrades = await bitmexdata.readFeedDay(setup.symbol,setup.candle.interval,startTime)
-  coinbasetrades = await coinbasedata.readFeedDay(setup.symbol,setup.candle.interval,startTime)
+  // bitmextrades = await coinbasedata.readFeedDay('BTC-USD',setup.candle.interval,startTime)
+  // bitmextrades = await bitstampdata.readFeedDay('btcusd',setup.candle.interval,startTime)
+  // bitmextrades = await binancedata.readFeedDay('BTCUSDT',setup.candle.interval,startTime)
+  // bitmextrades = await bitfinexdata.readFeedDay('tBTCUSD',setup.candle.interval,startTime)
+  // if (bitmextrades.length == 0) {
+  //   bitmextrades = await bitstampdata.readFeedDay('btcusd',setup.candle.interval,startTime)
+  // }
   var filterStartTime = (startTime % oneDayMs) != 0
   var filterEndTime = (endTime % oneDayMs) != oneDayMs - 1
   if (filterStartTime && filterEndTime) {
@@ -409,7 +418,6 @@ async function getAccumulationSignal(exchange,setup,stopLoss) {
   signal = await basedata.readSignal(exchange.name,exchange.symbols[setup.symbol],setup.candle.interval,now)
   if (!signal) {
     signal = await getAccumulationSignalFn(exchange,setup,stopLoss)
-    await basedata.writeSignal(exchange.name,exchange.symbols[setup.symbol],setup.candle.interval,now,signal)
   }
   
   return signal

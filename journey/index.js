@@ -40,7 +40,6 @@ global.storage = storage
 
 const bitmex = require('./exchange/bitmex')
 const strategy = require('./strategy/' + shoes.strategy + '_strategy')
-// const server = require('./server')
 const candlestick = require('./candlestick')
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
@@ -221,14 +220,6 @@ async function next(logOnly) { try {
     if (!mock) logger.info('position',bitmex.checkPositionParams)
     if (!logOnly) checkPosition(bitmex.checkPositionParams)
   // }
-} catch(e) {logger.error(e.stack||e);debugger} }
-
-async function getMarketJson(sp) { try {
-  var market = await bitmex.getMarket(sp)
-  if (sp.candlestick) {
-    candlestick.fillPatterns(market)
-  }
-  return JSON.stringify(market)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 var gettingTradeJson = false
@@ -415,16 +406,6 @@ async function getTradeJson(sp,useCache) { try {
   return tradeJSON
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getFundingCsv() { try {
-  var csv = 'Date,Rate\n'
-  var fundings = await bitmex.getFundingHistory()
-  fundings.push(bitmex.getNextFunding())
-  fundings.forEach(funding => {
-    csv += funding.timestamp+','+funding.fundingRate+'\n'
-  })
-  return csv
-} catch(e) {logger.error(e.stack||e);debugger} }
-
 function createInterval(candleDelay) {
   var now = getTimeNow()
   var interval = oneCandleMS
@@ -500,7 +481,6 @@ async function init() { try {
 
   await storage.init()
   await strategy.init()
-  // await server.init(getMarketJson,getTradeJson,getFundingCsv)
 
   if (mock) {
     var tradeJSON = await getTradeJson(setup,false)
