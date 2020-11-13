@@ -7,6 +7,7 @@ const coinbase = require('../exchange/coinbase')
 const bitstamp = require('../exchange/bitstamp')
 const binance = require('../exchange/binance')
 const bitfinex = require('../exchange/bitfinex')
+const basedata = require('../exchange/basedata')
 
 const shoes = require('../shoes')
 const winston = require('winston')
@@ -135,6 +136,8 @@ async function getAccumulationSignal(exchange,{rsi},stopLoss) { try {
   //   signal.condition = 'LONG'
   //   signal.stopLoss = base.roundPrice(close*0.98) //candlestick.lowestBody(market,24)
   // }
+    
+  await basedata.writeSignal(signalExchange.name,signalExchange.symbols[setup.symbol],setup.candle.interval,now,signal)
 
   return signal
 } catch(e) {console.error(e.stack||e);debugger} }
