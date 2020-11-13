@@ -9,14 +9,15 @@ const shoes = require('../shoes')
 
 const readFile = util.promisify(fs.readFile)
 const readFileOptions = {encoding:'utf-8', flag:'r'}
+const path = require('path')
 const writeFile = util.promisify(fs.writeFile)
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
 const oneDayMs = 24*60*60000
 
-const candleFilePath = 'data/exchange/candle/YYYYMMDD.json'
-const feedFilePath = 'data/exchange/feed/YYYYMMDD.json'
-const signalFilePath = 'data/exchange/signal/YYYYMMDD.json'
+const candleFilePath = path.resolve(__dirname, '../data/exchange/candle/YYYYMMDD.json')
+const feedFilePath = path.resolve(__dirname, '../data/exchange/feed/YYYYMMDD.json')
+const signalFilePath = path.resolve(__dirname, '../data/exchange/signal/YYYYMMDD.json')
 
 function getCandleFile(exchange,symbol,interval,ymd) {
   return candleFilePath.replace('exchange',exchange).replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
@@ -27,7 +28,6 @@ function getFeedFile(exchange,symbol,interval,ymd) {
 }
 
 function getSignalFile(exchange,symbol,interval,time) {
-  console.log(__dirname)
   return signalFilePath.replace('exchange',exchange).replace('YYYYMMDD',symbol+'/'+interval+'/'+time)
 }
 
