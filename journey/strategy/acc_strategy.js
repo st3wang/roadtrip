@@ -85,28 +85,28 @@ const logger = winston.createLogger({
   ]
 })
 
-async function getAccumulationSignal(exchange,{rsi},stopLoss) { try {
+async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
+  var now = getTimeNow()
   var signal = {
-    timestamp: new Date(getTimeNow()).toISOString(),
-    exchange:exchange.name,
+    timestamp: new Date(now).toISOString(),
+    signalExchange: signalExchange.name,
     condition: '-',
     stopLoss: stopLoss
   }
 
-  var market = await exchange.getCurrentMarket()
+  var market = await signalExchange.getCurrentMarket()
   if (!market || !market.candles || market.candles.length != setup.candle.length) {
-    console.log(exchange.name, 'invalid market', (market && market.candles) ? market.candles.length : market)
+    console.log(signalExchange.name, 'invalid market', (market && market.candles) ? market.candles.length : market)
     return signal
   }
   else {
-    console.log(exchange.name, 'got market', market.candles.length)
+    console.log(signalExchange.name, 'got market', market.candles.length)
   }
 
   var last = market.closes.length-1
   var open = market.opens[last]
   var close = market.closes[last]
 
-  // var timeNow = getTimeNow()
   // var bullRun = timeNow < 1516579200000 /*Date.parse('22 Jan 2018 00:00:00 GMT')*/ ||
   //   (timeNow > 1554681600000 /*Date.parse('08 Apr 2019 00:00:00 GMT')*/ && timeNow < 1569801600000 /*Date.parse('30 Sep 2019 00:00:00 GMT')*/)
   // if (!bullRun) return signal
