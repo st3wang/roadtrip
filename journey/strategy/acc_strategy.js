@@ -409,7 +409,7 @@ async function checkEntry(params) { try {
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
-  if (!isBear() && (signal.type == 'SHORT' || signal.type == 'LONG') && signal.entryPrice && signal.orderQtyUSD) {
+  if (!isBear() && signal.entryPrice && signal.orderQtyUSD) {
     var entrySignal = {signal:signal}
     await orderEntry(entrySignal)
   }
