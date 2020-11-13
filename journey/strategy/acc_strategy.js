@@ -136,7 +136,8 @@ async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
   //   signal.condition = 'LONG'
   //   signal.stopLoss = base.roundPrice(close*0.98) //candlestick.lowestBody(market,24)
   // }
-    
+  
+  console.log(setup.symbol, signalExchange.symbols)
   await basedata.writeSignal(signalExchange.name,signalExchange.symbols[setup.symbol],setup.candle.interval,now,signal)
 
   return signal
