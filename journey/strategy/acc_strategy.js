@@ -142,7 +142,57 @@ async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
   return signal
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function getOrder(setup,signal) {
+async function getOrder(setup,position,signal) {
+  if (signal.condition == '-') {
+    return signal
+  }
+
+  var quote = bitmex.getQuote()
+  var lastCandle = bitmex.getLastCandle()
+  var currentCandle = bitmex.getCurrentCandle()
+
+  switch(signal.condition) {
+    case 'LONG':
+      signal.entryPrice = Math.min(lastCandle.close,quote.bidPrice)
+      if (signal.entryPrice <= signal.stopLoss) {
+        signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
+        return signal
+      }
+      else if (currentCandle.low <= signal.stopLoss) {
+        signal.reason = 'currentCandle.low <= stopLoss ' + JSON.stringify(currentCandle)
+        return signal
+      }
+      // else if (base.isFundingWindow(fundingTimestamp) && fundingRate > 0) {
+      //   signal.reason = 'Will have to pay funding.'
+      //   return signal
+      // }
+      break
+    case 'SHORT':
+      signal.entryPrice = Math.max(lastCandle.close,quote.askPrice)
+      if (signal.entryPrice >= signal.stopLoss) {
+        signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
+        return signal
+      }
+      else if (currentCandle.high >= signal.stopLoss) {
+        signal.reason = 'currentCandle.high >= stopLoss ' + JSON.stringify(currentCandle)
+        return signal
+      }
+      // else if (base.isFundingWindow(fundingTimestamp) && fundingRate < 0) {
+      //   signal.reason = 'Will have to pay funding.'
+      //   return signal
+      // }
+      break
+  }
+
+  var XBTUSDRate = bitmex.getRate('XBTUSD')
+  signal.coinPairRate = quote.lastPrice/XBTUSDRate
+  signal.marginBalance = position.marginBalance / signal.coinPairRate
+  signal.lossDistance = base.roundPrice(signal.stopLoss - signal.entryPrice)
+
+  if (!signal.lossDistance || !signal.marginBalance) {
+    return signal
+  }
+
   var {marginBalance,entryPrice,lossDistance,coinPairRate} = signal
   var tick = setup.candle.tick
   var leverageMargin = marginBalance*0.000000008
@@ -254,89 +304,33 @@ async function getOrder(setup,signal) {
 
 async function getSignal(setup,params) {
   console.log('===== getSignal =====', new Date(getTimeNow()).toISOString())
-  const bitmexSignal = await getExchangeSignal(bitmex,setup,params)
-  if (bitmexSignal.entryPrice) {
+  const bitmexSignal = await getAccumulationSignal(bitmex,setup)
+  if (bitmexSignal.condition != '-') {
     return bitmexSignal
   }
 
-  const coinbaseSignal = await getExchangeSignal(coinbase,setup,params,bitmexSignal.stopLoss)
-  if (coinbaseSignal.entryPrice) {
+  const coinbaseSignal = await getAccumulationSignal(coinbase,setup,bitmexSignal.stopLoss)
+  if (coinbaseSignal.condition != '-') {
     return coinbaseSignal
   }
 
-  const bitstampSignal = await getExchangeSignal(bitstamp,setup,params,bitmexSignal.stopLoss)
-  if (bitstampSignal.entryPrice) {
+  const bitstampSignal = await getAccumulationSignal(bitstamp,setup,bitmexSignal.stopLoss)
+  if (bitstampSignal.condition != '-') {
     return bitstampSignal
   }
 
-  const binanceSignal = await getExchangeSignal(binance,setup,params,bitmexSignal.stopLoss)
-  if (binanceSignal.entryPrice) {
+  const binanceSignal = await getAccumulationSignal(binance,setup,bitmexSignal.stopLoss)
+  if (binanceSignal.condition != '-') {
     return binanceSignal
   }
 
-  const bitfinexSignal = await getExchangeSignal(bitfinex,setup,params,bitmexSignal.stopLoss)
-  if (bitfinexSignal.entryPrice) {
+  const bitfinexSignal = await getAccumulationSignal(bitfinex,setup,bitmexSignal.stopLoss)
+  if (bitfinexSignal.condition != '-') {
     return bitfinexSignal
   }
 
   return bitmexSignal
-} 
-
-async function getExchangeSignal(exchange, setup, {positionSize,fundingTimestamp,fundingRate,marginBalance},overrideStopLoss) { try {
-  var signal = await getAccumulationSignal(exchange,setup,overrideStopLoss)
-
-  if (signal.condition == '-') {
-    return signal
-  }
-
-  var quote = bitmex.getQuote()
-  var lastCandle = bitmex.getLastCandle()
-  var currentCandle = bitmex.getCurrentCandle()
-
-  switch(signal.condition) {
-    case 'LONG':
-      signal.entryPrice = Math.min(lastCandle.close,quote.bidPrice)
-      if (signal.entryPrice <= signal.stopLoss) {
-        signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
-        return signal
-      }
-      else if (currentCandle.low <= signal.stopLoss) {
-        signal.reason = 'currentCandle.low <= stopLoss ' + JSON.stringify(currentCandle)
-        return signal
-      }
-      // else if (base.isFundingWindow(fundingTimestamp) && fundingRate > 0) {
-      //   signal.reason = 'Will have to pay funding.'
-      //   return signal
-      // }
-      break
-    case 'SHORT':
-      signal.entryPrice = Math.max(lastCandle.close,quote.askPrice)
-      if (signal.entryPrice >= signal.stopLoss) {
-        signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
-        return signal
-      }
-      else if (currentCandle.high >= signal.stopLoss) {
-        signal.reason = 'currentCandle.high >= stopLoss ' + JSON.stringify(currentCandle)
-        return signal
-      }
-      // else if (base.isFundingWindow(fundingTimestamp) && fundingRate < 0) {
-      //   signal.reason = 'Will have to pay funding.'
-      //   return signal
-      // }
-      break
-  }
-
-  var XBTUSDRate = bitmex.getRate('XBTUSD')
-  signal.coinPairRate = quote.lastPrice/XBTUSDRate
-  signal.marginBalance = marginBalance / signal.coinPairRate
-  signal.lossDistance = base.roundPrice(signal.stopLoss - signal.entryPrice)
-  if (!signal.lossDistance || !signal.marginBalance) {
-    return signal
-  }
-
-  var orderSignal = await getOrder(setup,signal)
-  return orderSignal
-} catch(e) {console.error(e.stack||e);debugger} }
+}
 
 function cancelOrder(params) {
   var {positionSize,signal} = params
@@ -411,8 +405,7 @@ async function checkEntry(params) { try {
       }
     }
   }
-
-  var signal = await getSignal(setup,params)
+  var signal = await getOrder(setup,params,await getSignal(setup,params))
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
