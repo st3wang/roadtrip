@@ -378,7 +378,7 @@ async function checkEntry(params) { try {
   if (entrySignal.timestamp) {
     let now = getTimeNow()
     if (now > (entrySignal.time + oneCandleMS)) {
-      let {open,close} = await bitmex.getLastCandle()
+      let {open,close} = bitmex.getLastCandle()
       if ((entrySignal.type == 'LONG' && close > entrySignal.entryPrice && close > open) ||
         (entrySignal.type == 'SHORT' && close < entrySignal.entryPrice && close < open)) {
           await orderEntry(entrySignal)

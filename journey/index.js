@@ -166,8 +166,12 @@ global.logger = logger
 
 async function checkPositionCallback(params) { try {
   if (mock) {
+    const now = getTimeNow()
+    const nowString = new Date(now).toISOString()
     params.signal = strategy.getEntrySignal()
-    return await checkPosition(params)
+    if (nowString.endsWith('06.000Z')) {
+      return await checkPosition(params)
+    }
   }
   else {
     params.signal = strategy.getEntrySignal()
@@ -251,7 +255,7 @@ async function getTradeJson(sp,useCache) { try {
 
   var [orders,signals] = await Promise.all([
     bitmex.getOrders(sp),
-    storage.readEntrySignalTable(sp)
+    storage.entrySignals
   ])
   orders = orders.filter(o => {
     return o.stopPx != 1
@@ -266,9 +270,9 @@ async function getTradeJson(sp,useCache) { try {
   let totalHoursInTrade = 0
   
   signals.forEach((signal,i) => {
-    let {timestamp} = signal
+    let {timestamp} = signal.signal
     let startTime = new Date(timestamp).getTime() - timeOffset
-    let endTime = (signals[i+1] ? new Date(signals[i+1].timestamp) : new Date()).getTime() - timeOffset
+    let endTime = (signals[i+1] ? new Date(signals[i+1].signal.timestamp) : new Date()).getTime() - timeOffset
     ords[i] = orders.filter((o) => {
       let {timestamp} = o
       let t = new Date(timestamp).getTime()
@@ -463,19 +467,19 @@ async function readLog() {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20150101
-  var end = 20201109
-  // console.log('updateData bitmex')
-  // await bitmexdata.downloadTradeData(start,end)
+  var start = 20200101
+  var end = 20201111
+  console.log('updateData bitmex')
+  await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
-  // await bitmexdata.generateCandleDayFiles(start,end,60)
+  await bitmexdata.generateCandleDayFiles(start,end,60)
   // await bitmexdata.generateCandleDayFiles(start,end,1440)
   console.log('updateData coinbase')
-  // await coinbasedata.generateCandleDayFiles(start,end,60)
-  // console.log('updateData bitstamp')
-  // await bitstampdata.generateCandleDayFiles(start,end,60)
-  // console.log('updateData binance')
-  // await binancedata.generateCandleDayFiles(start,end,60)
+  await coinbasedata.generateCandleDayFiles(start,end,60)
+  console.log('updateData bitstamp')
+  await bitstampdata.generateCandleDayFiles(start,end,60)
+  console.log('updateData binance')
+  await binancedata.generateCandleDayFiles(start,end,60)
   console.log('updateData bitfinex')
   await bitfinexdata.generateCandleDayFiles(start,end,60)
   console.timeEnd('updateData')

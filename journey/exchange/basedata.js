@@ -16,6 +16,7 @@ const oneDayMs = 24*60*60000
 
 const candleFilePath = 'data/exchange/candle/YYYYMMDD.json'
 const feedFilePath = 'data/exchange/feed/YYYYMMDD.json'
+const signalFilePath = 'data/exchange/signal/YYYYMMDD.json'
 
 function getCandleFile(exchange,symbol,interval,ymd) {
   return candleFilePath.replace('exchange',exchange).replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
@@ -23,6 +24,10 @@ function getCandleFile(exchange,symbol,interval,ymd) {
 
 function getFeedFile(exchange,symbol,interval,ymd) {
   return feedFilePath.replace('exchange',exchange).replace('YYYYMMDD',symbol+'/'+interval+'/'+ymd)
+}
+
+function getSignalFile(exchange,symbol,interval,time) {
+  return signalFilePath.replace('exchange',exchange).replace('YYYYMMDD',symbol+'/'+interval+'/'+time)
 }
 
 async function readCandleDay(exchange,interval,time,symbol) {
@@ -98,11 +103,29 @@ function getFeedDay({candles},interval,lastPrice) { try {
   return feeds
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function readSignal(name,symbol,interval,time) { try {
+  time = time - (time % (interval*60000))
+  const readPath = getSignalFile(name,symbol,interval,time)
+  if (fs.existsSync(readPath)) {
+    const str = fs.readFileSync(readPath,readFileOptions)
+    const signal = JSON.parse(str)
+    return signal
+  }
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function writeSignal(name,symbol,interval,time,signal) { try {
+  time = time - (time % (interval*60000))
+  const wrutePath = getSignalFile(name,symbol,interval,time)
+  await writeFile(wrutePath,JSON.stringify(signal),writeFileOptions)
+} catch(e) {console.error(e.stack||e);debugger} }
+
 module.exports = {
   getCandleFile: getCandleFile,
   getFeedFile: getFeedFile,
   getFeedDay: getFeedDay,
   readCandleDay: readCandleDay,
   readFeedDay: readFeedDay,
-  readMarket: readMarket
+  readMarket: readMarket,
+  readSignal: readSignal,
+  writeSignal: writeSignal
 }

@@ -3,6 +3,10 @@ const winston = require('winston')
 const shoes = require('../shoes')
 const {symbol,account,setup} = shoes
 const oneCandleMs = setup.candle.interval*60000
+const name = 'bitfinex'
+const symbols = {
+  XBTUSD: 'tBTCUSD'
+}
 
 var mock
 if (shoes.setup.startTime) mock = require('../mock.js')
@@ -16,10 +20,10 @@ async function getCurrentMarket() { try {
   const endTime = new Date(now-oneCandleMs).toISOString().substr(0,14)+'00:00.000Z'
   var marketCache
   if (mock) {
-    marketCache = await bitfinexdata.readMarket('tBTCUSD',60,startTime,endTime)
+    marketCache = await bitfinexdata.readMarket(symbols.XBTUSD,60,startTime,endTime)
   }
   else {
-    marketCache = await bitfinexdata.getMarket('tBTCUSD',60,startTime,endTime)
+    marketCache = await bitfinexdata.getMarket(symbols.XBTUSD,60,startTime,endTime)
   }
   // console.log('bitfinex',new Date(now).toISOString())
   // console.log('startTime',startTime)
@@ -35,6 +39,8 @@ async function init() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 module.exports = {
+  name: name,
   init: init,
   getCurrentMarket: getCurrentMarket,
+  symbols: symbols
 }

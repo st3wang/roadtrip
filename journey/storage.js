@@ -129,6 +129,7 @@ async function init() {
 
 module.exports = {
   init: init,
+  entrySignals: entrySignals,
   writeEntrySignalTable: writeEntrySignalTable,
   readEntrySignalTable: readEntrySignalTable,
   cancelEntrySignal: cancelEntrySignal,

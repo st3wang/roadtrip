@@ -1,5 +1,6 @@
 const bitmexdata = require('./exchange/bitmexdata')
 const coinbasedata = require('./exchange/coinbasedata')
+const basedata = require('./exchange/basedata')
 
 const uuid = require('uuid');
 const fs = require('fs')
@@ -21,6 +22,8 @@ var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleIn
 
 var margin, walletHistory, orders, historyOrders, position, bitmextrades, coinbasetrades, currentTradeIndex
 var rsis
+
+var getAccumulationSignalFn
 
 const logger = winston.createLogger({
   format: winston.format.label({label:'bitmex'}),
@@ -396,6 +399,22 @@ async function getRsisCache(market) {
   return rsis.slice(begin,begin+len)
 }
 
+async function setGetAccumulationSignalFn(fn) {
+  getAccumulationSignalFn = fn
+}
+
+async function getAccumulationSignal(exchange,setup,stopLoss) {
+  const now = getTimeNow()
+  var signal
+  signal = await basedata.readSignal(exchange.name,exchange.symbols[setup.symbol],setup.candle.interval,now)
+  if (!signal) {
+    signal = await getAccumulationSignalFn(exchange,setup,stopLoss)
+    await basedata.writeSignal(exchange.name,exchange.symbols[setup.symbol],setup.candle.interval,now,signal)
+  }
+  
+  return signal
+}
+
 async function init(sp) {
   setup = sp
   oneCandleMs = sp.interval * 60000
@@ -469,4 +488,6 @@ module.exports = {
   createInterval: createInterval,
   start: start,
 
+  setGetAccumulationSignalFn: setGetAccumulationSignalFn,
+  getAccumulationSignal: getAccumulationSignal
 }

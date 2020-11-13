@@ -7,6 +7,10 @@ const {symbol,account,setup} = shoes
 const oneCandleMs = setup.candle.interval*60000
 const oneCandleEndMs = oneCandleMs-1
 const oneDayMS = 24*60*60000
+const name = 'bitmex'
+const symbols = {
+  XBTUSD: 'XBTUSD'
+}
 
 var mock
 if (shoes.setup.startTime) mock = require('../mock.js')
@@ -530,7 +534,7 @@ async function getMarket(sp) {
   return await getTradeBucketed(sp)
 }
 
-async function getLastCandle() {
+function getLastCandle() {
   return lastCandle
 }
 
@@ -646,7 +650,7 @@ async function getOrders({startTime,endTime}) { try {
   return orders
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-async function getCurrentCandle() {
+function getCurrentCandle() {
   return currentCandle
 }
 
@@ -1126,6 +1130,8 @@ if (mock) {
 }
 
 module.exports = {
+  name: name,
+  symbols: symbols,
   init: init,
   getMarket: getMarket,
   getCurrentMarket: getCurrentMarket,
