@@ -27,6 +27,7 @@ function getFeedFile(exchange,symbol,interval,ymd) {
 }
 
 function getSignalFile(exchange,symbol,interval,time) {
+  console.log(__dirname)
   return signalFilePath.replace('exchange',exchange).replace('YYYYMMDD',symbol+'/'+interval+'/'+time)
 }
 
