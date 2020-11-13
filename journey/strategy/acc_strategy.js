@@ -236,7 +236,7 @@ async function getOrder(setup,position,signal) {
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
-  var goodStopDistance = absLossDistancePercent >= minStopLoss && absLossDistancePercent <= maxStopLoss
+  // var goodStopDistance = absLossDistancePercent >= minStopLoss && absLossDistancePercent <= maxStopLoss
 
   var scaleInSize = Math.round(orderQtyUSD / scaleInLength)
   var absScaleInsize = Math.abs(scaleInSize)
@@ -290,14 +290,14 @@ async function getOrder(setup,position,signal) {
     scaleInOrders: scaleInOrders
   },signal)
 
-  if (!goodStopDistance) {
-    order.type = '-'
-    order.reason = 'not good stop distance. ' + JSON.stringify({
-      absLossDistancePercent: absLossDistancePercent,
-      minStopLoss: minStopLoss,
-      maxStopLoss: maxStopLoss
-    })
-  }
+  // if (!goodStopDistance) {
+  //   order.type = '-'
+  //   order.reason = 'not good stop distance. ' + JSON.stringify({
+  //     absLossDistancePercent: absLossDistancePercent,
+  //     minStopLoss: minStopLoss,
+  //     maxStopLoss: maxStopLoss
+  //   })
+  // }
 
   return order
 }
@@ -409,7 +409,8 @@ async function checkEntry(params) { try {
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
-  if (!isBear() && signal.entryPrice && signal.orderQtyUSD) {
+  if (!isBear() && signal.orderQtyUSD) {
+    if (!(signal.type == 'SHORT' || signal.type == 'LONG')) debugger
     var entrySignal = {signal:signal}
     await orderEntry(entrySignal)
   }
