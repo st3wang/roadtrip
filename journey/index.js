@@ -46,6 +46,7 @@ const binance = require('./exchange/binance')
 const bitfinex = require('./exchange/bitfinex')
 const exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
 var tradeExchanges = []
+console.log(setup.exchange)
 Object.keys(setup.exchange).forEach(exchangeName => {
   tradeExchanges.push(exchanges[exchangeName])
 })
