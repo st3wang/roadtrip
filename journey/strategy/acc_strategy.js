@@ -392,8 +392,10 @@ function isBear() {
   return false
 }
 
-async function checkEntry(tradeExchange,params) { try {
-  var existingSignal = params.signal.signal
+async function checkEntry(tradeExchange) { try {
+  console.log('checkEntry',tradeExchange.name)
+  const params = tradeExchange.checkPositionParams
+  var existingSignal = getEntrySignal().signal
   if (existingSignal) {
     let existingSignalTime = new Date(existingSignal.timestamp).getTime()
     let now = getTimeNow()
@@ -422,6 +424,7 @@ async function checkEntry(tradeExchange,params) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkExit(tradeExchange,params) { try {
+  params.signal = base.getEntrySignal()
   var {positionSize,bid,ask,lastPrice,signal} = params
   if (positionSize == 0 || !lastPrice || !signal || !signal.signal) return
 
@@ -486,14 +489,13 @@ async function checkExit(tradeExchange,params) { try {
   */
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function checkPosition(params) {
+async function checkPosition() {
   for (let i = 0; i < tradeExchanges.length; i++) {
-    await checkEntry(tradeExchanges[i],params)
+    await checkEntry(tradeExchanges[i])
   }
-  if (params.positionSize != 0) {
-    params.signal = base.getEntrySignal()
+  // if (params.positionSize != 0) {
     // await checkExit(bitex,params)
-  }
+  // }
 }
 
 function resetEntrySignal() {

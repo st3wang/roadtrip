@@ -13,6 +13,7 @@ const winston = require('winston')
 const path = require('path')
 
 const shoes = require('./shoes')
+const setup = shoes.setup
 global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 
@@ -39,9 +40,17 @@ const storage = require('./storage')
 global.storage = storage
 
 const bitmex = require('./exchange/bitmex')
+const coinbase = require('./exchange/coinbase')
+const bitstamp = require('./exchange/bitstamp')
+const binance = require('./exchange/binance')
+const bitfinex = require('./exchange/bitfinex')
+const exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
+var tradeExchanges = []
+Object.keys(setup.exchange).forEach(exchangeName => {
+  tradeExchanges.push(exchanges[exchangeName])
+})
 const strategy = require('./strategy/' + shoes.strategy + '_strategy')
 const candlestick = require('./candlestick')
-const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 
 global.bitmex = bitmex
@@ -202,7 +211,7 @@ async function checkPosition(params) { try {
   checking = true
   lastCheckPositionTime = getTimeNow()
 
-  await strategy.checkPosition(params)
+  await strategy.checkPosition()
 
   if (recheckWhenDone) {
     setTimeout(next,50)
@@ -213,13 +222,11 @@ async function checkPosition(params) { try {
 
 async function next(logOnly) { try {
   var now = getTimeNow()
-  // if (now-lastCheckPositionTime > 2500) {
-    bitmex.getCurrentMarket() // to start a new candle if necessary
-    bitmex.checkPositionParams.caller = 'interval'
-    bitmex.checkPositionParams.signal = strategy.getEntrySignal()
-    if (!mock) logger.info('position',bitmex.checkPositionParams)
-    if (!logOnly) checkPosition(bitmex.checkPositionParams)
-  // }
+  bitmex.getCurrentMarket() // to start a new candle if necessary
+  bitmex.checkPositionParams.caller = 'interval' // for logging
+  bitmex.checkPositionParams.signal = strategy.getEntrySignal() // for logging
+  if (!mock) logger.info('position',bitmex.checkPositionParams)
+  if (!logOnly) checkPosition(bitmex.checkPositionParams)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 var gettingTradeJson = false
@@ -234,7 +241,7 @@ async function getTradeJson(sp) { try {
     gettingTradeJson = true
     await mock.init(sp)
     strategy.resetEntrySignal()
-    await bitmex.init(sp,checkPositionCallback)
+    await initExchanges(sp)
     await mock.start()
     gettingTradeJson = false
   }
@@ -462,6 +469,14 @@ async function updateData() {
   debugger
 }
 
+async function initExchanges(setup) {
+  await bitmex.init(setup,checkPositionCallback)
+  await coinbase.init(setup,checkPositionCallback)
+  await bitstamp.init(setup,checkPositionCallback)
+  await binance.init(setup,checkPositionCallback)
+  await bitfinex.init(setup,checkPositionCallback)
+}
+
 async function init() { try {
   // await readLog()
   // await updateData()
@@ -482,7 +497,7 @@ async function init() { try {
     debugger
   }
   else {
-    await bitmex.init(setup,checkPositionCallback)
+    await initExchanges(setup)
     next()
     createInterval(6000*2**0) // 6s after candle close
     createInterval(6000*2**1) // 12s
