@@ -3,7 +3,7 @@ const SwaggerClient = require("swagger-client")
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 const winston = require('winston')
 const shoes = require('../shoes')
-const {symbol,account,setup} = shoes
+const {symbol,exchange,setup} = shoes
 const oneCandleMs = setup.candle.interval*60000
 const oneCandleEndMs = oneCandleMs-1
 const oneDayMS = 24*60*60000
@@ -147,8 +147,8 @@ async function wsAddStream(sym, table, handler) { try {
 async function connect() { try {
   ws = new BitMEXRealtimeAPI({
     testnet: shoes.test,
-    apiKeyID: account.bitmex.key,
-    apiKeySecret: account.bitmex.secret,
+    apiKeyID: exchange.bitmex.key,
+    apiKeySecret: exchange.bitmex.secret,
     maxTableLen:100
   })
   ws.on('error', (e) => logger.error(e));
@@ -406,7 +406,7 @@ async function authorize() { try {
     url: shoes.swagger,
     usePromise: true
   })
-  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(account.bitmex.key, account.bitmex.secret));
+  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(exchange.bitmex.key, exchange.bitmex.secret));
   console.log('Authorized')
   return swaggerClient
 } catch(e) {logger.error(e.stack||e);debugger} }

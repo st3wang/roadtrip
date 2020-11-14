@@ -1,20 +1,25 @@
 const path = require('path')
 
 const base = require('./base_strategy.js')
+const shoes = require('../shoes')
+const setup = shoes.setup
 
+const basedata = require('../exchange/basedata')
 const bitmex = require('../exchange/bitmex')
 const coinbase = require('../exchange/coinbase')
 const bitstamp = require('../exchange/bitstamp')
 const binance = require('../exchange/binance')
 const bitfinex = require('../exchange/bitfinex')
-const basedata = require('../exchange/basedata')
+const exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
+var tradeExchanges = []
+Object.keys(setup.exchange).forEach(exchangeName => {
+  tradeExchanges.push(exchanges[exchangeName])
+})
 
-const shoes = require('../shoes')
 const winston = require('winston')
 const storage = require('../storage')
 const candlestick = require('../candlestick')
 
-const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
 
 var mock
@@ -142,14 +147,14 @@ async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
   return signal
 } catch(e) {console.error(e.stack||e);debugger} }
 
-async function getOrder(setup,position,signal) {
+async function getOrder(tradeExchange,setup,position,signal) {
   if (signal.condition == '-') {
     return signal
   }
 
-  var quote = bitmex.getQuote()
-  var lastCandle = bitmex.getLastCandle()
-  var currentCandle = bitmex.getCurrentCandle()
+  var quote = tradeExchange.getQuote()
+  var lastCandle = tradeExchange.getLastCandle()
+  var currentCandle = tradeExchange.getCurrentCandle()
 
   switch(signal.condition) {
     case 'LONG':
@@ -184,7 +189,7 @@ async function getOrder(setup,position,signal) {
       break
   }
 
-  var XBTUSDRate = bitmex.getRate('XBTUSD')
+  var XBTUSDRate = tradeExchange.getRate('XBTUSD')
   signal.coinPairRate = quote.lastPrice/XBTUSDRate
   signal.marginBalance = position.marginBalance / signal.coinPairRate
   signal.lossDistance = base.roundPrice(signal.stopLoss - signal.entryPrice)
@@ -344,10 +349,10 @@ function cancelOrder(params) {
   || base.exitTarget(cancelParams) || base.exitStop(cancelParams))
 }
 
-async function orderEntry(entrySignal) { try {
+async function orderEntry(tradeExchange,entrySignal) { try {
   var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
   var now = getTimeNow()
-  var existingEntryOrders = bitmex.findOrders(/New|Fill/,entryOrders).filter(o => {
+  var existingEntryOrders = tradeExchange.findOrders(/New|Fill/,entryOrders).filter(o => {
     return (now < new Date(o.timestamp).getTime() + oneCandleMS)
     // return (new Date(o.timestamp).getTime() >= entrySignal.time)
   })
@@ -357,7 +362,7 @@ async function orderEntry(entrySignal) { try {
   else {
     if (!mock) logger.info('ENTER ORDER',entrySignal)
     closeOrders = closeOrders.slice(0,1)
-    let response = await bitmex.order(entryOrders.concat(closeOrders),true)
+    let response = await tradeExchange.order(entryOrders.concat(closeOrders),true)
     /*TODO: wait for order confirmations*/
     if (response.status == 200) {
       entrySignal.entryOrders = entryOrders
@@ -387,7 +392,7 @@ function isBear() {
   return false
 }
 
-async function checkEntry(params) { try {
+async function checkEntry(tradeExchange,params) { try {
   var existingSignal = params.signal.signal
   if (existingSignal) {
     let existingSignalTime = new Date(existingSignal.timestamp).getTime()
@@ -398,25 +403,25 @@ async function checkEntry(params) { try {
 
     if (now >= st && now <= et) {
       // there is an existing signal
-      let entryOrders = bitmex.findOrders(/New|Fill/,params.signal.entryOrders)
+      let entryOrders = tradeExchange.findOrders(/New|Fill/,params.signal.entryOrders)
       if (entryOrders.length > 0) {
         if (!mock) logger.info('EXISTING SIGNAL ENTRY ORDER EXISTS')
         return
       }
     }
   }
-  var signal = await getOrder(setup,params,await getSignal(setup,params))
+  var signal = await getOrder(tradeExchange,setup,params,await getSignal(setup,params))
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
   if (!isBear() && signal.orderQtyUSD) {
     if (!(signal.type == 'SHORT' || signal.type == 'LONG')) debugger
     var entrySignal = {signal:signal}
-    await orderEntry(entrySignal)
+    await orderEntry(tradeExchange,entrySignal)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function checkExit(params) { try {
+async function checkExit(tradeExchange,params) { try {
   var {positionSize,bid,ask,lastPrice,signal} = params
   if (positionSize == 0 || !lastPrice || !signal || !signal.signal) return
 
@@ -432,21 +437,21 @@ async function checkExit(params) { try {
     }]
     exit.exitOrders = exitOrders
 
-    let existingExitOrders = bitmex.findOrders(/New/,exitOrders)
+    let existingExitOrders = tradeExchange.findOrders(/New/,exitOrders)
     if (existingExitOrders.length == 1) {
       // logger.debug('EXIT EXISTING ORDER',exit)
       return existingExitOrders
     }
 
     if (!mock) logger.info('CLOSE ORDER', exit)
-    let response = await bitmex.order(exitOrders,true)
+    let response = await tradeExchange.order(exitOrders,true)
     return response
   }
   /*
   // move stop loss. it reduced draw down in the side way market. see Test 4
   else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
     // Use loss distance as next step
-    let closeOrder = bitmex.findOrders(/New/,[{
+    let closeOrder = tradeExchange.findOrders(/New/,[{
       side: (positionSize < 0 ? 'Buy' : 'Sell'),
       ordType: 'Stop',
       execInst: 'Close,LastPrice',
@@ -457,35 +462,37 @@ async function checkExit(params) { try {
     }
     let nextTarget = closeOrder.stopPx - lossDistance*2
     if (lastPrice >= nextTarget) {
-      let existingEntryOrders = bitmex.findOrders(/New/,[{
+      let existingEntryOrders = tradeExchange.findOrders(/New/,[{
         side: (positionSize > 0 ? 'Buy' : 'Sell'),
         ordType: 'Limit',
         execInst: 'ParticipateDoNotInitiate',
         price: 'any'
       }])
       if (existingEntryOrders.length > 0) {
-        bitmex.cancelOrders(existingEntryOrders)
+        tradeExchange.cancelOrders(existingEntryOrders)
       }
       let newStopLoss = closeOrder.stopPx - lossDistance
       closeOrder.stopPx = newStopLoss
-      return await bitmex.order([closeOrder])
+      return await tradeExchange.order([closeOrder])
     }
     // Use lowest low as a new stop loss
-    // let market = await bitmex.getCurrentMarket()
+    // let market = await tradeExchange.getCurrentMarket()
     // let newStopLoss = Math.min(...market.lows)
     // if (newStopLoss > closeOrders[0].stopPx) {
     //   closeOrders[0].stopPx = newStopLoss
-    //   return await bitmex.order(closeOrders)
+    //   return await tradeExchange.order(closeOrders)
     // }
   }
   */
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkPosition(params) {
-  await checkEntry(params)
+  for (let i = 0; i < tradeExchanges.length; i++) {
+    await checkEntry(tradeExchanges[i],params)
+  }
   if (params.positionSize != 0) {
     params.signal = base.getEntrySignal()
-    await checkExit(params)
+    // await checkExit(bitex,params)
   }
 }
 
@@ -513,17 +520,11 @@ async function init() {
   }
 }
 
-function getCacheTradePath(dirname,{symbol,startTime,endTime,candle:{interval},rsi:{rsiLength}}) {
-  return path.resolve(dirname, 'data/bitmex/signal/'+symbol+'/'+interval+'-'+startTime+'-'+endTime+
-    rsiLength+'.json').replace(/:/g,';')
-}
-
 module.exports = {
   init: init,
   checkPosition: checkPosition,
   resetEntrySignal: resetEntrySignal,
   getEntrySignal: getEntrySignal,
   getEntryExitOrders: getEntryExitOrders,
-  getCacheTradePath: getCacheTradePath
 }
 

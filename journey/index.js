@@ -224,15 +224,10 @@ async function next(logOnly) { try {
 
 var gettingTradeJson = false
 
-async function getTradeJson(sp,useCache) { try {
+async function getTradeJson(sp) { try {
   console.time('getTradeJson')
-  var cachePath = strategy.getCacheTradePath(__dirname,sp)
 
   if (mock) {
-    if (useCache && fs.existsSync(cachePath)) {
-      console.timeEnd('getTradeJson')
-      return fs.readFileSync(cachePath,readFileOptions)
-    }
     if (gettingTradeJson) {
       return ''
     }
@@ -483,7 +478,7 @@ async function init() { try {
   await strategy.init()
 
   if (mock) {
-    var tradeJSON = await getTradeJson(setup,false)
+    var tradeJSON = await getTradeJson(setup)
     debugger
   }
   else {
