@@ -147,8 +147,8 @@ async function wsAddStream(sym, table, handler) { try {
 async function connect() { try {
   ws = new BitMEXRealtimeAPI({
     testnet: shoes.test,
-    apiKeyID: account.key,
-    apiKeySecret: account.secret,
+    apiKeyID: account.bitmex.key,
+    apiKeySecret: account.bitmex.secret,
     maxTableLen:100
   })
   ws.on('error', (e) => logger.error(e));
@@ -406,7 +406,7 @@ async function authorize() { try {
     url: shoes.swagger,
     usePromise: true
   })
-  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(account.key, account.secret));
+  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(account.bitmex.key, account.bitmex.secret));
   console.log('Authorized')
   return swaggerClient
 } catch(e) {logger.error(e.stack||e);debugger} }
