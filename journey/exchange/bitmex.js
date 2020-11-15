@@ -15,7 +15,7 @@ const symbols = {
 var mock
 if (shoes.setup.startTime) mock = require('../mock.js')
 
-var client, checkPositionCallback, checkPositionParams = {}
+var client, checkPositionCallback, position = {}
 var marketCache, marketWithCurrentCandleCache
 var binSize = 1
 var binSizeString = '1m'
@@ -194,12 +194,12 @@ async function pruneOrders(orders) { try {
 
 async function handleMargin(data) { try {
   lastMargin = data[0]
-  checkPositionParams.walletBalance = lastMargin.walletBalance
-  checkPositionParams.marginBalance = lastMargin.marginBalance
-  checkPositionParams.unrealisedPnl = lastMargin.unrealisedPnl
+  position.walletBalance = lastMargin.walletBalance
+  position.marginBalance = lastMargin.marginBalance
+  position.unrealisedPnl = lastMargin.unrealisedPnl
   // check every tick
-  // checkPositionParams.caller = 'margin'
-  // await checkPositionCallback(checkPositionParams)
+  // position.caller = 'margin'
+  // await checkPositionCallback(position)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function handleOrder(orders) { try {
@@ -215,7 +215,7 @@ async function handleOrder(orders) { try {
         lastOrders.push(o)
       }
       if (o.ordType == 'Stop' && o.execInst == 'Close,LastPrice' && o.ordStatus == 'New' && o.stopPx > 1) {
-        checkPositionParams.currentStopPx = o.stopPx
+        position.currentStopPx = o.stopPx
       }
     }
     else {
@@ -233,8 +233,8 @@ async function handleOrder(orders) { try {
   var prunedCanceledOrder = pruneOrders(orders)
   pruneOrders(lastOrders)
   if (!prunedCanceledOrder) {
-    checkPositionParams.caller = 'order'
-    await checkPositionCallback(checkPositionParams)
+    position.caller = 'order'
+    await checkPositionCallback(position)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -243,11 +243,11 @@ async function handlePosition(data) {
 
   var qty = lastPosition.currentQty
   if (qty != lastQty) {
-    checkPositionParams.lastPositionSize = lastQty
-    checkPositionParams.positionSize = qty
+    position.lastPositionSize = lastQty
+    position.positionSize = qty
     if (lastQty != undefined) {
-      checkPositionParams.caller = 'position'
-      await checkPositionCallback(checkPositionParams)
+      position.caller = 'position'
+      await checkPositionCallback(position)
     }
   }
 
@@ -264,14 +264,14 @@ async function handleInstrument(data) { try {
   appendCandleLastPrice()
   
   if (mock || bid !== lastBid || ask !== lastAsk) {
-    checkPositionParams.bid = bid
-    checkPositionParams.ask = ask
-    checkPositionParams.lastPrice = lastInstrument.lastPrice
-    checkPositionParams.fundingTimestamp = lastInstrument.fundingTimestamp
-    checkPositionParams.fundingRate = lastInstrument.fundingRate
+    position.bid = bid
+    position.ask = ask
+    position.lastPrice = lastInstrument.lastPrice
+    position.fundingTimestamp = lastInstrument.fundingTimestamp
+    position.fundingRate = lastInstrument.fundingRate
     if (mock) {
-      checkPositionParams.caller = 'instrument'
-      await checkPositionCallback(checkPositionParams)
+      position.caller = 'instrument'
+      await checkPositionCallback(position)
     }
   }
 
@@ -286,8 +286,8 @@ async function handleXBTUSDInstrument(data) {
 
 async function handleInterval(data) {  
   getCurrentMarket() // to start a new candle if necessary
-  checkPositionParams.caller = 'interval'
-  await checkPositionCallback(checkPositionParams)
+  position.caller = 'interval'
+  await checkPositionCallback(position)
 }
 
 async function appendCandleLastPrice() {
@@ -1125,7 +1125,7 @@ module.exports = {
   getCandleTimeOffset: getCandleTimeOffset,
   getLastCandle: getLastCandle,
 
-  checkPositionParams: checkPositionParams,
+  position: position,
 
   order: order,
   cancelAll: cancelAll,

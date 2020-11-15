@@ -223,10 +223,10 @@ async function checkPosition(params) { try {
 async function next(logOnly) { try {
   var now = getTimeNow()
   bitmex.getCurrentMarket() // to start a new candle if necessary
-  bitmex.checkPositionParams.caller = 'interval' // for logging
-  bitmex.checkPositionParams.signal = strategy.getEntrySignal() // for logging
-  if (!mock) logger.info('position',bitmex.checkPositionParams)
-  if (!logOnly) checkPosition(bitmex.checkPositionParams)
+  bitmex.position.caller = 'interval' // for logging
+  bitmex.position.signal = strategy.getEntrySignal() // for logging
+  if (!mock) logger.info('position',bitmex.position)
+  if (!logOnly) checkPosition(bitmex.position)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 var gettingTradeJson = false
@@ -508,11 +508,7 @@ async function init() { try {
 init()
 
 /* TODO
-fix bitmex got market.candle.length 35 with live data
-get coinbase data
-  https://api.pro.coinbase.com/products/BTC-USD/candles?granularity=3600&start=2015-07-21T00:00:00Z&end=2015-07-21T23:00:00Z
-  analyze
-  use both bitmex and coinbase?
+test double trade on 11/14 21hr and 22hr
 
 if the position != 0 the new stop lost must be more than current stop loss
 

@@ -307,7 +307,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   return order
 }
 
-async function getSignal(setup,params) {
+async function getSignal(setup,position) {
   console.log('===== getSignal =====', new Date(getTimeNow()).toISOString())
   const bitmexSignal = await getAccumulationSignal(bitmex,setup)
   if (bitmexSignal.condition != '-') {
@@ -335,18 +335,6 @@ async function getSignal(setup,params) {
   }
 
   return bitmexSignal
-}
-
-function cancelOrder(params) {
-  var {positionSize,signal} = params
-  
-  if (positionSize != 0) return
-
-  let cancelParams = Object.assign({},params)
-  cancelParams.positionSize = signal.orderQtyUSD
-  return (base.exitTooLong(cancelParams) 
-  //|| base.exitFunding(cancelParams) 
-  || base.exitTarget(cancelParams) || base.exitStop(cancelParams))
 }
 
 async function orderEntry(tradeExchange,entrySignal) { try {
@@ -394,7 +382,7 @@ function isBear() {
 
 async function checkEntry(tradeExchange) { try {
   console.log('checkEntry',tradeExchange.name)
-  const params = tradeExchange.checkPositionParams
+  const position = tradeExchange.position
   var existingSignal = getEntrySignal().signal
   if (existingSignal) {
     let existingSignalTime = new Date(existingSignal.timestamp).getTime()
@@ -405,14 +393,14 @@ async function checkEntry(tradeExchange) { try {
 
     if (now >= st && now <= et) {
       // there is an existing signal
-      let entryOrders = tradeExchange.findOrders(/New|Fill/,params.signal.entryOrders)
+      let entryOrders = tradeExchange.findOrders(/New|Fill/,position.signal.entryOrders)
       if (entryOrders.length > 0) {
         if (!mock) logger.info('EXISTING SIGNAL ENTRY ORDER EXISTS')
         return
       }
     }
   }
-  var signal = await getOrder(tradeExchange,setup,params,await getSignal(setup,params))
+  var signal = await getOrder(tradeExchange,setup,position,await getSignal(setup,position))
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
@@ -423,14 +411,14 @@ async function checkEntry(tradeExchange) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function checkExit(tradeExchange,params) { try {
-  params.signal = base.getEntrySignal()
-  var {positionSize,bid,ask,lastPrice,signal} = params
+async function checkExit(tradeExchange,position) { try {
+  position.signal = base.getEntrySignal()
+  var {positionSize,bid,ask,lastPrice,signal} = position
   if (positionSize == 0 || !lastPrice || !signal || !signal.signal) return
 
   var {signal:{entryPrice,stopLoss,lossDistance},entryOrders,takeProfitOrders,closeOrders} = signal
 
-  var exit = base.exitTooLong(params) || base.exitFunding(params) || isBear()
+  var exit = base.exitTooLong(position) || base.exitFunding(position) || isBear()
   if (exit) {
     let exitOrders = [{
       price: (positionSize < 0 ? bid : ask),
@@ -493,8 +481,8 @@ async function checkPosition() {
   for (let i = 0; i < tradeExchanges.length; i++) {
     await checkEntry(tradeExchanges[i])
   }
-  // if (params.positionSize != 0) {
-    // await checkExit(bitex,params)
+  // if (position.positionSize != 0) {
+    // await checkExit(bitex,position)
   // }
 }
 
