@@ -117,5 +117,6 @@ module.exports = {
   name: name,
   init: init,
   getCurrentMarket: getCurrentMarket,
-  symbols: symbols
+  symbols: symbols,
+  position: position
 }

@@ -46,8 +46,10 @@ const binance = require('./exchange/binance')
 const bitfinex = require('./exchange/bitfinex')
 const exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
 var tradeExchanges = []
+var tradeExchangesByName = {}
 Object.keys(setup.exchange).forEach(exchangeName => {
   tradeExchanges.push(exchanges[exchangeName])
+  tradeExchangesByName[exchangeName] = exchanges[exchangeName]
 })
 const strategy = require('./strategy/' + shoes.strategy + '_strategy')
 const candlestick = require('./candlestick')
@@ -178,7 +180,7 @@ async function checkPositionCallback(params) { try {
     const nowString = new Date(now).toISOString()
     params.signal = strategy.getEntrySignal()
     if (nowString.endsWith('06.000Z')) {
-      return await checkPosition(params)
+      return await checkPosition()
     }
   }
   else {
@@ -189,21 +191,21 @@ async function checkPositionCallback(params) { try {
 
 var checking = false, recheckWhenDone = false
 
-async function checkPosition(params) { try {
-  const {walletBalance,lastPositionSize,positionSize,caller} = params
-  switch(caller) {
-    case 'position': {
-      if (lastPositionSize == 0) {
-        if (!mock) logger.info('ENTER POSITION', walletBalance)
-      }
-      else if (positionSize == 0) {
-        if (!mock) {
-          logger.info('EXIT POSITION', walletBalance)
-          strategy.resetEntrySignal()
-        }
-      }
-    } break;
-  }
+async function checkPosition() { try {
+  // const {walletBalance,lastPositionSize,positionSize,caller} = params
+  // switch(caller) {
+  //   case 'position': {
+  //     if (lastPositionSize == 0) {
+  //       if (!mock) logger.info('ENTER POSITION', walletBalance)
+  //     }
+  //     else if (positionSize == 0) {
+  //       if (!mock) {
+  //         logger.info('EXIT POSITION', walletBalance)
+  //         strategy.resetEntrySignal()
+  //       }
+  //     }
+  //   } break;
+  // }
   if (checking) {
     recheckWhenDone = true
     return
@@ -222,11 +224,13 @@ async function checkPosition(params) { try {
 
 async function next(logOnly) { try {
   var now = getTimeNow()
-  bitmex.getCurrentMarket() // to start a new candle if necessary
-  bitmex.position.caller = 'interval' // for logging
-  bitmex.position.signal = strategy.getEntrySignal() // for logging
-  if (!mock) logger.info('position',bitmex.position)
-  if (!logOnly) checkPosition(bitmex.position)
+  tradeExchanges.forEach(tradeExchange => {
+    tradeExchange.getCurrentMarket() // to start a new candle if necessary
+    tradeExchange.position.caller = 'interval' // for logging
+    tradeExchange.position.signal = strategy.getEntrySignal() // for logging
+    if (!mock) logger.info('position',tradeExchange.position)
+  })
+  if (!logOnly) checkPosition()
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 var gettingTradeJson = false
@@ -470,11 +474,9 @@ async function updateData() {
 }
 
 async function initExchanges(setup) {
-  await bitmex.init(setup,checkPositionCallback)
-  await coinbase.init(setup,checkPositionCallback)
-  await bitstamp.init(setup,checkPositionCallback)
-  await binance.init(setup,checkPositionCallback)
-  await bitfinex.init(setup,checkPositionCallback)
+  for (let i = 0; i < tradeExchanges.length; i++) {
+    await tradeExchanges[i].init(setup,checkPositionCallback)
+  }
 }
 
 async function init() { try {
