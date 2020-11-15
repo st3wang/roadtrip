@@ -446,14 +446,14 @@ function isBear() {
 }
 
 async function checkEntry(tradeExchange) { try {
-  const existingSignal = getEntrySignal(tradeExchange.name).signal
+  const existingSignal = getEntrySignal(tradeExchange.name)
   const position = tradeExchange.position
 
   position.signal = existingSignal // for logging try to remove it
   if (!mock) logger.info('checkEntry',position)
 
-  if (existingSignal) {
-    let existingSignalTime = new Date(existingSignal.timestamp).getTime()
+  if (existingSignal.signal) {
+    let existingSignalTime = new Date(existingSignal.signal.timestamp).getTime()
     let now = getTimeNow()
     let ts = new Date(now).toISOString()
     let st = existingSignalTime - existingSignalTime % oneCandleMS

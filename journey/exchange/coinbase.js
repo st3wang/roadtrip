@@ -38,6 +38,17 @@ async function getCurrentMarket() { try {
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
+const makerFee = -0.00025
+const takerFee = 0.00075
+function getCost({side,cumQty,price,execInst}) {
+  var foreignNotional = (side == 'Buy' ? -cumQty : cumQty)
+  var homeNotional = -foreignNotional / price
+  var coinPairRate = 1 //lastPrice/XBTUSDRate
+  var fee = execInst.indexOf('ParticipateDoNotInitiate') >= 0 ? makerFee : takerFee
+  var execComm = Math.round(Math.abs(homeNotional * coinPairRate) * fee * 100000000)
+  return [homeNotional,foreignNotional,execComm]
+}
+
 async function request(method,path,body) { try {
   return new Promise((resolve,reject) => {
     var timestamp = Math.round(Date.now() / 1000)
@@ -118,5 +129,13 @@ module.exports = {
   init: init,
   getCurrentMarket: getCurrentMarket,
   symbols: symbols,
-  position: position
+  position: position,
+  getCost: getCost,
+
+  // findOrders: findOrders,
+  // getQuote: getQuote,
+  // getLastCandle: getLastCandle,
+  // getCurrentCandle: getCurrentCandle,
+  // getRate: getRate,
+  // order: order,
 }
