@@ -15,7 +15,7 @@ if (shoes.setup.startTime) mock = require('../mock.js')
 
 const {getTimeNow, isoTimestamp, colorizer} = global
 
-var position = {}
+var position = {exchange:name}
 
 async function getCurrentMarket() { try {
   const now = getTimeNow()

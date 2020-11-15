@@ -26,7 +26,6 @@ var mock
 if (shoes.setup.startTime) mock = require('../mock.js')
 
 const {getTimeNow, isoTimestamp, colorizer} = global
-var exitCandleTime
 
 function typeColor(type) {
   return (type == 'LONG' ? '\x1b[36m' : type == 'SHORT' ? '\x1b[35m' : '') + type + '\x1b[39m'
@@ -46,6 +45,60 @@ const logger = winston.createLogger({
           let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
+            case 'checkEntry': {
+              let {exchange,caller,walletBalance,marginBalance,unrealisedPnl,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal,currentStopPx} = splat[0]
+              let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal || {}
+              let marginBalanceString,marginPnlPercent,stopBalance,stopBalanceString,stopPnlPercent,lossDistancePercentString, positionSizeString, lastPriceString
+              stopLoss = currentStopPx || stopLoss
+              walletBalance /= 100000000
+              unrealisedPnl /= 100000000
+              marginBalance /= 100000000
+              marginPnlPercent = Math.round((marginBalance-walletBalance) / walletBalance * 10000) / 100
+              marginBalanceString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + marginBalance.toFixed(4) + ' ' + marginPnlPercent + '%\x1b[39m'
+              
+              let lastCost = exchanges[exchange].getCost({
+                side: 'Sell',
+                cumQty: -positionSize,
+                price: lastPrice,
+                execInst: 'Close,LastPrice'
+              })
+              // console.log('lastCost',lastCost)
+              let stopCost = exchanges[exchange].getCost({
+                side: 'Sell',
+                cumQty: -positionSize,
+                price: stopLoss,
+                execInst: 'Close,LastPrice'
+              })
+              // console.log('stopCost',stopCost)
+              
+              stopBalance = walletBalance + unrealisedPnl + lastCost[0] - stopCost[0]
+              stopPnlPercent = Math.round((stopBalance-walletBalance) / walletBalance * 10000) / 100
+              stopBalanceString = (stopBalance > walletBalance ? '\x1b[32m' : (stopBalance < walletBalance ? '\x1b[31m' : '')) + stopBalance.toFixed(4) + ' ' + stopPnlPercent + '%\x1b[39m'
+              
+              if (positionSize > 0) {
+                positionSizeString = '\x1b[36m' + positionSize + '\x1b[39m'
+                lastPriceString = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
+              }
+              else if (positionSize < 0) {
+                positionSizeString = '\x1b[35m' + positionSize + '\x1b[39m'
+                lastPriceString = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
+              }
+              else {
+                positionSizeString = positionSize
+                lastPriceString = lastPrice.toFixed(1)
+              }
+              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34;1m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
+              let now = getTimeNow()
+              let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / oneCandleMS)
+              candlesInTrade = (candlesInTrade >= setup.candle.inTradeMax || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
+              let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/oneCandleMS)
+              candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
+              let payFunding = fundingRate*positionSize/lastPrice
+              payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
+              line += exchange + ' ' + caller + ' B:'+walletBalance.toFixed(4)+' M:'+marginBalanceString+' S:'+stopBalanceString+' P:'+positionSizeString+' L:'+lastPriceString+
+                ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
+                ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
+            } break
             case 'ENTER SIGNAL': {
               let signal = splat[0]
               if (signal) {
@@ -337,6 +390,18 @@ async function getSignal(setup,position) {
   return bitmexSignal
 }
 
+function cancelOrder(params) {
+  var {positionSize,signal} = params
+  
+  if (positionSize != 0) return
+
+  let cancelParams = Object.assign({},params)
+  cancelParams.positionSize = signal.orderQtyUSD
+  return (base.exitTooLong(cancelParams) 
+  //|| base.exitFunding(cancelParams) 
+  || base.exitTarget(cancelParams) || base.exitStop(cancelParams))
+}
+
 async function orderEntry(tradeExchange,entrySignal) { try {
   var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
   var now = getTimeNow()
@@ -356,7 +421,7 @@ async function orderEntry(tradeExchange,entrySignal) { try {
       entrySignal.entryOrders = entryOrders
       entrySignal.closeOrders = closeOrders
       entrySignal.takeProfitOrders = takeProfitOrders
-      base.setEntrySignal(entrySignal)
+      base.setEntrySignal(tradeExchange.name,entrySignal)
       storage.writeEntrySignalTable(entrySignal)
     }
   }
@@ -381,9 +446,12 @@ function isBear() {
 }
 
 async function checkEntry(tradeExchange) { try {
-  console.log('checkEntry',tradeExchange.name)
+  const existingSignal = getEntrySignal(tradeExchange.name).signal
   const position = tradeExchange.position
-  var existingSignal = getEntrySignal().signal
+
+  position.signal = existingSignal // for logging try to remove it
+  if (!mock) logger.info('checkEntry',position)
+
   if (existingSignal) {
     let existingSignalTime = new Date(existingSignal.timestamp).getTime()
     let now = getTimeNow()
@@ -412,7 +480,7 @@ async function checkEntry(tradeExchange) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkExit(tradeExchange,position) { try {
-  position.signal = base.getEntrySignal()
+  position.signal = getEntrySignal(tradeExchange.name)
   var {positionSize,bid,ask,lastPrice,signal} = position
   if (positionSize == 0 || !lastPrice || !signal || !signal.signal) return
 
@@ -479,21 +547,35 @@ async function checkExit(tradeExchange,position) { try {
 
 async function checkPosition() {
   for (let i = 0; i < tradeExchanges.length; i++) {
-    await checkEntry(tradeExchanges[i])
+    const exchange = tradeExchanges[i]
+    const {walletBalance,lastPositionSize,positionSize,caller,name} = exchange.position
+    switch(caller) {
+      case 'position': {
+        if (lastPositionSize == 0) {
+          if (!mock) logger.info('ENTER POSITION', walletBalance)
+        }
+        else if (positionSize == 0) {
+          if (!mock) {
+            logger.info('EXIT POSITION', walletBalance)
+            resetEntrySignal(name)
+          }
+        }
+      } break;
+    }
+    await checkEntry(exchange)
   }
   // if (position.positionSize != 0) {
     // await checkExit(bitex,position)
   // }
 }
 
-function resetEntrySignal() {
+function resetEntrySignal(exchange) {
   var now = getTimeNow()
-  exitCandleTime = now - (now % oneCandleMS)
-  base.resetEntrySignal()
+  base.resetEntrySignal(exchange)
 }
 
-function getEntrySignal() {
-  return base.getEntrySignal()
+function getEntrySignal(exchangeName) {
+  return base.getEntrySignal(exchangeName)
 }
 
 function getEntryExitOrders(signal) {
@@ -502,8 +584,7 @@ function getEntryExitOrders(signal) {
 
 async function init() {
   var now = getTimeNow()
-  exitCandleTime = now - (now % oneCandleMS)
-  base.init()
+  base.init(tradeExchanges)
   if (mock) {
     mock.setGetAccumulationSignalFn(getAccumulationSignal)
     getAccumulationSignal = mock.getAccumulationSignal

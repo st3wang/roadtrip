@@ -15,7 +15,7 @@ const symbols = {
 var mock
 if (shoes.setup.startTime) mock = require('../mock.js')
 
-var client, checkPositionCallback, position = {}
+var client, checkPositionCallback, position = {exchange:name}
 var marketCache, marketWithCurrentCandleCache
 var binSize = 1
 var binSizeString = '1m'
@@ -1036,6 +1036,17 @@ function getRate(symbol) {
   return lastRates[symbol]
 }
 
+const makerFee = -0.00025
+const takerFee = 0.00075
+function getCost({side,cumQty,price,execInst}) {
+  var foreignNotional = (side == 'Buy' ? -cumQty : cumQty)
+  var homeNotional = -foreignNotional / price
+  var coinPairRate = 1 //lastPrice/XBTUSDRate
+  var fee = execInst.indexOf('ParticipateDoNotInitiate') >= 0 ? makerFee : takerFee
+  var execComm = Math.round(Math.abs(homeNotional * coinPairRate) * fee * 100000000)
+  return [homeNotional,foreignNotional,execComm]
+}
+
 async function initMarket() { try {
   console.log('Initializing market')
   await getCurrentMarket()
@@ -1131,5 +1142,6 @@ module.exports = {
   cancelAll: cancelAll,
   cancelOrders: cancelOrders,
 
-  lastOrders: lastOrders
+  lastOrders: lastOrders,
+  getCost: getCost
 }

@@ -60,17 +60,6 @@ global.strategy = strategy
 
 var lastCheckPositionTime
 
-const makerFee = -0.00025
-const takerFee = 0.00075
-function getCost({side,cumQty,price,execInst}) {
-  var foreignNotional = (side == 'Buy' ? -cumQty : cumQty)
-  var homeNotional = -foreignNotional / price
-  var coinPairRate = 1 //lastPrice/XBTUSDRate
-  var fee = execInst.indexOf('ParticipateDoNotInitiate') >= 0 ? makerFee : takerFee
-  var execComm = Math.round(Math.abs(homeNotional * coinPairRate) * fee * 100000000)
-  return [homeNotional,foreignNotional,execComm]
-}
-
 const logger = winston.createLogger({
   format: winston.format.label({label:'index'}),
   transports: [
@@ -85,60 +74,6 @@ const logger = winston.createLogger({
           let prefix = timestamp.substring(5).replace(/[T,Z]/g,' ')+'['+colorizer.colorize(level,'bmx')+'] '
           let line = (typeof message == 'string' ? message : JSON.stringify(message)) + ' '
           switch(message) {
-            case 'position': {
-              let {caller,walletBalance,marginBalance,unrealisedPnl,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal,currentStopPx} = splat[0]
-              let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal || {}
-              let marginBalanceString,marginPnlPercent,stopBalance,stopBalanceString,stopPnlPercent,lossDistancePercentString, positionSizeString, lastPriceString
-              stopLoss = currentStopPx || stopLoss
-              walletBalance /= 100000000
-              unrealisedPnl /= 100000000
-              marginBalance /= 100000000
-              marginPnlPercent = Math.round((marginBalance-walletBalance) / walletBalance * 10000) / 100
-              marginBalanceString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + marginBalance.toFixed(4) + ' ' + marginPnlPercent + '%\x1b[39m'
-              
-              let lastCost = getCost({
-                side: 'Sell',
-                cumQty: -positionSize,
-                price: lastPrice,
-                execInst: 'Close,LastPrice'
-              })
-              // console.log('lastCost',lastCost)
-              let stopCost = getCost({
-                side: 'Sell',
-                cumQty: -positionSize,
-                price: stopLoss,
-                execInst: 'Close,LastPrice'
-              })
-              // console.log('stopCost',stopCost)
-              
-              stopBalance = walletBalance + unrealisedPnl + lastCost[0] - stopCost[0]
-              stopPnlPercent = Math.round((stopBalance-walletBalance) / walletBalance * 10000) / 100
-              stopBalanceString = (stopBalance > walletBalance ? '\x1b[32m' : (stopBalance < walletBalance ? '\x1b[31m' : '')) + stopBalance.toFixed(4) + ' ' + stopPnlPercent + '%\x1b[39m'
-              
-              if (positionSize > 0) {
-                positionSizeString = '\x1b[36m' + positionSize + '\x1b[39m'
-                lastPriceString = (lastPrice >= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
-              }
-              else if (positionSize < 0) {
-                positionSizeString = '\x1b[35m' + positionSize + '\x1b[39m'
-                lastPriceString = (lastPrice <= entryPrice ? '\x1b[32m' : '\x1b[31m') + lastPrice.toFixed(1) + '\x1b[39m'
-              }
-              else {
-                positionSizeString = positionSize
-                lastPriceString = lastPrice.toFixed(1)
-              }
-              lossDistancePercentString = Math.abs(lossDistancePercent) < 0.002 ? lossDistancePercent.toFixed(4) : ('\x1b[34;1m' + lossDistancePercent.toFixed(4) + '\x1b[39m')
-              let now = getTimeNow()
-              let candlesInTrade = ((now - new Date(timestamp||null).getTime()) / oneCandleMS)
-              candlesInTrade = (candlesInTrade >= setup.candle.inTradeMax || (Math.abs(lossDistancePercent) >= 0.002 && candlesInTrade >=3)) ? ('\x1b[33m' + candlesInTrade.toFixed(1) + '\x1b[39m') : candlesInTrade.toFixed(1)
-              let candlesTillFunding = ((new Date(fundingTimestamp||null).getTime() - now)/oneCandleMS)
-              candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
-              let payFunding = fundingRate*positionSize/lastPrice
-              payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
-              line += caller + ' B:'+walletBalance.toFixed(4)+' M:'+marginBalanceString+' S:'+stopBalanceString+' P:'+positionSizeString+' L:'+lastPriceString+
-                ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' T:'+takeProfit.toFixed(1)+
-                ' D:'+lossDistancePercentString+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
-            } break
             default: {
               line += (splat ? JSON.stringify(splat) : '')
             }
@@ -174,38 +109,23 @@ const logger = winston.createLogger({
 
 global.logger = logger
 
-async function checkPositionCallback(params) { try {
+async function checkPositionCallback(position) { try {
   if (mock) {
     const now = getTimeNow()
     const nowString = new Date(now).toISOString()
-    params.signal = strategy.getEntrySignal()
     if (nowString.endsWith('06.000Z')) {
       return await checkPosition()
     }
   }
   else {
-    params.signal = strategy.getEntrySignal()
-    logger.info('position',params)
+    // position.signal = strategy.getEntrySignal(position.exchange)
+    // logger.info('position',params)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 var checking = false, recheckWhenDone = false
 
 async function checkPosition() { try {
-  // const {walletBalance,lastPositionSize,positionSize,caller} = params
-  // switch(caller) {
-  //   case 'position': {
-  //     if (lastPositionSize == 0) {
-  //       if (!mock) logger.info('ENTER POSITION', walletBalance)
-  //     }
-  //     else if (positionSize == 0) {
-  //       if (!mock) {
-  //         logger.info('EXIT POSITION', walletBalance)
-  //         strategy.resetEntrySignal()
-  //       }
-  //     }
-  //   } break;
-  // }
   if (checking) {
     recheckWhenDone = true
     return
@@ -227,8 +147,6 @@ async function next(logOnly) { try {
   tradeExchanges.forEach(tradeExchange => {
     tradeExchange.getCurrentMarket() // to start a new candle if necessary
     tradeExchange.position.caller = 'interval' // for logging
-    tradeExchange.position.signal = strategy.getEntrySignal() // for logging
-    if (!mock) logger.info('position',tradeExchange.position)
   })
   if (!logOnly) checkPosition()
 } catch(e) {logger.error(e.stack||e);debugger} }
@@ -244,7 +162,9 @@ async function getTradeJson(sp) { try {
     }
     gettingTradeJson = true
     await mock.init(sp)
-    strategy.resetEntrySignal()
+    for (let i = 0; i < tradeExchanges.length; i++) {
+      strategy.resetEntrySignal(tradeExchanges[i].name)
+    }
     await initExchanges(sp)
     await mock.start()
     gettingTradeJson = false

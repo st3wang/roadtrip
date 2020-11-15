@@ -7,8 +7,9 @@ const shoes = require('../shoes')
 const { v4 } = require('uuid')
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
+const path = require('path')
 
-const entrySignalFilePath = global.logDir + '/entry_signal.json'
+const entrySignalFilePath = path.resolve(__dirname, '../data/exchange/entrySignal/YYYYMMDD.json')
 
 const setup = shoes.setup
 const oneCandleMS = setup.candle.interval*60000
@@ -16,10 +17,15 @@ const fundingWindowTime = setup.candle.fundingWindow * oneCandleMS
 var cutOffTimeForAll = setup.candle.inTradeMax*60000
 var cutOffTimeForLargeTrade = 59*60000
 
-var entrySignal
+var tradeExchanges
+var entrySignals = {}
 var roundPriceFactor = 1/setup.candle.tick
 
 const {getTimeNow} = global
+
+function getEntrySignalFile(exchange,ymd) {
+  return entrySignalFilePath.replace('exchange',exchange).replace('YYYYMMDD',ymd || 'last')
+}
 
 function roundPrice(p) {
   return +((Math.round(p*roundPriceFactor)/roundPriceFactor).toFixed(2))
@@ -110,39 +116,47 @@ function exitStop({positionSize,bid,ask,signal}) {
   }
 }
 
-function resetEntrySignal() {
-  entrySignal = {}
-  if (fs.existsSync(entrySignalFilePath)) {
-    fs.unlinkSync(entrySignalFilePath)
+function resetEntrySignal(exchange) {
+  entrySignals[exchange] = {}
+  const entrySignalFile = getEntrySignalFile(exchange)
+  if (fs.existsSync(entrySignalFile)) {
+    fs.unlinkSync(entrySignalFile)
   }
 }
 
-function getEntrySignal() {
-  return entrySignal
+function getEntrySignal(exchange) {
+  return entrySignals[exchange]
 }
 
-function setEntrySignal(v) {
-  entrySignal = v
-  writeEntrySignal(v)
+function setEntrySignal(exchange,signal) {
+  entrySignals[exchange] = signal
+  writeEntrySignal(exchange,signal)
 }
 
-function readEntrySignal() {
-  if (!fs.existsSync(entrySignalFilePath)) {
+function readEntrySignal(exchange) {
+  var entrySignalFile = getEntrySignalFile(exchange)
+  if (!fs.existsSync(entrySignalFile)) {
     return
   }
 
-  var entrySignalString = fs.readFileSync(entrySignalFilePath,readFileOptions)
-  entrySignal = JSON.parse(entrySignalString)
+  var entrySignalString = fs.readFileSync(entrySignalFile,readFileOptions)
+  var entrySignal = JSON.parse(entrySignalString)
   entrySignal.time = new Date(entrySignal.signal.timestamp).getTime()
 
   var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
   entrySignal.entryOrders = entryOrders
   entrySignal.closeOrders = closeOrders
   entrySignal.takeProfitOrders = takeProfitOrders
+
+  entrySignals[exchange] = entrySignal
 }
 
-function writeEntrySignal(signal) {
-  fs.writeFileSync(entrySignalFilePath,JSON.stringify(signal),writeFileOptions)
+function writeEntrySignal(exchange,signal) {
+  var signalJsonString = JSON.stringify(signal)
+  var entrySignalFile = getEntrySignalFile(exchange)
+  fs.writeFileSync(entrySignalFile,signalJsonString,writeFileOptions)
+  var entrySignalFileLog = getEntrySignalFile(exchange,getTimeNow())
+  fs.writeFileSync(entrySignalFileLog,signalJsonString,writeFileOptions)
 }
 
 function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProfit,takeHalfProfit,scaleInOrders}) {
@@ -227,9 +241,13 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
   return {entryOrders:entryOrders,closeOrders:closeOrders,takeProfitOrders:takeProfitOrders}
 }
 
-async function init() {
-  entrySignal = {}
-  readEntrySignal()
+async function init(tradeExchanges) {
+  entrySignals.bitmex = {}
+  entrySignals.coinbase = {}
+  for (let i = 0; i < tradeExchanges.length; i++) {
+    const exchange = tradeExchanges[i]
+    readEntrySignal(exchange.name)
+  }
 }
 
 module.exports = {
@@ -237,8 +255,8 @@ module.exports = {
   roundPrice: roundPrice,
   getRsi: getRsi,
   getWilly: getWilly,
-  resetEntrySignal: resetEntrySignal,
   isFundingWindow: isFundingWindow,
+  resetEntrySignal: resetEntrySignal,
   getEntrySignal: getEntrySignal,
   setEntrySignal: setEntrySignal,
   getEntryExitOrders: getEntryExitOrders,
