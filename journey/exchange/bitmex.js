@@ -1092,6 +1092,7 @@ async function init(sp,checkPositionCb) { try {
   client = await authorize()
   if (!client) {
     console.error('failed authorize')
+    return
   }
   // inspect(client.apis)
   await initMarket()
