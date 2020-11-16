@@ -1090,6 +1090,9 @@ async function init(sp,checkPositionCb) { try {
 
   checkPositionCallback = checkPositionCb
   client = await authorize()
+  if (!client) {
+    console.error('failed authorize')
+  }
   // inspect(client.apis)
   await initMarket()
   await initOrders()
