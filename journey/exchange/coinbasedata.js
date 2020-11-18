@@ -42,18 +42,24 @@ async function getMarket(symbol,interval,start,end) {
           let candles = {
             opens: [], highs: [], lows: [], closes: [], candles: []
           }
-          let value = JSON.parse(data).reverse()
-          value.forEach(v => {
-            candles.opens.push(v[3])
-            candles.highs.push(v[2])
-            candles.lows.push(v[1])
-            candles.closes.push(v[4])
-            candles.candles.push({
-              time: new Date(v[0]*1000).toISOString(),
-              volume: v[5],
-              open: v[3], high: v[2], low: v[1], close: v[4]
+          let value = JSON.parse(data)
+          if (value.reverse) {
+            value.reverse()
+            value.forEach(v => {
+              candles.opens.push(v[3])
+              candles.highs.push(v[2])
+              candles.lows.push(v[1])
+              candles.closes.push(v[4])
+              candles.candles.push({
+                time: new Date(v[0]*1000).toISOString(),
+                volume: v[5],
+                open: v[3], high: v[2], low: v[1], close: v[4]
+              })
             })
-          })
+          }
+          else {
+            console.log('coinbasedata getMarket value', value)
+          }
           resolve(candles)
         })
       }

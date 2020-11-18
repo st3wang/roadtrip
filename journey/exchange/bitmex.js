@@ -1091,7 +1091,7 @@ async function init(sp,checkPositionCb) { try {
   checkPositionCallback = checkPositionCb
   client = await authorize()
   if (!client) {
-    console.error('failed authorize')
+    console.log('failed authorize')
     return
   }
   // inspect(client.apis)
