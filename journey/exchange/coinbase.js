@@ -218,7 +218,6 @@ function translateOrders(orders) { try {
       transactTime: o.created_at,
       timestamp: o.created_at,
       ordStatus: o.ordStatus || orderStatusMap[o.status],
-      ordType: capitalizeFirstLetter(o.type)
     }
     if (o.stop == 'loss') {
       order.ordType = 'Market'
