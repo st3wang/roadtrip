@@ -506,6 +506,7 @@ async function subscribe() { try {
           await checkStopLoss()
         }
         break;
+      case 'activate':
       case 'open':
         console.log(data)
         await handleOrderSubscription(data)
