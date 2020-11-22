@@ -524,7 +524,7 @@ async function subscribe() { try {
   }
 
   setInterval(() => {
-    ws.send('{}')
+    ws.send('{"type":"unsubscribe","channels":["heartbeat"]}')
   }, 12000)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
