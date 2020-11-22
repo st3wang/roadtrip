@@ -49,6 +49,12 @@ function handleOrder(orders) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
+async function updatePosition() { try {
+  var accountUSD = await request('GET','/accounts/' + exchange.coinbase.account_ids.USD)
+  var quote = await getQuote()
+  position.marginBalance = accountUSD.balance * 100000000 / quote.lastPrice
+} catch(e) {logger.error(e.stack||e);debugger} }
+
 async function getCurrentMarket() { try {
   const now = getTimeNow()
   const length = setup.candle.length
@@ -457,42 +463,18 @@ async function subscribe() { try {
 
 async function init(stg) { try {
   strategy = stg
-  var res
-  // res = await request('GET','/accounts')
-  // res = await request('GET','/accounts/' + exchange.coinbase.account_id)
-  // res = await request('GET','/orders')
-  // res = await request('GET','/fills?product_id=BTC-USD')
-  // res = await request('DELETE','/orders')
-  // var quote = await getQuote()
-  // res = await order({
-  //   side: 'sell',
-  //   product_id: 'BTC-USD',
-  //   size: 0.01,
-  //   stop: 'loss',
-  //   stop_price: 16000,
-  //   price: 1
-  // })
-  // debugger
-  // if (res.id) {
-  //   // valid
-  // }
-  // else {
-  //   console.error(res.message)
-  // }
-  // debugger
+
+  await updatePosition()
   await checkStopLoss()
-
   await subscribe()
-
-  var accountUSD = await request('GET','/accounts/' + exchange.coinbase.account_ids.USD)
-  var quote = await getQuote()
-  position.marginBalance = accountUSD.balance * 100000000 / quote.lastPrice
   handleOrder(await getOrders({}))
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 module.exports = {
   name: name,
   init: init,
+
+  updatePosition: updatePosition,
   getCurrentMarket: getCurrentMarket,
   symbols: symbols,
   position: position,

@@ -543,8 +543,8 @@ async function checkExit(tradeExchange,position) { try {
 
 async function checkPosition() {
   for (let i = 0; i < tradeExchanges.length; i++) {
-    const exchange = tradeExchanges[i]
-    const {walletBalance,lastPositionSize,positionSize,caller,name} = exchange.position
+    const tradeExchange = tradeExchanges[i]
+    const {walletBalance,lastPositionSize,positionSize,caller,name} = tradeExchange.position
     switch(caller) {
       case 'position': {
         if (lastPositionSize == 0) {
@@ -558,7 +558,8 @@ async function checkPosition() {
         }
       } break;
     }
-    await checkEntry(exchange)
+    await tradeExchange.updatePosition()
+    await checkEntry(tradeExchange)
   }
   // if (position.positionSize != 0) {
     // await checkExit(bitex,position)

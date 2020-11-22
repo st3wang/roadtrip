@@ -538,6 +538,10 @@ function getLastCandle() {
   return lastCandle
 }
 
+async function updatePosition() {
+  // the position is updated via ws
+}
+
 async function getCurrentMarket() { try {
   if (marketCache) {
     // update current candle
@@ -1121,6 +1125,7 @@ module.exports = {
   symbols: symbols,
   init: init,
   getMarket: getMarket,
+  updatePosition: updatePosition,
   getCurrentMarket: getCurrentMarket,
   getPosition: getPosition,
   getInstrument: getInstrument,
