@@ -165,7 +165,7 @@ async function getTradeJson(sp) { try {
     for (let i = 0; i < tradeExchanges.length; i++) {
       strategy.resetEntrySignal(tradeExchanges[i].name)
     }
-    await initExchanges(sp)
+    await initExchanges()
     await mock.start()
     gettingTradeJson = false
   }
@@ -393,9 +393,9 @@ async function updateData() {
   debugger
 }
 
-async function initExchanges(setup) {
+async function initExchanges() {
   for (let i = 0; i < tradeExchanges.length; i++) {
-    await tradeExchanges[i].init(setup,checkPositionCallback)
+    await tradeExchanges[i].init(strategy,checkPositionCallback)
   }
 }
 
@@ -412,14 +412,14 @@ async function init() { try {
   }
 
   await storage.init()
-  await strategy.init()
+  await strategy.init(tradeExchanges)
 
   if (mock) {
     var tradeJSON = await getTradeJson(setup)
     debugger
   }
   else {
-    await initExchanges(setup)
+    await initExchanges()
     next()
     createInterval(6000*2**0) // 6s after candle close
     createInterval(6000*2**1) // 12s

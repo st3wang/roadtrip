@@ -19,7 +19,6 @@ var cutOffTimeForLargeTrade = 59*60000
 
 var tradeExchanges
 var entrySignals = {}
-var roundPriceFactor = 1/setup.candle.tick
 
 const {getTimeNow} = global
 
@@ -27,8 +26,10 @@ function getEntrySignalFile(exchange,ymd) {
   return entrySignalFilePath.replace('exchange',exchange).replace('YYYYMMDD',ymd || 'last')
 }
 
-function roundPrice(p) {
-  return +((Math.round(p*roundPriceFactor)/roundPriceFactor).toFixed(2))
+function roundPrice(exchange,p,roundFn) {
+  roundFn = roundFn || Math.round
+  const roundPriceFactor = 1/setup.exchange[exchange.name].tick
+  return +((roundFn(p*roundPriceFactor)/roundPriceFactor).toFixed(2))
 }
 
 async function getRsi(closes,length) { try {

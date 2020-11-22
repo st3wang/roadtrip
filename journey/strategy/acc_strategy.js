@@ -11,10 +11,7 @@ const bitstamp = require('../exchange/bitstamp')
 const binance = require('../exchange/binance')
 const bitfinex = require('../exchange/bitfinex')
 const exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
-var tradeExchanges = []
-Object.keys(setup.exchange).forEach(exchangeName => {
-  tradeExchanges.push(exchanges[exchangeName])
-})
+var tradeExchanges
 
 const winston = require('winston')
 const storage = require('../storage')
@@ -184,15 +181,10 @@ async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
   if (isWPrice == 3 && isWRsi == 3) {
     signal.condition = 'LONG'
   }
+
   // if (isMPrice == 3 && isMRsi == 3) {
   //   signal.condition = 'SHORT'
   //   signal.stopLoss = Math.max(...market.highs)
-  // }
-
-  // var timestamp = new Date(getTimeNow()).toISOString()
-  // if (timestamp.includes('T11')) {
-  //   signal.condition = 'LONG'
-  //   signal.stopLoss = base.roundPrice(close*0.98) //candlestick.lowestBody(market,24)
   // }
   
   await basedata.writeSignal(signalExchange.name,signalExchange.symbols[setup.symbol],setup.candle.interval,now,signal)
@@ -205,9 +197,9 @@ async function getOrder(tradeExchange,setup,position,signal) {
     return signal
   }
 
-  var quote = tradeExchange.getQuote()
+  var quote = await tradeExchange.getQuote()
   var lastCandle = tradeExchange.getLastCandle()
-  var currentCandle = tradeExchange.getCurrentCandle()
+  var currentCandle = await tradeExchange.getCurrentCandle()
 
   switch(signal.condition) {
     case 'LONG':
@@ -216,7 +208,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
         signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
         return signal
       }
-      else if (currentCandle.low <= signal.stopLoss) {
+      else if (currentCandle && currentCandle.low <= signal.stopLoss) {
         signal.reason = 'currentCandle.low <= stopLoss ' + JSON.stringify(currentCandle)
         return signal
       }
@@ -231,7 +223,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
         signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
         return signal
       }
-      else if (currentCandle.high >= signal.stopLoss) {
+      else if (currentCandle && currentCandle.high >= signal.stopLoss) {
         signal.reason = 'currentCandle.high >= stopLoss ' + JSON.stringify(currentCandle)
         return signal
       }
@@ -242,10 +234,10 @@ async function getOrder(tradeExchange,setup,position,signal) {
       break
   }
 
-  var XBTUSDRate = tradeExchange.getRate('XBTUSD')
+  var XBTUSDRate = quote.lastPrice
   signal.coinPairRate = quote.lastPrice/XBTUSDRate
   signal.marginBalance = position.marginBalance / signal.coinPairRate
-  signal.lossDistance = base.roundPrice(signal.stopLoss - signal.entryPrice)
+  signal.lossDistance = base.roundPrice(tradeExchange, signal.stopLoss - signal.entryPrice)
 
   if (!signal.lossDistance || !signal.marginBalance) {
     return signal
@@ -263,11 +255,11 @@ async function getOrder(tradeExchange,setup,position,signal) {
   var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
 
   minOrderSizeBTC /= coinPairRate
-  stopMarketDistance = base.roundPrice(lossDistance * stopMarketFactor)
-  profitDistance = base.roundPrice(-lossDistance * profitFactor)
+  stopMarketDistance = base.roundPrice(tradeExchange, lossDistance * stopMarketFactor)
+  profitDistance = base.roundPrice(tradeExchange, -lossDistance * profitFactor)
 
-  stopMarket = base.roundPrice(entryPrice + stopMarketDistance)
-  takeProfit = base.roundPrice(entryPrice + profitDistance)
+  stopMarket = base.roundPrice(tradeExchange, entryPrice + stopMarketDistance)
+  takeProfit = base.roundPrice(tradeExchange, entryPrice + profitDistance)
 
   stopLossTrigger = entryPrice + (lossDistance/2)
   takeProfitTrigger = entryPrice + (profitDistance/8)
@@ -319,7 +311,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   for (var i = 0; i < scaleInLength; i++) {
     scaleInOrders.push({
       size:scaleInSize,
-      price:base.roundPrice(entryPrice+scaleInStep*i)
+      price:base.roundPrice(tradeExchange, entryPrice+scaleInStep*i, signal.condition == 'LONG' ? Math.floor : Math.ceil)
     })
   }
   
@@ -362,32 +354,33 @@ async function getOrder(tradeExchange,setup,position,signal) {
 
 async function getSignal(setup,position) {
   console.log('===== getSignal =====', new Date(getTimeNow()).toISOString())
-  const bitmexSignal = await getAccumulationSignal(bitmex,setup)
-  if (bitmexSignal.condition != '-') {
-    return bitmexSignal
-  }
+  // const bitmexSignal = await getAccumulationSignal(bitmex,setup)
+  // if (bitmexSignal.condition != '-') {
+  //   return bitmexSignal
+  // }
 
-  const coinbaseSignal = await getAccumulationSignal(coinbase,setup,bitmexSignal.stopLoss)
+  const coinbaseSignal = await getAccumulationSignal(coinbase,setup)
+  // const coinbaseSignal = await getAccumulationSignal(coinbase,setup,bitmexSignal.stopLoss)
   if (coinbaseSignal.condition != '-') {
     return coinbaseSignal
   }
 
-  const bitstampSignal = await getAccumulationSignal(bitstamp,setup,bitmexSignal.stopLoss)
+  const bitstampSignal = await getAccumulationSignal(bitstamp,setup,coinbaseSignal.stopLoss)
   if (bitstampSignal.condition != '-') {
     return bitstampSignal
   }
 
-  const binanceSignal = await getAccumulationSignal(binance,setup,bitmexSignal.stopLoss)
+  const binanceSignal = await getAccumulationSignal(binance,setup,coinbaseSignal.stopLoss)
   if (binanceSignal.condition != '-') {
     return binanceSignal
   }
 
-  const bitfinexSignal = await getAccumulationSignal(bitfinex,setup,bitmexSignal.stopLoss)
+  const bitfinexSignal = await getAccumulationSignal(bitfinex,setup,coinbaseSignal.stopLoss)
   if (bitfinexSignal.condition != '-') {
     return bitfinexSignal
   }
 
-  return bitmexSignal
+  return coinbaseSignal
 }
 
 function cancelOrder(params) {
@@ -423,6 +416,10 @@ async function orderEntry(tradeExchange,entrySignal) { try {
       entrySignal.takeProfitOrders = takeProfitOrders
       base.setEntrySignal(tradeExchange.name,entrySignal)
       storage.writeEntrySignalTable(entrySignal)
+    }
+    else {
+      console.error(response)
+      debugger
     }
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
@@ -473,7 +470,6 @@ async function checkEntry(tradeExchange) { try {
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
   if (!isBear() && signal.orderQtyUSD) {
-    if (!(signal.type == 'SHORT' || signal.type == 'LONG')) debugger
     var entrySignal = {signal:signal}
     await orderEntry(tradeExchange,entrySignal)
   }
@@ -582,8 +578,9 @@ function getEntryExitOrders(signal) {
   return base.getEntryExitOrders(signal)
 }
 
-async function init() {
+async function init(tx) {
   var now = getTimeNow()
+  tradeExchanges = tx
   base.init(tradeExchanges)
   if (mock) {
     mock.setGetAccumulationSignalFn(getAccumulationSignal)

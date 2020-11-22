@@ -392,7 +392,7 @@ function getPosition() {
   return lastPosition
 }
 
-function getQuote() {
+async function getQuote() {
   return {
     bidPrice: lastInstrument.bidPrice,
     askPrice: lastInstrument.askPrice,
@@ -622,7 +622,7 @@ async function getOrders({startTime,endTime}) { try {
   return orders
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
-function getCurrentCandle() {
+async function getCurrentCandle() {
   return currentCandle
 }
 
@@ -1079,7 +1079,7 @@ async function initOrders() { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function init(sp,checkPositionCb) { try {
+async function init(strategy,checkPositionCb) { try {
   lastMargin = {}
   lastInstrument = {}
   lastPosition = {}
