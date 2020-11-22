@@ -533,8 +533,8 @@ async function init(stg) { try {
   strategy = stg
   handleOrder(await getOrders({}))
   await updatePosition()
-  await checkStopLoss()
   await subscribe()
+  await checkStopLoss()
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 module.exports = {
