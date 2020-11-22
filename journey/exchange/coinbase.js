@@ -222,6 +222,8 @@ function translateOrders(orders) { try {
     if (o.stop == 'loss') {
       order.ordType = 'Market'
       order.execInst = 'Close,LastPrice'
+      order.stopPx = o.stop_price
+      delete order.price
     }
     else {
       order.ordType = capitalizeFirstLetter(o.type)
