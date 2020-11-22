@@ -240,7 +240,9 @@ async function getOrders({startTime,endTime}) { try {
     let o = await request('GET','/orders/'+fills[i].order_id)
     if (o) {
       o.ordStatus = 'Filled'
-      orders.push(o)
+      if (new Date(order.timestamp).getTime() > endTime) {
+        orders.push(o)
+      }
     }
   }
   return translateOrders(orders)
@@ -531,7 +533,7 @@ async function subscribe() { try {
 
 async function init(stg) { try {
   strategy = stg
-  handleOrder(await getOrders({}))
+  handleOrder(await getOrders({endTime:getTimeNow() - oneDayMS}))
   await updatePosition()
   await subscribe()
   await checkStopLoss()
