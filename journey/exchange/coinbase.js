@@ -240,7 +240,7 @@ async function getOrders({startTime,endTime}) { try {
     let o = await request('GET','/orders/'+fills[i].order_id)
     if (o) {
       o.ordStatus = 'Filled'
-      if (new Date(order.timestamp).getTime() > endTime) {
+      if (new Date(o.done_at).getTime() > endTime) {
         orders.push(o)
       }
     }
