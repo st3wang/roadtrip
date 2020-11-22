@@ -212,7 +212,6 @@ function translateOrders(orders) { try {
       cumQty: parseFloat(o.filled_size || o.size) * price,
       orderID: o.id || o.order_id,
       orderQty: parseFloat(o.size) * price,
-      price: price,
       side: capitalizeFirstLetter(o.side),
       symbol: o.product_id,
       transactTime: o.created_at,
@@ -223,11 +222,11 @@ function translateOrders(orders) { try {
       order.ordType = 'Market'
       order.execInst = 'Close,LastPrice'
       order.stopPx = o.stop_price
-      delete order.price
     }
     else {
       order.ordType = capitalizeFirstLetter(o.type)
       order.execInst = o.post_only ? 'ParticipateDoNotInitiate' : ''
+      order.price = price
     }
     return order
   })
@@ -527,7 +526,7 @@ async function subscribe() { try {
 
   setInterval(() => {
     ws.send('{"type":"unsubscribe","channels":["heartbeat"]}')
-  }, 12000)
+  }, 6000)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init(stg) { try {
