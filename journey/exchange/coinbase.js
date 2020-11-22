@@ -6,6 +6,7 @@ const winston = require('winston')
 const shoes = require('../shoes')
 const {symbol,exchange,setup} = shoes
 // const strategy = require('../strategy/' + shoes.strategy + '_strategy')
+const oneDayMS = 24*60*60000
 const oneCandleMs = setup.candle.interval*60000
 const name = 'coinbase'
 const symbols = {
@@ -19,6 +20,31 @@ const {getTimeNow, isoTimestamp, colorizer} = global
 
 var position = {exchange:name}
 var lastCandle, lastOrders = []
+
+async function pruneOrders(orders) { try {
+  var found, pruned
+  var yesterday = getTimeNow() - oneDayMS
+  var prunedCanceledOrder = false
+  do {
+    found = orders.findIndex(order => {
+      switch (order.ordStatus) {
+        case 'Canceled':
+          prunedCanceledOrder = true
+          return true
+        case 'Filled':
+          return (new Date(order.timestamp).getTime() < yesterday)
+      }
+      return false
+    })
+    if (found >= 0) {
+      if (!mock) {
+        logger.info('pruneOrders',orders[found])
+      }
+      orders.splice(found,1)
+    }
+  } while(found >= 0)
+  return prunedCanceledOrder
+} catch(e) {logger.error(e.stack||e);debugger} }
 
 function handleOrder(orders) { try {
   orders.forEach(o => {
@@ -47,6 +73,13 @@ function handleOrder(orders) { try {
     })
     console.log('---------------------')
   }
+  pruneOrders(lastOrders)
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function handleOrderSubscription(o) { try {
+  let order = await request('GET','/orders/'+o.order_id)
+  let orders = translateOrders([order])
+  handleOrder(orders)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updatePosition() { try {
@@ -166,16 +199,13 @@ function capitalizeFirstLetter(string) {
   return string.charAt(0).toUpperCase() + string.slice(1);
 }
 
-async function getOrders({startTime,endTime}) { try {
-  const orders = await request('GET','/orders')
-  const fills = await request('GET','/fills?product_id=BTC-USD')
-  for (let i = 0; i < fills.length; i++) {
-    let o = await request('GET','/orders/'+fills[i].order_id)
-    if (o) {
-      o.ordStatus = 'Filled'
-      orders.push(o)
-    }
-  }
+const orderStatusMap = {
+  open: 'New',
+  active: 'New',
+  done: 'Filled'
+}
+
+function translateOrders(orders) { try {
   const ords = orders.map(o => {
     let price = parseFloat(o.price)
     let order = {
@@ -187,7 +217,7 @@ async function getOrders({startTime,endTime}) { try {
       symbol: o.product_id,
       transactTime: o.created_at,
       timestamp: o.created_at,
-      ordStatus: o.ordStatus || 'New',
+      ordStatus: o.ordStatus || orderStatusMap[o.status],
       ordType: capitalizeFirstLetter(o.type)
     }
     if (o.stop == 'loss') {
@@ -201,6 +231,19 @@ async function getOrders({startTime,endTime}) { try {
     return order
   })
   return ords
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function getOrders({startTime,endTime}) { try {
+  const orders = await request('GET','/orders')
+  const fills = await request('GET','/fills?product_id=BTC-USD')
+  for (let i = 0; i < fills.length; i++) {
+    let o = await request('GET','/orders/'+fills[i].order_id)
+    if (o) {
+      o.ordStatus = 'Filled'
+      orders.push(o)
+    }
+  }
+  return translateOrders(orders)
 } catch(e) {logger.error(e.stack||e);debugger} }
 /*
 created_at:'2020-11-16T02:15:40.325734Z'
@@ -321,7 +364,20 @@ function getRate() {
   return 
 }
 
-async function order(ords) { try {
+async function cancelAll() { try  {
+  const canceledOrderIds = await request('DELETE','/orders/')
+  handleOrder(canceledOrderIds.map(oid => {
+    return {
+      orderID: oid,
+      ordStatus: 'Canceled'
+    }
+  }))
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function order(ords, cancelAllBeforeOrder) { try {
+  if (cancelAllBeforeOrder) {
+    await cancelAll()
+  }
   const enterOrders = ords.filter(ord => {
     return ord.execInst == 'ParticipateDoNotInitiate'
   })
@@ -378,8 +434,15 @@ async function getOpenStopLossOrders() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function cancelExit(openStopLossOrders) { try {
-  await Promise.all(openStopLossOrders.map(o => {
+  if (!openStopLossOrders || openStopLossOrders.length == 0) return
+  const canceledOrderIds = await Promise.all(openStopLossOrders.map(o => {
     return request('DELETE','/orders/'+o.id)
+  }))
+  handleOrder(canceledOrderIds.map(oid => {
+    return {
+      orderID: oid,
+      ordStatus: 'Canceled'
+    }
   }))
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -439,9 +502,13 @@ async function subscribe() { try {
         //  reason: 'canceled',
         console.log(data)
         if (data.reason == 'filled') {
-          debugger // is it stop or limit?
+          await handleOrderSubscription(data)
           await checkStopLoss()
         }
+        break;
+      case 'open':
+        console.log(data)
+        await handleOrderSubscription(data)
         break;
       default:
         console.log(data)
@@ -463,7 +530,6 @@ async function subscribe() { try {
 
 async function init(stg) { try {
   strategy = stg
-
   await updatePosition()
   await checkStopLoss()
   await subscribe()
