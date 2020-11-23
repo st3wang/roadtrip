@@ -1084,6 +1084,7 @@ async function initOrders() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init(strategy,checkPositionCb) { try {
+  console.log('bitmex init')
   lastMargin = {}
   lastInstrument = {}
   lastPosition = {}

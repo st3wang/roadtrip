@@ -228,7 +228,7 @@ async function getOrders({startTime,endTime}) { try {
   const orders = await request('GET','/orders')
   const fills = await request('GET','/fills?product_id=BTC-USD')
   for (let i = 0; i < fills.length; i++) {
-    await wait(250)
+    await wait(200)
     let o = await request('GET','/orders/'+fills[i].order_id)
     if (o) {
       o.ordStatus = 'Filled'
@@ -482,6 +482,7 @@ async function subscribe() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init(stg) { try {
+  console.log('coinbase init')
   strategy = stg
   // const accounts = await request('GET','/accounts')
   // debugger
