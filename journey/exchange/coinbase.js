@@ -68,8 +68,8 @@ function handleOrder(orders) { try {
   })
 
   if (!mock) {
-    lastOrders.forEach((order,i) => {
-      console.log('handleOrder',order)
+    lastOrders.forEach((o,i) => {
+      console.log('handleOrder',name,o.ordStatus,o.ordType,o.side,o.cumQty,o.orderQty,o.price,o.execInst)
     })
     console.log('---------------------')
   }
@@ -115,7 +115,7 @@ const takerFee = 0.00075
 function getCost({side,cumQty,price,execInst}) {
   var foreignNotional = (side == 'Buy' ? -cumQty : cumQty)
   var homeNotional = -foreignNotional / price
-  var coinPairRate = 1 //lastPrice/XBTUSDRate
+  var coinPairRate = 777 //lastPrice/XBTUSDRate
   var fee = execInst.indexOf('ParticipateDoNotInitiate') >= 0 ? makerFee : takerFee
   var execComm = Math.round(Math.abs(homeNotional * coinPairRate) * fee * 100000000)
   return [homeNotional,foreignNotional,execComm]
@@ -212,11 +212,12 @@ function translateOrders(orders) { try {
       cumQty: parseFloat(o.filled_size || o.size) * price,
       orderID: o.id || o.order_id,
       orderQty: parseFloat(o.size) * price,
+      price: price,
       side: capitalizeFirstLetter(o.side),
       symbol: o.product_id,
       transactTime: o.created_at,
       timestamp: o.created_at,
-      ordStatus: o.ordStatus || orderStatusMap[o.status],
+      ordStatus: o.ordStatus || orderStatusMap[o.status]
     }
     if (o.stop == 'loss') {
       order.ordType = 'Market'
@@ -226,7 +227,6 @@ function translateOrders(orders) { try {
     else {
       order.ordType = capitalizeFirstLetter(o.type)
       order.execInst = o.post_only ? 'ParticipateDoNotInitiate' : ''
-      order.price = price
     }
     return order
   })

@@ -155,7 +155,7 @@ async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
     return signal
   }
   else {
-    console.log(signalExchange.name, 'got market', market.candles.length)
+    // console.log(signalExchange.name, 'got market', market.candles.length)
   }
 
   var last = market.closes.length-1
