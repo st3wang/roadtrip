@@ -16,7 +16,7 @@ const symbols = {
 var mock, strategy, ws, wsKeepAliveInterval
 if (shoes.setup.startTime) mock = require('../mock.js')
 
-const {getTimeNow, isoTimestamp, colorizer} = global
+const {getTimeNow, isoTimestamp, colorizer, wait} = global
 
 var position = {exchange:name}
 var lastCandle, lastOrders = []
@@ -133,7 +133,7 @@ async function request(method,path,body) { try {
 
     const options = {
       method: method,
-      hostname: 'api-public.sandbox.pro.coinbase.com',
+      hostname: exchange.coinbase.api,
       // hostname: 'api.pro.coinbase.com',
       path: path,
       agent: false,
@@ -237,6 +237,7 @@ async function getOrders({startTime,endTime}) { try {
   const orders = await request('GET','/orders')
   const fills = await request('GET','/fills?product_id=BTC-USD')
   for (let i = 0; i < fills.length; i++) {
+    await wait(250)
     let o = await request('GET','/orders/'+fills[i].order_id)
     if (o) {
       o.ordStatus = 'Filled'
@@ -452,9 +453,9 @@ async function checkStopLoss() { try {
   const accountBTC = await request('GET','/accounts/' + exchange.coinbase.account_ids.BTC)
   const availableBTC = parseFloat(accountBTC.available)
   const balanceBTC = parseFloat(accountBTC.balance)
-  const openStopLossOrders = await getOpenStopLossOrders()
-  const entrySignal = await strategy.getEntrySignal(name)
   if (balanceBTC > 0) {
+    const openStopLossOrders = await getOpenStopLossOrders()
+    const entrySignal = await strategy.getEntrySignal(name)
     if (availableBTC > 0 || openStopLossOrders.length != 1 || 
       parseFloat(openStopLossOrders[0].stop_price) != entrySignal.closeOrders[0].stopPx) {
       await cancelExit(openStopLossOrders)
@@ -464,7 +465,7 @@ async function checkStopLoss() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function subscribe() { try { 
-  ws = new WebSocket('wss://ws-feed-public.sandbox.pro.coinbase.com')
+  ws = new WebSocket(exchange.coinbase.ws)
   
   ws.onopen = () => {
     console.log('Coinbase WebSocket Connected')
@@ -541,6 +542,8 @@ async function subscribe() { try {
 
 async function init(stg) { try {
   strategy = stg
+  // const accounts = await request('GET','/accounts')
+  // debugger
   handleOrder(await getOrders({endTime:getTimeNow() - oneDayMS}))
   await updatePosition()
   await subscribe()
