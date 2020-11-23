@@ -134,7 +134,6 @@ async function request(method,path,body) { try {
     const options = {
       method: method,
       hostname: exchange.coinbase.api,
-      // hostname: 'api.pro.coinbase.com',
       path: path,
       agent: false,
       headers: {
@@ -150,15 +149,7 @@ async function request(method,path,body) { try {
       options.headers['Content-Type'] = 'application/json'
       options.headers['Content-Length'] = body.length
     }
-    // const options = {
-    //   hostname: 'encrypted.google.com',
-    //   port: 443,
-    //   path: '/',
-    //   method: 'GET'
-    // }
     const req = https.request(options, (res) => {
-      // console.log('statusCode:', res.statusCode);
-      // console.log('headers:', res.headers);
       let data = ''
       res.on('data', (chunk) => {data += chunk})
       res.on('end', () => {
@@ -248,48 +239,6 @@ async function getOrders({startTime,endTime}) { try {
   }
   return translateOrders(orders)
 } catch(e) {logger.error(e.stack||e);debugger} }
-/*
-created_at:'2020-11-16T02:15:40.325734Z'
-executed_value:'0.0000000000000000'
-fill_fees:'0.0000000000000000'
-filled_size:'0.00000000'
-id:'fa17bcb3-ca64-40b9-aa2c-ef5b2fc89600'
-post_only:true
-price:'888.00000000'
-product_id:'BTC-USD'
-profile_id:'b94f350d-755e-4285-8de5-8af773ca4a68'
-settled:false
-side:'buy'
-size:'1.00000000'
-status:'open'
-time_in_force:'GTC'
-type:'limit'
-
-created_at:'2020-11-18T04:01:45.014Z'
-fee:'0.9021930000000000'
-liquidity:'M'
-order_id:'b6394036-1376-46f5-9ae4-9f8d90e01a39'
-price:'18043.86000000'
-product_id:'BTC-USD'
-profile_id:'6fa33f91-8ead-471a-a477-6c86840b63b8'
-settled:true
-side:'buy'
-size:'0.01000000'
-trade_id:19245305
-usd_volume:'180.4386000000000000'
-user_id:'5a4063bcd96aa305d74c4691'
-
-// see base_strategy.js getEntryExitOrders
-'Close,ParticipateDoNotInitiate' // close toolong or funding
-'Close,LastPrice' // stop order
-'ParticipateDoNotInitiate,ReduceOnly' // take profit order
-execInst:'ParticipateDoNotInitiate' // 
-ordStatus:'Filled'
-ordType:'Limit'
-stopPx:null
-timestamp:'2020-11-15T09:00:34.397Z'
-transactTime:'2020-11-15T09:00:06.078Z'
-*/
 
 function isPriceEqual(a,b) {
   return (a >= (b*0.99) && a <= (b*1.01))
@@ -393,14 +342,6 @@ async function order(ords, cancelAllBeforeOrder) { try {
   }, {status:200})
   response.orders = responses
   return response
-  // res = await order({
-  //   side: 'sell',
-  //   product_id: 'BTC-USD',
-  //   size: 0.01,
-  //   stop: 'loss',
-  //   stop_price: 16000,
-  //   price: 1
-  // })
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function orderEntry(ord) { try {
