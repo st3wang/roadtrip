@@ -13,7 +13,7 @@ const symbols = {
   XBTUSD: 'BTC-USD'
 }
 
-var mock, strategy
+var mock, strategy, ws, wsKeepAliveInterval
 if (shoes.setup.startTime) mock = require('../mock.js')
 
 const {getTimeNow, isoTimestamp, colorizer} = global
@@ -464,7 +464,7 @@ async function checkStopLoss() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function subscribe() { try { 
-  var ws = new WebSocket('wss://ws-feed-public.sandbox.pro.coinbase.com')
+  ws = new WebSocket('wss://ws-feed-public.sandbox.pro.coinbase.com')
   
   ws.onopen = () => {
     console.log('Coinbase WebSocket Connected')
@@ -519,16 +519,24 @@ async function subscribe() { try {
   }
   
   ws.onclose = () => {
-    console.log('Closed')
+    console.log('WS closed. Reconnecting in 1000ms')
+    setTimeout(subscribe, 1000)
   }
   
   ws.onerror = () => {
-    console.log('Connection Error')
+    console.error('Connection Error')
   }
 
-  setInterval(() => {
-    ws.send('{"type":"unsubscribe","channels":["heartbeat"]}')
-  }, 6000)
+  if (!wsKeepAliveInterval) {
+    wsKeepAliveInterval = setInterval(() => {
+      if (ws.readyState === ws.OPEN) {
+        ws.send('{"type":"unsubscribe","channels":["heartbeat"]}')
+      }
+      else {
+        console.log('ws.readyState', ws.readyState)
+      }
+    }, 3000)
+  }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init(stg) { try {
