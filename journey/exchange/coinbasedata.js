@@ -1,6 +1,7 @@
 const util = require('util')
 const fs = require('fs')
 const https 	= require('https')
+const path = require('path')
 
 const ymdHelper = require('../ymdHelper')
 const shoes = require('../shoes')
@@ -13,6 +14,26 @@ const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
 const exchange = 'coinbase'
 const symbols = ['BTC-USD']
+
+const orderFilePath = path.resolve(__dirname, '../data/exchange/order/orderid.json')
+
+function getOrderFile(o) {
+  return orderFilePath.replace('exchange',exchange).replace('orderid',o.id)
+}
+
+async function readOrder(orderId) {
+  const readPath = getOrderFile({id:orderId})
+  if (fs.existsSync(readPath)) {
+    var str = fs.readFileSync(readPath,readFileOptions)
+    var order = JSON.parse(str)
+    return order
+  }
+}
+
+async function writeOrder(o) {
+  const writePath = getOrderFile(o)
+  await writeFile(writePath,JSON.stringify(o),writeFileOptions)
+}
 
 async function readFeedDay(symbol,interval,time) {
   return await base.readFeedDay(exchange,symbol,interval,time)
@@ -109,9 +130,13 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
   }
 } catch(e) {console.error(e.stack||e);debugger} }
 
+
+
 module.exports = {
   generateCandleDayFiles: generateCandleDayFiles,
   readFeedDay: readFeedDay,
   readMarket: readMarket,
-  getMarket: getMarket
+  getMarket: getMarket,
+  readOrder: readOrder,
+  writeOrder: writeOrder
 }

@@ -83,9 +83,12 @@ async function handleOrderSubscription(o) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updatePosition() { try {
-  var accountUSD = await request('GET','/accounts/' + exchange.coinbase.account_ids.USD)
+  const accounts = await request('GET','/accounts')
+  const accountUSD = accounts.find(a => {return a.currency == 'USD' && a.balance > 0})
+  const accountBTC = accounts.find(a => {return a.currency == 'BTC'})
   var quote = await getQuote()
-  position.marginBalance = accountUSD.balance * 100000000 / quote.lastPrice
+  position.marginBalance = (accountUSD.balance*1 / quote.lastPrice + accountBTC.balance*1) * 100000000
+  position.walletBalance = position.marginBalance
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getCurrentMarket() { try {
@@ -122,6 +125,11 @@ function getCost({side,cumQty,price,execInst}) {
 }
 
 async function request(method,path,body) { try {
+  if (method == 'GET' && path.startsWith('/orders') && path.length > 8) {
+    var cachedOrder = await coinbasedata.readOrder(path.replace('/orders/',''))
+    if (cachedOrder) return cachedOrder
+    await wait(200) // rate limit
+  }
   return new Promise((resolve,reject) => {
     var timestamp = Math.round(Date.now() / 1000)
     body = body ? JSON.stringify(body) : body
@@ -152,8 +160,14 @@ async function request(method,path,body) { try {
     const req = https.request(options, (res) => {
       let data = ''
       res.on('data', (chunk) => {data += chunk})
-      res.on('end', () => {
+      res.on('end', async() => {
         let value = JSON.parse(data)
+        if (method == 'GET' && path.startsWith('/orders') && path.length > 8) {
+          let ords = translateOrders([value])
+          value.translatedOrder = ords[0]
+          // write order cache
+          await coinbasedata.writeOrder(value)
+        }
         resolve(value)
       })
     })
@@ -169,9 +183,9 @@ async function getQuote() { try {
   // GET /products/<product-id>/ticker
   var ticker = await request('GET','/products/' + symbols[shoes.symbol] + '/ticker')
   return {
-    bidPrice: parseFloat(ticker.bid),
-    askPrice: parseFloat(ticker.ask),
-    lastPrice: parseFloat(ticker.price)
+    bidPrice: ticker.bid*1,
+    askPrice: ticker.ask*1,
+    lastPrice: ticker.price*1
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -198,11 +212,14 @@ const orderStatusMap = {
 
 function translateOrders(orders) { try {
   const ords = orders.map(o => {
-    let price = parseFloat(o.price)
+    if (o.translatedOrder) {
+      return o.translatedOrder
+    }
+    let price = o.price*1
     let order = {
-      cumQty: parseFloat(o.filled_size || o.size) * price,
+      cumQty: 1*(o.filled_size || o.size) * price,
       orderID: o.id || o.order_id,
-      orderQty: parseFloat(o.size) * price,
+      orderQty: 1*(o.size) * price,
       price: price,
       side: capitalizeFirstLetter(o.side),
       symbol: o.product_id,
@@ -228,7 +245,6 @@ async function getOrders({startTime,endTime}) { try {
   const orders = await request('GET','/orders')
   const fills = await request('GET','/fills?product_id=BTC-USD')
   for (let i = 0; i < fills.length; i++) {
-    await wait(200)
     let o = await request('GET','/orders/'+fills[i].order_id)
     if (o) {
       o.ordStatus = 'Filled'
@@ -392,13 +408,13 @@ async function cancelExit(openStopLossOrders) { try {
 
 async function checkStopLoss() { try {
   const accountBTC = await request('GET','/accounts/' + exchange.coinbase.account_ids.BTC)
-  const availableBTC = parseFloat(accountBTC.available)
-  const balanceBTC = parseFloat(accountBTC.balance)
+  const availableBTC = 1*(accountBTC.available)
+  const balanceBTC = 1*(accountBTC.balance)
   if (balanceBTC > 0) {
     const openStopLossOrders = await getOpenStopLossOrders()
     const entrySignal = await strategy.getEntrySignal(name)
     if (availableBTC > 0 || openStopLossOrders.length != 1 || 
-      parseFloat(openStopLossOrders[0].stop_price) != entrySignal.closeOrders[0].stopPx) {
+      1*(openStopLossOrders[0].stop_price) != entrySignal.closeOrders[0].stopPx) {
       await cancelExit(openStopLossOrders)
       await orderExit(entrySignal.closeOrders[0], balanceBTC)
     }

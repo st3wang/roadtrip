@@ -116,8 +116,8 @@ async function readSignal(name,symbol,interval,time) { try {
 
 async function writeSignal(name,symbol,interval,time,signal) { try {
   time = time - (time % (interval*60000))
-  const wrutePath = getSignalFile(name,symbol,interval,time)
-  await writeFile(wrutePath,JSON.stringify(signal),writeFileOptions)
+  const writePath = getSignalFile(name,symbol,interval,time)
+  await writeFile(writePath,JSON.stringify(signal),writeFileOptions)
 } catch(e) {console.error(e.stack||e);debugger} }
 
 module.exports = {
