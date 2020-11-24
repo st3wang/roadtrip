@@ -15,6 +15,7 @@ const writeFileOptions = {encoding:'utf-8', flag:'w'}
 const exchange = 'coinbase'
 const symbols = ['BTC-USD']
 
+const orderDirPath = path.resolve(__dirname, '../data/coinbase/order')
 const orderFilePath = path.resolve(__dirname, '../data/exchange/order/orderid.json')
 
 function getOrderFile(o) {
@@ -24,10 +25,26 @@ function getOrderFile(o) {
 async function readOrder(orderId) {
   const readPath = getOrderFile({id:orderId})
   if (fs.existsSync(readPath)) {
-    var str = fs.readFileSync(readPath,readFileOptions)
-    var order = JSON.parse(str)
+    const str = fs.readFileSync(readPath,readFileOptions)
+    const order = JSON.parse(str)
     return order
   }
+}
+
+async function readAllOrders() {
+  const orders = []
+  const files = fs.readdirSync(orderDirPath) 
+
+  files.forEach(function (file, index) {
+    // Make one pass and make the file complete
+    let readPath = path.join(orderDirPath, file)
+    if (readPath.endsWith('.json')) {
+      const str = fs.readFileSync(readPath,readFileOptions)
+      const order = JSON.parse(str)
+      orders.push(order)
+    }
+  })
+  return orders
 }
 
 async function writeOrder(o) {
@@ -137,6 +154,7 @@ module.exports = {
   readFeedDay: readFeedDay,
   readMarket: readMarket,
   getMarket: getMarket,
+  readAllOrders: readAllOrders,
   readOrder: readOrder,
   writeOrder: writeOrder
 }

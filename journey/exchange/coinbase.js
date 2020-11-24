@@ -86,9 +86,42 @@ async function updatePosition() { try {
   const accounts = await request('GET','/accounts')
   const accountUSD = accounts.find(a => {return a.currency == 'USD' && a.balance > 0})
   const accountBTC = accounts.find(a => {return a.currency == 'BTC'})
-  var quote = await getQuote()
-  position.marginBalance = (accountUSD.balance*1 / quote.lastPrice + accountBTC.balance*1) * 100000000
-  position.walletBalance = position.marginBalance
+  const balanceUSD = accountUSD.balance*1
+  const balanceBTC = accountBTC.balance*1
+  var {lastPrice} = await getQuote()
+
+  const allOrders = await coinbasedata.readAllOrders()
+  allOrders.sort((a,b) => {
+    if (a.done_at < b.done_at) {
+      return 1
+    }
+    else {
+      return -1
+    }
+  })
+  var countBalanceBTC = balanceBTC
+  var i = 0, activeTradeOrders = [], totalCostUSD = 0
+  
+  while (countBalanceBTC > 0) {
+    let o = allOrders[i]
+    if (!o.stop && o.status == 'done') {
+      let size = o.size*1
+      let valueUSD = size * o.price
+      let costUSD = valueUSD //* 1.005
+      countBalanceBTC = Math.round((countBalanceBTC - size)*10000000000)/10000000000
+      activeTradeOrders.push(o)
+      totalCostUSD += costUSD
+    }
+    i++
+  }
+  var totalCostBTC = Math.round(((totalCostUSD) / lastPrice) * 100000000)
+
+  position.marginBalance = Math.round((balanceUSD / lastPrice + balanceBTC) * 100000000)
+  position.walletBalance = Math.round(((balanceUSD + totalCostUSD) / lastPrice) * 100000000)
+  position.unrealisedPnl = totalCostBTC - Math.round((balanceBTC) * 100000000)
+  position.positionSize = Math.round(balanceBTC*lastPrice)
+  position.lastPrice = lastPrice
+  debugger
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getCurrentMarket() { try {
@@ -124,8 +157,8 @@ function getCost({side,cumQty,price,execInst}) {
   return [homeNotional,foreignNotional,execComm]
 }
 
-async function request(method,path,body) { try {
-  if (method == 'GET' && path.startsWith('/orders') && path.length > 8) {
+async function request(method,path,body,noCache) { try {
+  if (!noCache && method == 'GET' && path.startsWith('/orders') && path.length > 8) {
     var cachedOrder = await coinbasedata.readOrder(path.replace('/orders/',''))
     if (cachedOrder) return cachedOrder
     await wait(200) // rate limit
@@ -162,7 +195,9 @@ async function request(method,path,body) { try {
       res.on('data', (chunk) => {data += chunk})
       res.on('end', async() => {
         let value = JSON.parse(data)
-        if (method == 'GET' && path.startsWith('/orders') && path.length > 8) {
+        if (value.id && 
+            ((method == 'GET' && path.startsWith('/orders') && path.length > 8) ||
+            (method == 'POST' && path.startsWith('/orders')))) {
           let ords = translateOrders([value])
           value.translatedOrder = ords[0]
           // write order cache
@@ -460,15 +495,16 @@ async function subscribe() { try {
         break;
       case 'done':
         //  reason: 'canceled',
-        console.log(data)
+        // console.log(data)
         if (data.reason == 'filled') {
+          await request('GET','/orders/'+data.order_id)
           await handleOrderSubscription(data)
           await checkStopLoss()
         }
         break;
       case 'activate':
       case 'open':
-        console.log(data)
+        // console.log(data)
         await handleOrderSubscription(data)
         break;
       default:
@@ -501,6 +537,15 @@ async function init(stg) { try {
   console.log('coinbase init')
   strategy = stg
   // const accounts = await request('GET','/accounts')
+  // debugger
+  // await request('POST','/orders',{
+  //   product_id: 'BTC-USD',
+  //   side: 'sell',
+  //   price: 1, // execute at market price
+  //   stop: 'loss',
+  //   stop_price: 1000,
+  //   size: 0.01
+  // })
   // debugger
   handleOrder(await getOrders({endTime:getTimeNow() - oneDayMS}))
   await updatePosition()
