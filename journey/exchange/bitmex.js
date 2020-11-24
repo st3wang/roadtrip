@@ -37,8 +37,8 @@ var lastCandle, currentCandle
 
 const {getTimeNow, isoTimestamp, colorizer} = global
 
-function orderString({ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst}) {
-  return ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
+function orderString({timestamp,ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst}) {
+  return timestamp+' '+ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
 }
 
 function orderStringBulk(orders) {

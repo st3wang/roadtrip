@@ -69,7 +69,7 @@ function handleOrder(orders) { try {
 
   if (!mock) {
     lastOrders.forEach((o,i) => {
-      console.log('handleOrder',name,o.ordStatus,o.ordType,o.side,o.cumQty,o.orderQty,o.price,o.execInst)
+      console.log('handleOrder',name,o.timestamp,o.ordStatus,o.ordType,o.side,o.cumQty,o.orderQty,o.price,o.execInst)
     })
     console.log('---------------------')
   }
