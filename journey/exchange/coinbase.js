@@ -107,7 +107,11 @@ async function updatePosition() { try {
   while (countBalanceBTC > 0) {
     let o = allOrders[i]
     if (!o.stop) {
-      // if (o.status !=)
+      if (o.status != 'done') {
+        // update the order status. make sure it's not already filled.
+        o = await request('GET','/orders/'+o.order_id,undefined,true)
+        allOrders[i] = o
+      }
       if (o.status == 'done') {
         let size = parseFloat(o.size)
         let valueUSD = size * o.price
@@ -284,6 +288,9 @@ function translateOrders(orders) { try {
 
 async function getOrders({startTime,endTime}) { try {
   const orders = await request('GET','/orders')
+  for (let i = 0; i < orders.length; i++) {
+    coinbasedata.writeOrder(orders[i])
+  }
   const fills = await request('GET','/fills?product_id=BTC-USD')
   for (let i = 0; i < fills.length; i++) {
     let o = await request('GET','/orders/'+fills[i].order_id)
