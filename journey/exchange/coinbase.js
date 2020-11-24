@@ -90,27 +90,23 @@ async function updatePosition() { try {
   const balanceBTC = accountBTC.balance*1
   var {lastPrice} = await getQuote()
 
-  const allOrders = await coinbasedata.readAllOrders()
-  allOrders.sort((a,b) => {
-    if (a.done_at < b.done_at) {
-      return 1
-    }
-    else {
-      return -1
-    }
+  const allDoneOrders = (await coinbasedata.readAllOrders()).filter(o => {return o.done_at})
+  allDoneOrders.sort((a,b) => {
+    let aTime = new Date(a.done_at).getTime()
+    let bTime = new Date(b.done_at).getTime()
+    return bTime - aTime
   })
-  // console.log('allOrders',allOrders)
 
   var countBalanceBTC = balanceBTC
   var i = 0, activeTradeOrders = [], totalCostUSD = 0
   
   while (countBalanceBTC > 0) {
-    let o = allOrders[i]
+    let o = allDoneOrders[i]
     if (!o.stop) {
       if (o.status != 'done') {
         // update the order status. make sure it's not already filled.
         o = await request('GET','/orders/'+o.order_id,undefined,true)
-        allOrders[i] = o
+        allDoneOrders[i] = o
       }
       if (o.status == 'done') {
         let size = parseFloat(o.size)
@@ -123,7 +119,6 @@ async function updatePosition() { try {
     }
     i++
   }
-  // console.log('activeTradeOrders',activeTradeOrders)
   var totalCostBTC = Math.round(((totalCostUSD) / lastPrice) * 100000000)
 
   position.marginBalance = Math.round((balanceUSD / lastPrice + balanceBTC) * 100000000)
@@ -391,6 +386,9 @@ async function cancelAll() { try  {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function order(ords, cancelAllBeforeOrder) { try {
+  return {
+    status: 200
+  }
   if (cancelAllBeforeOrder) {
     await cancelAll()
   }
