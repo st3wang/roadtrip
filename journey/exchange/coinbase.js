@@ -114,6 +114,7 @@ async function updatePosition() { try {
     }
     i++
   }
+  console.log('activeTradeOrders',activeTradeOrders)
   var totalCostBTC = Math.round(((totalCostUSD) / lastPrice) * 100000000)
 
   position.marginBalance = Math.round((balanceUSD / lastPrice + balanceBTC) * 100000000)
