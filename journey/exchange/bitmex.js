@@ -19,16 +19,15 @@ var client, checkPositionCallback, position = {exchange:name}
 var marketCache, marketWithCurrentCandleCache
 var binSize = 1
 var binSizeString = '1m'
-var bitMexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
 if (setup.candle.interval >= 60) {
   binSize = 60
   binSizeString = '1h'
-  bitMexOffset = 0
 }
 else if (setup.candle.interval >= 5) {
   binSize = 5
   binSizeString = '5m'
 }
+var bitmexOffset = binSize * 60000 // bitmet bucket time is one bucket ahead
 
 var ws
 var lastMargin = {}, lastInstrument = {}, lastPosition = {}, lastOrders = [], lastXBTUSDInstrument = {}
@@ -425,13 +424,13 @@ function getPageTimes({interval,startTime,endTime}) {
   var endTimeMs = new Date(endTime).getTime()
   var length = (endTimeMs - startTimeMs) / (interval*60000)
   var offset = (length * interval * 60000) + (endTimeMs % (interval * 60000))
-  offset -= bitMexOffset
+  offset -= bitmexOffset
   var totalMinutes = interval*length
   var maxPageSize = binSize*100
   var pageIncrement = totalMinutes/Math.ceil(totalMinutes/maxPageSize)*60000
   var pages = []
   if (offset > pageIncrement) {
-    var end = pageIncrement - bitMexOffset
+    var end = pageIncrement - bitmexOffset
     for (; offset >= end; offset-=pageIncrement) {
       pages.push({
         startTime: new Date(endTimeMs - offset).toISOString(),
@@ -450,7 +449,7 @@ function getPageTimes({interval,startTime,endTime}) {
 
 function toCandle(group) {
   var open = group[0].open
-  let timeMs = new Date(group[0].timestamp).getTime()
+  let timeMs = new Date(group[0].timestamp).getTime() - oneCandleMs
   let candle = {
     time: new Date(timeMs).toISOString(),
     startTimeMs: timeMs,
@@ -504,7 +503,7 @@ async function getTradeBucketed(sp) { try {
   getTradeBucketedRequesting = Promise.all(pages.map(async (page,i) => {
     let response = await client.Trade.Trade_getBucketed({symbol: symbol, binSize: '1h', 
       startTime:page.startTime,endTime:page.endTime})
-    page.buckets = JSON.parse(response.data.toString());
+    page.buckets = JSON.parse(response.data.toString())
   }))
   await getTradeBucketedRequesting
   getTradeBucketedRequesting = null
@@ -535,6 +534,7 @@ async function getMarket(sp) {
 }
 
 function getLastCandle() {
+  console.log('bitmex getLastCandle', lastCandle)
   return lastCandle
 }
 
@@ -627,6 +627,7 @@ async function getOrders({startTime,endTime}) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getCurrentCandle() {
+  console.log('bitmex getCurrentCandle', currentCandle)
   return currentCandle
 }
 

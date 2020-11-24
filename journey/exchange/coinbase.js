@@ -90,10 +90,10 @@ async function updatePosition() { try {
   const balanceBTC = accountBTC.balance*1
   var {lastPrice} = await getQuote()
 
-  const allDoneOrders = (await coinbasedata.readAllOrders()).filter(o => {return o.done_at})
+  const allDoneOrders = await coinbasedata.readAllOrders()
   allDoneOrders.sort((a,b) => {
-    let aTime = new Date(a.done_at).getTime()
-    let bTime = new Date(b.done_at).getTime()
+    let aTime = new Date(a.created_at).getTime()
+    let bTime = new Date(b.created_at).getTime()
     return bTime - aTime
   })
 
@@ -111,7 +111,7 @@ async function updatePosition() { try {
       if (o.status == 'done') {
         let size = parseFloat(o.size)
         let valueUSD = size * o.price
-        let costUSD = valueUSD //* 1.005
+        let costUSD = valueUSD + (o.fill_fees*1)
         countBalanceBTC = Math.round((countBalanceBTC - size)*10000000000)/10000000000
         activeTradeOrders.push(o)
         totalCostUSD += costUSD
@@ -123,10 +123,9 @@ async function updatePosition() { try {
 
   position.marginBalance = Math.round((balanceUSD / lastPrice + balanceBTC) * 100000000)
   position.walletBalance = Math.round(((balanceUSD + totalCostUSD) / lastPrice) * 100000000)
-  position.unrealisedPnl = totalCostBTC - Math.round((balanceBTC) * 100000000)
+  position.unrealisedPnl = Math.round((balanceBTC) * 100000000) - totalCostBTC
   position.positionSize = Math.round(balanceBTC*lastPrice)
   position.lastPrice = lastPrice
-  debugger
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getCurrentMarket() { try {
@@ -151,13 +150,11 @@ async function getCurrentMarket() { try {
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-const makerFee = -0.00025
-const takerFee = 0.00075
 function getCost({side,cumQty,price,execInst}) {
   var foreignNotional = (side == 'Buy' ? -cumQty : cumQty)
   var homeNotional = -foreignNotional / price
-  var coinPairRate = 777 //lastPrice/XBTUSDRate
-  var fee = execInst.indexOf('ParticipateDoNotInitiate') >= 0 ? makerFee : takerFee
+  var coinPairRate = 1 //lastPrice/XBTUSDRate
+  var fee = 0.005
   var execComm = Math.round(Math.abs(homeNotional * coinPairRate) * fee * 100000000)
   return [homeNotional,foreignNotional,execComm]
 }
@@ -233,10 +230,12 @@ async function getCurrentCandle() { try {
   const now = getTimeNow()
   const start = new Date(now - (now % oneCandleMs)).toISOString()
   var market = await coinbasedata.getMarket(symbols[shoes.symbol], setup.candle.interval, start, start)
+  console.log('coinbase getCurrentCandle', market.candles[0])
   return market.candles[0]
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function getLastCandle() {
+  console.log('coinbase getLastCandle', lastCandle)
   return lastCandle
 }
 
@@ -386,9 +385,6 @@ async function cancelAll() { try  {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function order(ords, cancelAllBeforeOrder) { try {
-  return {
-    status: 200
-  }
   if (cancelAllBeforeOrder) {
     await cancelAll()
   }
@@ -425,7 +421,7 @@ async function orderExit(ord,size) { try {
     let o = {
       product_id: 'BTC-USD',
       side: ord.side.toLowerCase(),
-      price: 1, // execute at market price
+      price: 777, // execute at market price
       stop: 'loss',
       stop_price: ord.stopPx,
       size: size

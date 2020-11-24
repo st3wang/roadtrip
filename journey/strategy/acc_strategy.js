@@ -193,13 +193,13 @@ async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getOrder(tradeExchange,setup,position,signal) {
+  var lastCandle = tradeExchange.getLastCandle()
+  var currentCandle = await tradeExchange.getCurrentCandle()
   if (signal.condition == '-') {
     return signal
   }
 
   var quote = await tradeExchange.getQuote()
-  var lastCandle = tradeExchange.getLastCandle()
-  var currentCandle = await tradeExchange.getCurrentCandle()
 
   switch(signal.condition) {
     case 'LONG':
