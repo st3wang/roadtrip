@@ -534,7 +534,6 @@ async function getMarket(sp) {
 }
 
 function getLastCandle() {
-  console.log('bitmex getLastCandle', lastCandle)
   return lastCandle
 }
 
@@ -627,7 +626,6 @@ async function getOrders({startTime,endTime}) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function getCurrentCandle() {
-  console.log('bitmex getCurrentCandle', currentCandle)
   return currentCandle
 }
 

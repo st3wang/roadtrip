@@ -230,12 +230,10 @@ async function getCurrentCandle() { try {
   const now = getTimeNow()
   const start = new Date(now - (now % oneCandleMs)).toISOString()
   var market = await coinbasedata.getMarket(symbols[shoes.symbol], setup.candle.interval, start, start)
-  console.log('coinbase getCurrentCandle', market.candles[0])
   return market.candles[0]
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function getLastCandle() {
-  console.log('coinbase getLastCandle', lastCandle)
   return lastCandle
 }
 

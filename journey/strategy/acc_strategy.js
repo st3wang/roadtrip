@@ -352,35 +352,48 @@ async function getOrder(tradeExchange,setup,position,signal) {
   return order
 }
 
-async function getSignal(setup,position) {
-  console.log('===== getSignal =====', new Date(getTimeNow()).toISOString())
-  // const bitmexSignal = await getAccumulationSignal(bitmex,setup)
-  // if (bitmexSignal.condition != '-') {
-  //   return bitmexSignal
-  // }
-
-  const coinbaseSignal = await getAccumulationSignal(coinbase,setup)
-  // const coinbaseSignal = await getAccumulationSignal(coinbase,setup,bitmexSignal.stopLoss)
-  if (coinbaseSignal.condition != '-') {
-    return coinbaseSignal
+async function getSignal(tradeExchange,setup,position) {
+  const tradeExchangeSignal = await getAccumulationSignal(tradeExchange,setup)
+  if (tradeExchangeSignal.condition != '-') {
+    return tradeExchangeSignal
+  }
+  
+  if (tradeExchange != bitmex) {
+    const bitmexSignal = await getAccumulationSignal(bitmex,setup,tradeExchangeSignal.stopLoss)
+    if (bitmexSignal.condition != '-') {
+      return bitmexSignal
+    }
   }
 
-  const bitstampSignal = await getAccumulationSignal(bitstamp,setup,coinbaseSignal.stopLoss)
-  if (bitstampSignal.condition != '-') {
-    return bitstampSignal
+  if (tradeExchange != coinbase) {
+    const coinbaseSignal = await getAccumulationSignal(coinbase,setup,tradeExchangeSignal.stopLoss)
+    if (coinbaseSignal.condition != '-') {
+      return coinbaseSignal
+    }
   }
 
-  const binanceSignal = await getAccumulationSignal(binance,setup,coinbaseSignal.stopLoss)
-  if (binanceSignal.condition != '-') {
-    return binanceSignal
+  if (tradeExchange != bitstamp) {
+    const bitstampSignal = await getAccumulationSignal(bitstamp,setup,tradeExchangeSignal.stopLoss)
+    if (bitstampSignal.condition != '-') {
+      return bitstampSignal
+    }
   }
 
-  const bitfinexSignal = await getAccumulationSignal(bitfinex,setup,coinbaseSignal.stopLoss)
-  if (bitfinexSignal.condition != '-') {
-    return bitfinexSignal
+  if (tradeExchange != binance) {
+    const binanceSignal = await getAccumulationSignal(binance,setup,tradeExchangeSignal.stopLoss)
+    if (binanceSignal.condition != '-') {
+      return binanceSignal
+    }
   }
 
-  return coinbaseSignal
+  if (tradeExchange != bitfinex) {
+    const bitfinexSignal = await getAccumulationSignal(bitfinex,setup,tradeExchangeSignal.stopLoss)
+    if (bitfinexSignal.condition != '-') {
+      return bitfinexSignal
+    }
+  }
+
+  return tradeExchangeSignal
 }
 
 function cancelOrder(params) {
@@ -465,7 +478,7 @@ async function checkEntry(tradeExchange) { try {
       }
     }
   }
-  var signal = await getOrder(tradeExchange,setup,position,await getSignal(setup,position))
+  var signal = await getOrder(tradeExchange,setup,position,await getSignal(tradeExchange,setup,position))
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
