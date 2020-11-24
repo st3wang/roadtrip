@@ -99,24 +99,27 @@ async function updatePosition() { try {
       return -1
     }
   })
-  console.log('allOrders',allOrders)
+  // console.log('allOrders',allOrders)
 
   var countBalanceBTC = balanceBTC
   var i = 0, activeTradeOrders = [], totalCostUSD = 0
   
   while (countBalanceBTC > 0) {
     let o = allOrders[i]
-    if (!o.stop && o.status == 'done') {
-      let size = o.size*1
-      let valueUSD = size * o.price
-      let costUSD = valueUSD //* 1.005
-      countBalanceBTC = Math.round((countBalanceBTC - size)*10000000000)/10000000000
-      activeTradeOrders.push(o)
-      totalCostUSD += costUSD
+    if (!o.stop) {
+      // if (o.status !=)
+      if (o.status == 'done') {
+        let size = parseFloat(o.size)
+        let valueUSD = size * o.price
+        let costUSD = valueUSD //* 1.005
+        countBalanceBTC = Math.round((countBalanceBTC - size)*10000000000)/10000000000
+        activeTradeOrders.push(o)
+        totalCostUSD += costUSD
+      }
     }
     i++
   }
-  console.log('activeTradeOrders',activeTradeOrders)
+  // console.log('activeTradeOrders',activeTradeOrders)
   var totalCostBTC = Math.round(((totalCostUSD) / lastPrice) * 100000000)
 
   position.marginBalance = Math.round((balanceUSD / lastPrice + balanceBTC) * 100000000)
@@ -163,7 +166,7 @@ function getCost({side,cumQty,price,execInst}) {
 async function request(method,path,body,noCache) { try {
   if (!noCache && method == 'GET' && path.startsWith('/orders') && path.length > 8) {
     var cachedOrder = await coinbasedata.readOrder(path.replace('/orders/',''))
-    if (cachedOrder) return cachedOrder
+    if (cachedOrder && cachedOrder.status == 'done') return cachedOrder
     await wait(200) // rate limit
   }
   return new Promise((resolve,reject) => {
@@ -500,7 +503,7 @@ async function subscribe() { try {
         //  reason: 'canceled',
         // console.log(data)
         if (data.reason == 'filled') {
-          await request('GET','/orders/'+data.order_id)
+          await request('GET','/orders/'+data.order_id,undefined,true)
           await handleOrderSubscription(data)
           await checkStopLoss()
         }
