@@ -85,7 +85,7 @@ function getISOTimeNow() {
 }
 
 function authorize() {
-
+  return {}
 }
 
 async function getTradeBucketed({symbol,interval,startTime,endTime}) { try {

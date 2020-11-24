@@ -55,7 +55,6 @@ Object.keys(setup.exchange).forEach(exchangeName => {
   tradeExchangesByName[exchangeName] = exchanges[exchangeName]
 })
 const strategy = require('./strategy/' + shoes.strategy + '_strategy')
-const candlestick = require('./candlestick')
 const oneCandleMS = setup.candle.interval*60000
 
 global.bitmex = bitmex
@@ -183,7 +182,6 @@ async function getTradeJson(sp) { try {
   var firstEnterPrice = signals[0].signal.entryPrice
   var walletHistory = await bitmex.getWalletHistory()
   var trades = [], ords = []
-  var timeOffset = 1000 // bitmex time and server time are not the same
   var walletBalance = walletHistory[0][1]
   var walletBalanceUSD = walletBalance*firstEnterPrice/100000000
   var groupid = 0
@@ -191,8 +189,10 @@ async function getTradeJson(sp) { try {
   
   signals.forEach((signal,i) => {
     let {timestamp} = signal.signal
-    let startTime = new Date(timestamp).getTime() - timeOffset
-    let endTime = (signals[i+1] ? new Date(signals[i+1].signal.timestamp) : new Date()).getTime() - timeOffset
+    let startTime = new Date(timestamp).getTime()
+    startTime -= startTime%oneCandleMS
+    let endTime = (signals[i+1] ? new Date(signals[i+1].signal.timestamp) : new Date()).getTime()
+    endTime -= endTime%oneCandleMS+1000
     ords[i] = orders.filter((o) => {
       let {timestamp} = o
       let t = new Date(timestamp).getTime()
@@ -378,7 +378,7 @@ async function readLog() {
 async function updateData() {
   console.time('updateData')
   var start = 20200101
-  var end = 20201111
+  var end = 20201123
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
