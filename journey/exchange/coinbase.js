@@ -99,6 +99,8 @@ async function updatePosition() { try {
       return -1
     }
   })
+  console.log('allOrders',allOrders)
+
   var countBalanceBTC = balanceBTC
   var i = 0, activeTradeOrders = [], totalCostUSD = 0
   
