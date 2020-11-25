@@ -140,13 +140,12 @@ const logger = winston.createLogger({
   ]
 })
 
-async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
+async function getAccumulationSignal(signalExchange,{rsi}) { try {
   var now = getTimeNow()
   var signal = {
     timestamp: new Date(now).toISOString(),
     signalExchange: signalExchange.name,
-    condition: '-',
-    stopLoss: stopLoss
+    condition: '-'
   }
 
   var market = await signalExchange.getCurrentMarket()
@@ -175,7 +174,6 @@ async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
   // var [isMPrice,mtop1,mbottom1,mtop2] = candlestick.findM(avgBodies,last,bodyLows,open,close)
 
   // signal.stopLoss = market.lows[wbottom2]
-  signal.stopLoss = signal.stopLoss || Math.min(...market.lows)
   // signal.stopLoss = Math.min(...(market.lows.slice(6,market.lows.length-1)))
 
   if (isWPrice == 3 && isWRsi == 3) {
@@ -183,8 +181,7 @@ async function getAccumulationSignal(signalExchange,{rsi},stopLoss) { try {
   }
 
   // if (isMPrice == 3 && isMRsi == 3) {
-  //   signal.condition = 'SHORT'
-  //   signal.stopLoss = Math.max(...market.highs)
+    // signal.condition = 'SHORT'
   // }
   
   await basedata.writeSignal(signalExchange.name,signalExchange.symbols[setup.symbol],setup.candle.interval,now,signal)
@@ -200,9 +197,12 @@ async function getOrder(tradeExchange,setup,position,signal) {
   }
 
   var quote = await tradeExchange.getQuote()
+  var market = await tradeExchange.getCurrentMarket()
 
   switch(signal.condition) {
     case 'LONG':
+      var lows = market.lows//.slice(0,36)
+      signal.stopLoss = Math.min(...lows)
       signal.entryPrice = Math.min(lastCandle.close,quote.bidPrice)
       if (signal.entryPrice <= signal.stopLoss) {
         signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
@@ -218,6 +218,8 @@ async function getOrder(tradeExchange,setup,position,signal) {
       // }
       break
     case 'SHORT':
+      var highs = market.highs//.slice(0,36)
+      signal.stopLoss = Math.max(...highs)
       signal.entryPrice = Math.max(lastCandle.close,quote.askPrice)
       if (signal.entryPrice >= signal.stopLoss) {
         signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
@@ -359,35 +361,35 @@ async function getSignal(tradeExchange,setup,position) {
   }
   
   if (tradeExchange != bitmex) {
-    const bitmexSignal = await getAccumulationSignal(bitmex,setup,tradeExchangeSignal.stopLoss)
+    const bitmexSignal = await getAccumulationSignal(bitmex,setup)
     if (bitmexSignal.condition != '-') {
       return bitmexSignal
     }
   }
 
   if (tradeExchange != coinbase) {
-    const coinbaseSignal = await getAccumulationSignal(coinbase,setup,tradeExchangeSignal.stopLoss)
+    const coinbaseSignal = await getAccumulationSignal(coinbase,setup)
     if (coinbaseSignal.condition != '-') {
       return coinbaseSignal
     }
   }
 
   if (tradeExchange != bitstamp) {
-    const bitstampSignal = await getAccumulationSignal(bitstamp,setup,tradeExchangeSignal.stopLoss)
+    const bitstampSignal = await getAccumulationSignal(bitstamp,setup)
     if (bitstampSignal.condition != '-') {
       return bitstampSignal
     }
   }
 
   if (tradeExchange != binance) {
-    const binanceSignal = await getAccumulationSignal(binance,setup,tradeExchangeSignal.stopLoss)
+    const binanceSignal = await getAccumulationSignal(binance,setup)
     if (binanceSignal.condition != '-') {
       return binanceSignal
     }
   }
 
   if (tradeExchange != bitfinex) {
-    const bitfinexSignal = await getAccumulationSignal(bitfinex,setup,tradeExchangeSignal.stopLoss)
+    const bitfinexSignal = await getAccumulationSignal(bitfinex,setup)
     if (bitfinexSignal.condition != '-') {
       return bitfinexSignal
     }
