@@ -256,6 +256,45 @@ async function getOrder(tradeExchange,setup,position,signal) {
     stopMarketFactor,scaleInFactor,scaleInLength,minOrderSizeBTC,minStopLoss,maxStopLoss} = setup.bankroll
   var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
 
+  const existingSignal = getEntrySignal(tradeExchange.name).signal
+  // exp
+  if (existingSignal && existingSignal.riskPerTradePercent && position.positionSize) {
+    riskPerTradePercent = existingSignal.riskPerTradePercent * 2.2
+    if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
+      riskPerTradePercent = setup.bankroll.riskPerTradePercent
+    }
+    else if (riskPerTradePercent < riskPerTradePercent/40) {
+      riskPerTradePercent = riskPerTradePercent/40
+    }
+  }
+  else {
+    riskPerTradePercent = riskPerTradePercent/40
+  }
+
+  // linear
+  // if (existingSignal.signal && position.positionSize) {
+  //   riskPerTradePercent = existingSignal.signal.riskPerTradePercent + riskPerTradePercent/12
+  //   if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
+  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent
+  //   }
+  // }
+  // else {
+  //   riskPerTradePercent = riskPerTradePercent/12
+  // }
+
+  // log
+  // if (existingSignal.signal && position.positionSize) {
+  //   riskPerTradePercent = existingSignal.signal.riskPerTradePercent + (riskPerTradePercent/3 - existingSignal.signal.riskPerTradePercent/3)
+  //   if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
+  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent
+  //   }
+  // }
+  // else {
+  //   riskPerTradePercent = riskPerTradePercent/3
+  // }
+
+  console.log(riskPerTradePercent)
+
   minOrderSizeBTC /= coinPairRate
   stopMarketDistance = base.roundPrice(tradeExchange, lossDistance * stopMarketFactor)
   profitDistance = base.roundPrice(tradeExchange, -lossDistance * profitFactor)
@@ -334,6 +373,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
     stopLossTrigger: stopLossTrigger,
     takeProfitTrigger: takeProfitTrigger,
     stopMarketTrigger: stopMarketTrigger,
+    riskPerTradePercent: riskPerTradePercent,
     riskAmountBTC: riskAmountBTC,
     riskAmountUSD: riskAmountUSD,
     qtyBTC: qtyBTC,
