@@ -314,6 +314,8 @@ async function getTradeJson(sp) { try {
       }
       else {
         t.drawdown = pt.drawdown
+        t.drawdownPercent = (Math.round(t.drawdown / (walletBalance-t.drawdown) * 10000) / 100).toFixed(2)
+        t.walletBalanceStart = walletBalance*firstEnterPrice/100000000
         t.drawdownUSD = pt.drawdownUSD
         t.wl = 0
         t.cwl = pt.cwl
@@ -377,8 +379,8 @@ async function readLog() {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20200101
-  var end = 20201123
+  var start = 20201101
+  var end = 20201125
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
@@ -433,6 +435,7 @@ async function init() { try {
 init()
 
 /* TODO
+find more signal to reduce the 5-6 trade draw down
 test double trade on 11/14 21hr and 22hr
 
 if the position != 0 the new stop lost must be more than current stop loss
