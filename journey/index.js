@@ -17,7 +17,7 @@ const setup = shoes.setup
 global.logDir = path.resolve(__dirname, 'log/'+shoes.symbol)
 process.env["NODE_TLS_REJECT_UNAUTHORIZED"] = 0;
 global.wait = async function wait(ms) {
-  await new Promise(resolve => setTimeout(resolve, ms));
+  return await new Promise(resolve => setTimeout(resolve(true), ms))
 }
 
 const colorizer = winston.format.colorize()

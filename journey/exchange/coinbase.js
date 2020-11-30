@@ -83,7 +83,17 @@ async function handleOrderSubscription(o) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updatePosition() { try {
-  const accounts = await request('GET','/accounts')
+  var accounts = await request('GET','/accounts')
+  var retryGetAccounts = 0
+  while (!accounts && retryGetAccounts < 15) {
+    retryGetAccounts++
+    console.log('retryGetAccounts',retryGetAccounts)
+    await wait(1000)
+    accounts = await request('GET','/accounts')
+  } 
+  if (!accounts) {
+    console.error('coinbase updatePosition unable to get accounts')
+  }
   const accountUSD = accounts.find(a => {return a.currency == 'USD' && a.balance > 0})
   const accountBTC = accounts.find(a => {return a.currency == 'BTC'})
   const balanceUSD = accountUSD.balance*1
@@ -447,7 +457,17 @@ async function cancelExit(openStopLossOrders) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function checkStopLoss() { try {
-  const accountBTC = await request('GET','/accounts/' + exchange.coinbase.account_ids.BTC)
+  var accountBTC = await request('GET','/accounts/' + exchange.coinbase.account_ids.BTC)
+  var retryGetAccountBTC = 0
+  while (!accountBTC && retryGetAccountBTC < 15) {
+    retryGetAccounts++
+    console.log('retryGetAccountBTC', retryGetAccountBTC)
+    await wait(1000)
+    accountBTC = await request('GET','/accounts/' + exchange.coinbase.account_ids.BTC)
+  } 
+  if (!accountBTC) {
+    console.error('coinbase checkStopLoss unable to get accountBTC')
+  }
   const availableBTC = 1*(accountBTC.available)
   const balanceBTC = 1*(accountBTC.balance)
   if (balanceBTC > 0) {
