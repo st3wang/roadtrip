@@ -271,6 +271,7 @@ async function getTradeJson(sp) { try {
     for (;startIndex < len; startIndex++) {
       let t = trades[startIndex]
       let pt = trades[startIndex-1] || {drawdown:0,wl:0,cwl:0,wins:0,losses:0}
+      let signal = signals[startIndex].signal
       let entryOrder = t.entryOrders[0]
       if (entryOrder.ordStatus == 'Filled') {
         t.group = groupid
@@ -300,7 +301,8 @@ async function getTradeJson(sp) { try {
         t.costPercent = (Math.round(t.cost / walletBalance * 10000) / 100).toFixed(2)
         t.pnlPercent = (Math.round(t.pnl / walletBalance * 10000) / 100).toFixed(2)
         t.drawdownPercent = (Math.round(t.drawdown / (walletBalance-t.drawdown) * 10000) / 100).toFixed(2)
-        t.drawdownUSDPercent = (Math.round(t.drawdownUSD / (walletBalanceUSD-t.drawdownUSD) * 10000) / 100).toFixed(2)
+        t.drawdownUSDPercent = signal.riskPerTradePercent
+        //(Math.round(t.drawdownUSD / (walletBalanceUSD-t.drawdownUSD) * 10000) / 100).toFixed(2)
         walletBalance += t.pnl
         walletBalanceUSD += pnlUSD
         t.walletBalance = walletBalance
@@ -316,6 +318,7 @@ async function getTradeJson(sp) { try {
         t.drawdown = pt.drawdown
         t.drawdownPercent = (Math.round(t.drawdown / (walletBalance-t.drawdown) * 10000) / 100).toFixed(2)
         t.walletBalanceStart = walletBalance*firstEnterPrice/100000000
+        t.drawdownUSDPercent = signal.riskPerTradePercent
         t.drawdownUSD = pt.drawdownUSD
         t.wl = 0
         t.cwl = pt.cwl
@@ -380,7 +383,7 @@ async function readLog() {
 async function updateData() {
   console.time('updateData')
   var start = 20201101
-  var end = 20201125
+  var end = 20201126
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
@@ -435,6 +438,9 @@ async function init() { try {
 init()
 
 /* TODO
+in ranging market the stoploss should look back should be closer 24. exp stoploss lookback
+fix 2019 year incorrect quantity
+
 find more signal to reduce the 5-6 trade draw down
 test double trade on 11/14 21hr and 22hr
 

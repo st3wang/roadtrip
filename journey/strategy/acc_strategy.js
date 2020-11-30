@@ -196,12 +196,55 @@ async function getOrder(tradeExchange,setup,position,signal) {
     return signal
   }
 
-  var quote = await tradeExchange.getQuote()
-  var market = await tradeExchange.getCurrentMarket()
+  const quote = await tradeExchange.getQuote()
+  const market = await tradeExchange.getCurrentMarket()
+  const existingSignal = getEntrySignal(tradeExchange.name).signal
+  var riskPerTradePercent = setup.bankroll.riskPerTradePercent, stopLossLookBack = 24
+
+  // linear
+  // if (existingSignal && position.positionSize) {
+  //   riskPerTradePercent = existingSignal.riskPerTradePercent + riskPerTradePercent/10
+  //   if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
+  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent
+  //   }
+  // }
+  // else {
+  //   riskPerTradePercent = riskPerTradePercent/10
+  // }
+
+  // exp
+  // if (existingSignal && position.positionSize && existingSignal.riskPerTradePercent) {
+  //   riskPerTradePercent = existingSignal.riskPerTradePercent * 2.2
+  //   if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
+  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent
+  //   }
+  //   else if (riskPerTradePercent < setup.bankroll.riskPerTradePercent/40) {
+  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent/40
+  //   }
+  // }
+  // else {
+  //   riskPerTradePercent = setup.bankroll.riskPerTradePercent/40
+  // }
+  // console.log(riskPerTradePercent)
+
+  // const stopLossLookBackStart = 20
+  // if (existingSignal && position.positionSize && existingSignal.stopLossLookBack) {
+  //   stopLossLookBack = (existingSignal.stopLossLookBack - stopLossLookBackStart) * 2 + stopLossLookBackStart
+  //   if (stopLossLookBack > 36) {
+  //     stopLossLookBack = 36
+  //   }
+  //   if (stopLossLookBack <= stopLossLookBackStart) {
+  //     stopLossLookBack = stopLossLookBackStart+1
+  //   }
+  // }
+  // else {
+  //   stopLossLookBack = stopLossLookBackStart
+  // }
+  // console.log(stopLossLookBack)
 
   switch(signal.condition) {
     case 'LONG':
-      var lows = market.lows//.slice(0,36)
+      const lows = market.lows.slice(market.lows.length-stopLossLookBack,market.lows.length)
       signal.stopLoss = Math.min(...lows)
       signal.entryPrice = Math.min(lastCandle.close,quote.bidPrice)
       if (signal.entryPrice <= signal.stopLoss) {
@@ -218,7 +261,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
       // }
       break
     case 'SHORT':
-      var highs = market.highs//.slice(0,36)
+      const highs = market.highs.slice(market.highs.length-stopLossLookBack,market.highs.length)
       signal.stopLoss = Math.max(...highs)
       signal.entryPrice = Math.max(lastCandle.close,quote.askPrice)
       if (signal.entryPrice >= signal.stopLoss) {
@@ -252,35 +295,9 @@ async function getOrder(tradeExchange,setup,position,signal) {
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
 
-  var {outsideCapitalBTC=0,outsideCapitalUSD=0,riskPerTradePercent,profitPercent,profitFactor,
+  var {outsideCapitalBTC=0,outsideCapitalUSD=0,profitPercent,profitFactor,
     stopMarketFactor,scaleInFactor,scaleInLength,minOrderSizeBTC,minStopLoss,maxStopLoss} = setup.bankroll
   var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
-
-  const existingSignal = getEntrySignal(tradeExchange.name).signal
-  // exp
-  if (existingSignal && existingSignal.riskPerTradePercent && position.positionSize) {
-    riskPerTradePercent = existingSignal.riskPerTradePercent * 2.2
-    if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
-      riskPerTradePercent = setup.bankroll.riskPerTradePercent
-    }
-    else if (riskPerTradePercent < riskPerTradePercent/40) {
-      riskPerTradePercent = riskPerTradePercent/40
-    }
-  }
-  else {
-    riskPerTradePercent = riskPerTradePercent/40
-  }
-
-  // linear
-  // if (existingSignal.signal && position.positionSize) {
-  //   riskPerTradePercent = existingSignal.signal.riskPerTradePercent + riskPerTradePercent/12
-  //   if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
-  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent
-  //   }
-  // }
-  // else {
-  //   riskPerTradePercent = riskPerTradePercent/12
-  // }
 
   // log
   // if (existingSignal.signal && position.positionSize) {
@@ -292,8 +309,6 @@ async function getOrder(tradeExchange,setup,position,signal) {
   // else {
   //   riskPerTradePercent = riskPerTradePercent/3
   // }
-
-  console.log(riskPerTradePercent)
 
   minOrderSizeBTC /= coinPairRate
   stopMarketDistance = base.roundPrice(tradeExchange, lossDistance * stopMarketFactor)
@@ -370,6 +385,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
     profitDistance: profitDistance,
     takeProfit: takeProfit,
     stopMarket: stopMarket,
+    stopLossLookBack: stopLossLookBack,
     stopLossTrigger: stopLossTrigger,
     takeProfitTrigger: takeProfitTrigger,
     stopMarketTrigger: stopMarketTrigger,
