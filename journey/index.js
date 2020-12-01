@@ -8,6 +8,7 @@ const coinbasedata = require('./exchange/coinbasedata')
 const bitstampdata = require('./exchange/bitstampdata')
 const binancedata = require('./exchange/binancedata')
 const bitfinexdata = require('./exchange/bitfinexdata')
+const gsheet = require('./gsheet/gsheet')
 
 const winston = require('winston')
 const path = require('path')
@@ -31,10 +32,10 @@ global.isoTimestamp = isoTimestamp
 var mock, getTimeNow
 if (shoes.setup.startTime) {
   mock = require('./mock.js')
-  global.getTimeNow = mock.getTimeNow
+  getTimeNow = global.getTimeNow = mock.getTimeNow
 }
 else {
-  global.getTimeNow = () => {
+  getTimeNow = global.getTimeNow = () => {
     return new Date().getTime()
   }
 }
@@ -331,7 +332,9 @@ async function getTradeJson(sp) { try {
   console.timeEnd('getTradeJson')
 
   let tradeObject = {trades:trades} //,orders:orders,walletHistory:walletHistory}
-  await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
+  const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
+  const sheetName = '24 36 +2'
+  await gsheet.upload(setup.startTime.substr(0,13) + ' ' + setup.endTime.substr(0,13) + ' ' + sheetName,csvString)
   console.log('getTradeJson done')
   debugger
   // return tradeObject
@@ -383,7 +386,7 @@ async function readLog() {
 async function updateData() {
   console.time('updateData')
   var start = 20201101
-  var end = 20201126
+  var end = 20201130
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
@@ -438,9 +441,6 @@ async function init() { try {
 init()
 
 /* TODO
-in ranging market the stoploss should look back should be closer 24. exp stoploss lookback
-fix 2019 year incorrect quantity
-
 find more signal to reduce the 5-6 trade draw down
 test double trade on 11/14 21hr and 22hr
 

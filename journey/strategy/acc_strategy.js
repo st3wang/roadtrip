@@ -227,20 +227,40 @@ async function getOrder(tradeExchange,setup,position,signal) {
   // }
   // console.log(riskPerTradePercent)
 
-  // const stopLossLookBackStart = 20
+  // stoploss going up
+  const stopLossLookBackStart = 24
+  if (existingSignal && position.positionSize && existingSignal.stopLossLookBack) {
+    // stopLossLookBack = (existingSignal.stopLossLookBack - stopLossLookBackStart) * 2 + stopLossLookBackStart
+    stopLossLookBack = existingSignal.stopLossLookBack + 2
+    if (stopLossLookBack > 36) {
+      stopLossLookBack = 36
+    }
+    if (stopLossLookBack <= stopLossLookBackStart) {
+      stopLossLookBack = stopLossLookBackStart+1
+    }
+  }
+  else {
+    stopLossLookBack = stopLossLookBackStart
+  }
+  // console.log(stopLossLookBack)
+  // debugger
+
+  // stoploss going down
+  // const stopLossLookBackStart = 36
   // if (existingSignal && position.positionSize && existingSignal.stopLossLookBack) {
   //   stopLossLookBack = (existingSignal.stopLossLookBack - stopLossLookBackStart) * 2 + stopLossLookBackStart
-  //   if (stopLossLookBack > 36) {
-  //     stopLossLookBack = 36
+  //   if (stopLossLookBack < 24) {
+  //     stopLossLookBack = 24
   //   }
-  //   if (stopLossLookBack <= stopLossLookBackStart) {
-  //     stopLossLookBack = stopLossLookBackStart+1
+  //   if (stopLossLookBack >= stopLossLookBackStart) {
+  //     stopLossLookBack = stopLossLookBackStart-1
   //   }
   // }
   // else {
   //   stopLossLookBack = stopLossLookBackStart
   // }
   // console.log(stopLossLookBack)
+  // debugger
 
   switch(signal.condition) {
     case 'LONG':

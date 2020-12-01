@@ -1,6 +1,6 @@
 const util = require('util')
 const fs = require('fs')
-const https 	= require('https')
+const https = require('https')
 const path = require('path')
 
 const ymdHelper = require('../ymdHelper')
