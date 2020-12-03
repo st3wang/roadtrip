@@ -21,6 +21,10 @@ const {getTimeNow, isoTimestamp, colorizer, wait} = global
 var position = {exchange:name}
 var lastCandle, lastOrders = []
 
+function orderString({timestamp,ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst}) {
+  return timestamp+' '+ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
+}
+
 async function pruneOrders(orders) { try {
   var found, pruned
   var yesterday = getTimeNow() - oneDayMS
@@ -38,7 +42,7 @@ async function pruneOrders(orders) { try {
     })
     if (found >= 0) {
       if (!mock) {
-        logger.info('pruneOrders',orders[found])
+        logger.info('coinbase pruneOrders',orderString(orders[found]))
       }
       orders.splice(found,1)
     }
@@ -73,7 +77,7 @@ function handleOrder(orders) { try {
 
   if (!mock) {
     lastOrders.forEach((o,i) => {
-      console.log('handleOrder',name,o.timestamp,o.ordStatus,o.ordType,o.side,o.cumQty,o.orderQty,o.price,o.execInst)
+      console.log('coinbase handleOrder',orderString(o))
     })
     console.log('---------------------')
   }
@@ -216,6 +220,7 @@ async function request(method,path,body,noCache) { try {
       res.on('data', (chunk) => {data += chunk})
       res.on('end', async() => {
         let value = JSON.parse(data)
+        console.log('request end',method,path,value)
         if (value.id && 
             ((method == 'GET' && path.startsWith('/orders') && path.length > 8) ||
             (method == 'POST' && path.startsWith('/orders')))) {
@@ -538,7 +543,7 @@ async function subscribe() { try {
         break;
       case 'activate':
       case 'open':
-        // console.log(data)
+        console.log(data)
         await handleOrderSubscription(data)
         break;
       default:
