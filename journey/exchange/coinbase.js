@@ -47,6 +47,10 @@ async function pruneOrders(orders) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function handleOrder(orders) { try {
+  if (!orders) {
+    console.log('handleOrder orders is ', orders)
+    return
+  }
   orders.forEach(o => {
     if (o.orderID) {
       let lastOrderIndex = lastOrders.findIndex(lo => {
@@ -78,8 +82,13 @@ function handleOrder(orders) { try {
 
 async function handleOrderSubscription(o) { try {
   let order = await request('GET','/orders/'+o.order_id)
-  let orders = translateOrders([order])
-  handleOrder(orders)
+  if (order) {
+    let orders = translateOrders([order])
+    handleOrder(orders)
+  }
+  else {
+    console.log('handleOrderSubscription order is ', order)
+  }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updatePosition() { try {
@@ -213,7 +222,7 @@ async function request(method,path,body,noCache) { try {
           let ords = translateOrders([value])
           value.translatedOrder = ords[0]
           // write order cache
-          await coinbasedata.writeOrder(value)
+          coinbasedata.writeOrder(value)
         }
         resolve(value)
       })
@@ -538,7 +547,7 @@ async function subscribe() { try {
   }
   
   ws.onclose = () => {
-    console.log('WS closed. Reconnecting in 1000ms')
+    console.log('Coinbase WS closed. Reconnecting in 1000ms')
     setTimeout(subscribe, 1000)
   }
   

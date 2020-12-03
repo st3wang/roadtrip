@@ -25,9 +25,15 @@ function getOrderFile(o) {
 async function readOrder(orderId) {
   const readPath = getOrderFile({id:orderId})
   if (fs.existsSync(readPath)) {
-    const str = fs.readFileSync(readPath,readFileOptions)
-    const order = JSON.parse(str)
-    return order
+    try {
+      const str = fs.readFileSync(readPath,readFileOptions)
+      const order = JSON.parse(str)
+      return order
+    }
+    catch(e) {
+      console.log('coinbasedata readOrder', e)
+      return undefined
+    }
   }
 }
 
@@ -47,9 +53,9 @@ async function readAllOrders() {
   return orders
 }
 
-async function writeOrder(o) {
+function writeOrder(o) {
   const writePath = getOrderFile(o)
-  await writeFile(writePath,JSON.stringify(o),writeFileOptions)
+  fs.writeFileSync(writePath,JSON.stringify(o),writeFileOptions)
 }
 
 async function readFeedDay(symbol,interval,time) {
