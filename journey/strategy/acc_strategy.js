@@ -199,7 +199,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   const quote = await tradeExchange.getQuote()
   const market = await tradeExchange.getCurrentMarket()
   const existingSignal = getEntrySignal(tradeExchange.name).signal
-  var riskPerTradePercent = setup.bankroll.riskPerTradePercent, stopLossLookBack = 24
+  var riskPerTradePercent = setup.exchange[tradeExchange.name].riskPerTradePercent, stopLossLookBack = 24
 
   // linear
   // if (existingSignal && position.positionSize) {
