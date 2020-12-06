@@ -220,7 +220,7 @@ async function request(method,path,body,noCache) { try {
       res.on('data', (chunk) => {data += chunk})
       res.on('end', async() => {
         let value = JSON.parse(data)
-        if (path !== '/accounts') {
+        if (path !== '/accounts' && !path.startsWith('/products')) {
           console.log('request end',method,path,value)
         }
         if (value.id && 
