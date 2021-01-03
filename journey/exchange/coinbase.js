@@ -97,7 +97,6 @@ async function handleOrderSubscription(o) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updatePosition() { try {
-  console.log('updatePosition')
   var accounts = await request('GET','/accounts')
   var retryGetAccounts = 0
   while (!accounts && retryGetAccounts < 15) {
@@ -307,7 +306,6 @@ function translateOrders(orders) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getOrders({startTime,endTime}) { try {
-  console.log('getOrders')
   const orders = await request('GET','/orders')
   for (let i = 0; i < orders.length; i++) {
     coinbasedata.writeOrder(orders[i])
