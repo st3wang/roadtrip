@@ -130,10 +130,7 @@ async function updatePosition() { try {
     if (!o.stop) {
       if (o.status != 'done') {
         // update the order status. make sure it's not already filled.
-        if (!o.order_id) {
-          console.log(o)
-        }
-        o = await request('GET','/orders/'+o.order_id,undefined,true)
+        o = await request('GET','/orders/'+(o.id || o.order_id),undefined,true)
         allDoneOrders[i] = o
       }
       if (o.status == 'done') {
