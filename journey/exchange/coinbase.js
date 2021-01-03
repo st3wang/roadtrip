@@ -85,6 +85,7 @@ function handleOrder(orders) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function handleOrderSubscription(o) { try {
+  await wait(3000)
   let order = await request('GET','/orders/'+o.order_id)
   if (order) {
     let orders = translateOrders([order])
@@ -96,6 +97,7 @@ async function handleOrderSubscription(o) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function updatePosition() { try {
+  console.log('updatePosition')
   var accounts = await request('GET','/accounts')
   var retryGetAccounts = 0
   while (!accounts && retryGetAccounts < 15) {
@@ -305,12 +307,14 @@ function translateOrders(orders) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getOrders({startTime,endTime}) { try {
+  console.log('getOrders')
   const orders = await request('GET','/orders')
   for (let i = 0; i < orders.length; i++) {
     coinbasedata.writeOrder(orders[i])
   }
   const fills = await request('GET','/fills?product_id=BTC-USD')
   for (let i = 0; i < fills.length; i++) {
+    if (!fills[i].order_id) debugger
     let o = await request('GET','/orders/'+fills[i].order_id)
     if (o) {
       o.ordStatus = 'Filled'
