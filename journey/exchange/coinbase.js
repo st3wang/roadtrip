@@ -85,9 +85,13 @@ function handleOrder(orders) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function handleOrderSubscription(o) { try {
-  await wait(3000)
+  await wait(5000)
   let order = await request('GET','/orders/'+o.order_id)
-  if (order) {
+  if (order && order.message == 'NotFound') {
+    await wait(10000)
+    order = await request('GET','/orders/'+o.order_id)
+  }
+  if (order && !order.message) {
     let orders = translateOrders([order])
     handleOrder(orders)
   }
