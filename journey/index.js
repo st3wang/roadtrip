@@ -333,7 +333,7 @@ async function getTradeJson(sp) { try {
 
   let tradeObject = {trades:trades} //,orders:orders,walletHistory:walletHistory}
   const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
-  const sheetName = '24 36 +2'
+  const sheetName = '2% normal'
   await gsheet.upload(setup.startTime.substr(0,13) + ' ' + setup.endTime.substr(0,13) + ' ' + sheetName,csvString)
   console.log('getTradeJson done')
   debugger
@@ -385,8 +385,8 @@ async function readLog() {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20201101
-  var end = 20201130
+  var start = 20200101
+  var end = 20210105
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)

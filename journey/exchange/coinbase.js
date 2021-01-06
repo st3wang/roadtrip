@@ -10,7 +10,8 @@ const oneDayMS = 24*60*60000
 const oneCandleMs = setup.candle.interval*60000
 const name = 'coinbase'
 const symbols = {
-  XBTUSD: 'BTC-USD'
+  XBTUSD: 'BTC-USD',
+  BTCUSDC: 'BTC-USDC'
 }
 
 var mock, strategy, ws, wsKeepAliveInterval
@@ -85,10 +86,13 @@ function handleOrder(orders) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function handleOrderSubscription(o) { try {
-  await wait(5000)
-  let order = await request('GET','/orders/'+o.order_id)
-  if (order && order.message == 'NotFound') {
-    await wait(10000)
+  var waitTime = 5000
+  await wait(waitTime)
+  var order = await request('GET','/orders/'+o.order_id)
+  while (order && order.message == 'NotFound' && waitTime < 20000) {
+    console.log('handleOrderSubscription waitTime',waitTime)
+    waitTime *= 2
+    await wait(waitTime)
     order = await request('GET','/orders/'+o.order_id)
   }
   if (order && !order.message) {
@@ -156,17 +160,17 @@ async function updatePosition() { try {
   position.lastPrice = lastPrice
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function getCurrentMarket() { try {
+async function getCurrentMarket(symbol) { try {
   const now = getTimeNow()
   const length = setup.candle.length
   const startTime = new Date(now-length*oneCandleMs).toISOString().substr(0,14)+'00:00.000Z'
   const endTime = new Date(now-oneCandleMs).toISOString().substr(0,14)+'00:00.000Z'
   var marketCache
   if (mock) {
-    marketCache = await coinbasedata.readMarket(symbols.XBTUSD,60,startTime,endTime)
+    marketCache = await coinbasedata.readMarket(symbol || symbols.XBTUSD,60,startTime,endTime)
   }
   else {
-    marketCache = await coinbasedata.getMarket(symbols.XBTUSD,60,startTime,endTime)
+    marketCache = await coinbasedata.getMarket(symbol || symbols.XBTUSD,60,startTime,endTime)
   }
   lastCandle = marketCache.candles[setup.candle.length-1]
   // console.log('coinbase',new Date(now).toISOString())

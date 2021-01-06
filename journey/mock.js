@@ -412,12 +412,12 @@ async function setGetAccumulationSignalFn(fn) {
   getAccumulationSignalFn = fn
 }
 
-async function getAccumulationSignal(exchange,setup,stopLoss) {
+async function getAccumulationSignal(exchange,setup,symbol) {
   const now = getTimeNow()
   var signal
-  signal = await basedata.readSignal(exchange.name,exchange.symbols[setup.symbol],setup.candle.interval,now)
+  signal = await basedata.readSignal(exchange.name,exchange.symbols[symbol || setup.symbol],setup.candle.interval,now)
   if (!signal) {
-    signal = await getAccumulationSignalFn(exchange,setup,stopLoss)
+    signal = await getAccumulationSignalFn(exchange,setup,symbol)
   }
   
   return signal

@@ -140,7 +140,7 @@ const logger = winston.createLogger({
   ]
 })
 
-async function getAccumulationSignal(signalExchange,{rsi}) { try {
+async function getAccumulationSignal(signalExchange,{rsi},symbol) { try {
   var now = getTimeNow()
   var signal = {
     timestamp: new Date(now).toISOString(),
@@ -148,7 +148,7 @@ async function getAccumulationSignal(signalExchange,{rsi}) { try {
     condition: '-'
   }
 
-  var market = await signalExchange.getCurrentMarket()
+  var market = await signalExchange.getCurrentMarket(symbol)
   if (!market || !market.candles || market.candles.length != setup.candle.length) {
     console.log(signalExchange.name, 'invalid market', (market && market.candles) ? market.candles.length : market)
     return signal
@@ -448,6 +448,11 @@ async function getSignal(tradeExchange,setup,position) {
     if (coinbaseSignal.condition != '-') {
       return coinbaseSignal
     }
+  }
+
+  const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,'BTC-USDC')
+  if (coinbaseUSDCSignal.condition != '-') {
+    return coinbaseUSDCSignal
   }
 
   if (tradeExchange != bitstamp) {
