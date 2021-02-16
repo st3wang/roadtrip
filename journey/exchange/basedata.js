@@ -38,6 +38,15 @@ async function readCandleDay(exchange,interval,time,symbol) {
     var dayMarket = JSON.parse(str)
     return dayMarket
   }
+  else {
+    return {
+      opens: [],
+      highs: [],
+      lows: [],
+      closes: [],
+      candles: []
+    }
+  }
 }
 
 async function readFeedDay(exchange,symbol,interval,time) { try {
