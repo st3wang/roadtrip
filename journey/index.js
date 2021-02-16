@@ -184,10 +184,11 @@ async function getTradeJson(sp) { try {
   var walletHistory = await bitmex.getWalletHistory()
   var trades = [], ords = []
   var walletBalance = walletHistory[0][1]
-  var walletBalanceUSD = walletBalance*firstEnterPrice/100000000
+  var startDrawDownWalletBalance = walletBalance
+  var startDrawDownWalletBalanceUSD = startDrawDownWalletBalance*firstEnterPrice/100000000
   var groupid = 0
   let totalHoursInTrade = 0
-  
+
   signals.forEach((signal,i) => {
     let {timestamp} = signal.signal
     let startTime = new Date(timestamp).getTime()
@@ -201,7 +202,7 @@ async function getTradeJson(sp) { try {
     })
   })
   signals.forEach((s,i) => {
-    let previousTrade = trades[i-1] || {drawdown:0,drawdownPercent:0,drawdownUSD:0,drawdownUSDPercent:0,wl:0,cwl:0,wins:0,losses:0,walletBalanceStart:0}
+    let previousTrade = trades[i-1] || {drawdown:0,drawdownPercent:0,drawdownUSD:0,drawdownUSDPercent:0,wl:0,cwl:0,wins:0,losses:0,walletBalanceUSD:0,psize:0,psizePercent:0}
     let trade = {
       signal: s,
       entryOrders: bitmex.findOrders(/.+/,s.entryOrders,ords[i]),
@@ -214,8 +215,12 @@ async function getTradeJson(sp) { try {
       wl: 0, /* continuous win or los */ cwl: previousTrade.cwl,
       wins: previousTrade.wins, losses: previousTrade.losses, winsPercent: previousTrade.winsPercent,
       walletBalance: walletBalance, walletBalancePercent:'%',
-      walletBalanceStart: previousTrade.walletBalanceStart, walletBalanceUSD: previousTrade.walletBalanceUSD,
-      hoursInTrade: 0, avgHoursInTrade: 0, avgGroupHoursInTrade: 0
+      walletBalanceUSD: previousTrade.walletBalanceUSD, 
+      //walletBalanceUSD: previousTrade.walletBalanceUSD,
+      hoursInTrade: 0, avgHoursInTrade: 0, avgGroupHoursInTrade: 0,
+      psize: 0, psizePercent: 0,
+      stopRiskPercent: s.signal.stopRiskPercent,
+      stopDistanceRiskRatio: s.signal.stopDistanceRiskRatio
     }
     let foundOrders = trade.entryOrders.concat(trade.closeOrders).concat(trade.takeProfitOrders)
     trade.otherOrders = ords.filter((e) => {
@@ -271,7 +276,7 @@ async function getTradeJson(sp) { try {
     }
     for (;startIndex < len; startIndex++) {
       let t = trades[startIndex]
-      let pt = trades[startIndex-1] || {drawdown:0,wl:0,cwl:0,wins:0,losses:0}
+      let pt = trades[startIndex-1] || {drawdown:0,wl:0,cwl:0,wins:0,losses:0,positionSize:0}
       let signal = signals[startIndex].signal
       let entryOrder = t.entryOrders[0]
       if (entryOrder.ordStatus == 'Filled') {
@@ -291,25 +296,36 @@ async function getTradeJson(sp) { try {
         t.wins = pt.wins + (t.wl > 0 ? 1 : 0)
         t.losses = pt.losses + (t.wl < 0 ? 1 : 0)
         t.winsPercent = (Math.round(t.wins / (startIndex+1) * 10000) / 100).toFixed(2)
-        let pnlUSD = t.pnl*lastPrice/100000000
-        t.drawdown = pt.drawdown + t.pnl
-        t.drawdownUSD = pt.drawdownUSD + pnlUSD
-        if (t.drawdown > 0) {
-          t.drawdown = 0
-          t.drawdownUSD = 0
-        }
         t.feePercent = (Math.round(-t.fee / walletBalance * 10000) / 100).toFixed(2)
         t.costPercent = (Math.round(t.cost / walletBalance * 10000) / 100).toFixed(2)
         t.pnlPercent = (Math.round(t.pnl / walletBalance * 10000) / 100).toFixed(2)
-        t.drawdownPercent = (Math.round(t.drawdown / (walletBalance-t.drawdown) * 10000) / 100).toFixed(2)
-        t.drawdownUSDPercent = signal.riskPerTradePercent
-        //(Math.round(t.drawdownUSD / (walletBalanceUSD-t.drawdownUSD) * 10000) / 100).toFixed(2)
+
         walletBalance += t.pnl
-        walletBalanceUSD += pnlUSD
         t.walletBalance = walletBalance
         t.walletBalancePercent = (walletBalance / walletHistory[0][1] * 100).toFixed(2)
-        t.walletBalanceStart = walletBalance*firstEnterPrice/100000000
-        t.walletBalanceUSD = walletBalanceUSD
+        t.walletBalanceUSD = walletBalance*lastPrice/100000000
+
+        t.drawdown = pt.drawdown + t.pnl
+        t.drawdownUSD = t.walletBalanceUSD - startDrawDownWalletBalanceUSD
+        if (t.drawdown > 0) {
+          t.drawdown = 0
+          t.drawdownUSD = 0
+          startDrawDownWalletBalance = walletBalance
+        }
+        if (t.drawdownUSD > 0) {
+          t.drawdownUSD = 0
+          startDrawDownWalletBalanceUSD = walletBalance*lastPrice/100000000
+        }
+        t.drawdownPercent = (Math.round(t.drawdown / (startDrawDownWalletBalance) * 10000) / 100).toFixed(2)
+        t.drawdownUSDPercent = (Math.round(t.drawdownUSD / (startDrawDownWalletBalanceUSD) * 10000) / 100).toFixed(2)
+
+        if (t.group == pt.group) {
+          t.psize = pt.psize + entryOrder.cumQty
+        }
+        else {
+          t.psize = entryOrder.cumQty
+        }
+        t.psizePercent = (t.psize/t.walletBalanceUSD)*100
         t.hoursInTrade = (closeTime - entryTime) / 3600000
         totalHoursInTrade += t.hoursInTrade
         totalGroupHoursInTrade += t.hoursInTrade
@@ -317,10 +333,10 @@ async function getTradeJson(sp) { try {
       }
       else {
         t.drawdown = pt.drawdown
-        t.drawdownPercent = (Math.round(t.drawdown / (walletBalance-t.drawdown) * 10000) / 100).toFixed(2)
-        t.walletBalanceStart = walletBalance*firstEnterPrice/100000000
-        t.drawdownUSDPercent = signal.riskPerTradePercent
         t.drawdownUSD = pt.drawdownUSD
+        t.walletBalanceUSD = pt.walletBalanceUSD
+        t.drawdownPercent = (Math.round(t.drawdown / (startDrawDownWalletBalance) * 10000) / 100).toFixed(2)
+        t.drawdownUSDPercent = (Math.round(t.drawdownUSD / (startDrawDownWalletBalanceUSD) * 10000) / 100).toFixed(2)
         t.wl = 0
         t.cwl = pt.cwl
       }
@@ -331,7 +347,8 @@ async function getTradeJson(sp) { try {
   
   console.timeEnd('getTradeJson')
 
-  let tradeObject = {trades:trades} //,orders:orders,walletHistory:walletHistory}
+  trades[trades.length-1].drawdownPercent = '-100'
+  let tradeObject = {trades:trades}
   const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
   const sheetName = '2% normal'
   await gsheet.upload(setup.startTime.substr(0,13) + ' ' + setup.endTime.substr(0,13) + ' ' + sheetName,csvString)
@@ -385,8 +402,8 @@ async function readLog() {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20200101
-  var end = 20210105
+  var start = 20210101
+  var end = 20210214
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)

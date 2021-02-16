@@ -83,7 +83,7 @@ function cancelEntrySignal(order) { try {
 
 async function writeTradesCSV(writePath,trades) { try {
   var outputString =
-    'number,timestamp,cumQty,status,entry,exit,stop,cost%,fee%,pnl%,wl,cwl,group,grouppnl,balance,balance%,bstart,busd,dd%,ddusd%,winsPercent,hoursInTrade,avgInTrade,avgGroupInTrade'
+    'number,timestamp,cumQty,status,entry,exit,stop,cost%,fee%,pnl%,wl,cwl,group,grouppnl,balance,balance%,busd,dd%,ddusd%,psize,risk%,riskratio,hoursInTrade,avgInTrade,avgGroupInTrade'
     // 'number,timestamp,cumQty,status,entry,exit,stop,cost,cost%,fee,fee%,pnl,pnl%,balance,balance%,bstart,busd,dd,dd%,ddusd,ddusd%,wl,cwl,wins,losses,winsPercent'
   trades.forEach((t,i) => {
     let entryOrder = t.entryOrders[0] || {}
@@ -109,13 +109,13 @@ async function writeTradesCSV(writePath,trades) { try {
       // t.losses + ',' +
       t.walletBalance + ',' +
       t.walletBalancePercent + ',' +
-      t.walletBalanceStart + ',' +
+      // t.walletBalanceStart + ',' +
       t.walletBalanceUSD + ',' +
-      // t.drawdown + ',' +
       t.drawdownPercent + ',' +
-      // t.drawdownUSD + ',' +
       t.drawdownUSDPercent + ',' +
-      t.winsPercent + ',' +
+      t.psize + ',' +
+      t.stopRiskPercent + ',' +
+      t.stopDistanceRiskRatio + ',' +
       t.hoursInTrade + ',' +
       t.avgHoursInTrade + ',' +
       t.avgGroupHoursInTrade + ','

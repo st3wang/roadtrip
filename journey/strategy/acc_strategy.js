@@ -28,6 +28,45 @@ function typeColor(type) {
   return (type == 'LONG' ? '\x1b[36m' : type == 'SHORT' ? '\x1b[35m' : '') + type + '\x1b[39m'
 }
 
+function getStopRisk({exchange,positionSize,lastPrice,walletBalance,marginBalance,unrealisedPnl},stopLoss) {
+  // console.log(positionSize,lastPrice,walletBalance,unrealisedPnl,stopLoss)
+  const lastCost = exchanges[exchange].getCost({
+    side: 'Sell',
+    cumQty: -positionSize,
+    price: lastPrice,
+    execInst: 'Close,LastPrice'
+  })
+  // console.log('lastCost',lastCost)
+  const stopCost = exchanges[exchange].getCost({
+    side: 'Sell',
+    cumQty: -positionSize,
+    price: stopLoss,
+    execInst: 'Close,LastPrice'
+  })
+  // console.log('stopCost',stopCost)
+
+  marginBalance = walletBalance + unrealisedPnl
+  
+  const stopDistance = lastCost[0] - stopCost[0]
+  const stopDistancePercent = stopDistance / lastCost[0] || 0
+  const stopBalance = walletBalance + unrealisedPnl + stopDistance
+  const stopPnlPercent = Math.round((stopBalance-walletBalance) / walletBalance * 10000) / 100
+  const stopRisk = stopBalance-marginBalance
+  const stopRiskPercent = Math.round(stopRisk / walletBalance * 10000) / 100
+
+  const riskPerTradePercent = setup.exchange[exchange].riskPerTradePercent * 100
+  const stopDistanceRiskRatio = Math.round(stopRiskPercent/stopDistancePercent/riskPerTradePercent/10) || 0
+
+  // console.log(stopDistance.toFixed(0), stopDistancePercent.toFixed(2), stopRisk.toFixed(0), stopRiskPercent, stopDistanceRiskRatio)
+  
+  return {
+    stopBalance: stopBalance,
+    stopPnlPercent: stopPnlPercent,
+    stopRiskPercent: stopRiskPercent,
+    stopDistanceRiskRatio: stopDistanceRiskRatio
+  }
+}
+
 const logger = winston.createLogger({
   format: winston.format.label({label:'acc'}),
   transports: [
@@ -45,31 +84,16 @@ const logger = winston.createLogger({
             case 'checkEntry': {
               let {exchange,caller,walletBalance,marginBalance,unrealisedPnl,lastPrice=NaN,positionSize,fundingTimestamp,fundingRate=NaN,signal,currentStopPx} = splat[0]
               let {timestamp,entryPrice=NaN,stopLoss=NaN,takeProfit=NaN,lossDistancePercent=NaN} = signal.signal || {}
-              let marginBalanceString,marginPnlPercent,stopBalance,stopBalanceString,stopPnlPercent,lossDistancePercentString, positionSizeString, lastPriceString
+              let marginBalanceString,marginPnlPercent,stopBalanceString,lossDistancePercentString, positionSizeString, lastPriceString
               stopLoss = currentStopPx || stopLoss
               walletBalance /= 100000000
               unrealisedPnl /= 100000000
               marginBalance /= 100000000
               marginPnlPercent = Math.round((marginBalance-walletBalance) / walletBalance * 10000) / 100
               marginBalanceString = (marginBalance > walletBalance ? '\x1b[32m' : (marginBalance < walletBalance ? '\x1b[31m' : '')) + marginBalance.toFixed(4) + ' ' + marginPnlPercent + '%\x1b[39m'
-              
-              let lastCost = exchanges[exchange].getCost({
-                side: 'Sell',
-                cumQty: -positionSize,
-                price: lastPrice,
-                execInst: 'Close,LastPrice'
-              })
-              // console.log('lastCost',lastCost)
-              let stopCost = exchanges[exchange].getCost({
-                side: 'Sell',
-                cumQty: -positionSize,
-                price: stopLoss,
-                execInst: 'Close,LastPrice'
-              })
-              // console.log('stopCost',stopCost)
-              
-              stopBalance = walletBalance + unrealisedPnl + lastCost[0] - stopCost[0]
-              stopPnlPercent = Math.round((stopBalance-walletBalance) / walletBalance * 10000) / 100
+
+              let {stopBalance,stopPnlPercent} = getStopRisk(splat[0],stopLoss) 
+
               stopBalanceString = (stopBalance > walletBalance ? '\x1b[32m' : (stopBalance < walletBalance ? '\x1b[31m' : '')) + stopBalance.toFixed(4) + ' ' + stopPnlPercent + '%\x1b[39m'
               
               if (positionSize > 0) {
@@ -319,17 +343,6 @@ async function getOrder(tradeExchange,setup,position,signal) {
     stopMarketFactor,scaleInFactor,scaleInLength,minOrderSizeBTC,minStopLoss,maxStopLoss} = setup.bankroll
   var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
 
-  // log
-  // if (existingSignal.signal && position.positionSize) {
-  //   riskPerTradePercent = existingSignal.signal.riskPerTradePercent + (riskPerTradePercent/3 - existingSignal.signal.riskPerTradePercent/3)
-  //   if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
-  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent
-  //   }
-  // }
-  // else {
-  //   riskPerTradePercent = riskPerTradePercent/3
-  // }
-
   minOrderSizeBTC /= coinPairRate
   stopMarketDistance = base.roundPrice(tradeExchange, lossDistance * stopMarketFactor)
   profitDistance = base.roundPrice(tradeExchange, -lossDistance * profitFactor)
@@ -341,6 +354,16 @@ async function getOrder(tradeExchange,setup,position,signal) {
   takeProfitTrigger = entryPrice + (profitDistance/8)
   stopMarketTrigger = entryPrice + (stopMarketDistance/4)
   lossDistancePercent = lossDistance/entryPrice
+
+  const {stopRiskPercent, stopDistanceRiskRatio} = getStopRisk(position,stopMarket) 
+  // console.log(stopRiskPercent)
+  // if (stopDistanceRiskRatio > riskPerTradePercent*6000) {
+  //   riskPerTradePercent /= 2
+  // }
+  // else 
+  // if (stopDistanceRiskRatio > riskPerTradePercent*7000) {
+  //   riskPerTradePercent /= 10
+  // }
 
   var capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + marginBalance/100000000
   var capitalUSD = capitalBTC * entryPrice
@@ -415,7 +438,9 @@ async function getOrder(tradeExchange,setup,position,signal) {
     qtyBTC: qtyBTC,
     orderQtyUSD: orderQtyUSD,
     leverage: leverage,
-    scaleInOrders: scaleInOrders
+    scaleInOrders: scaleInOrders,
+    stopRiskPercent: stopRiskPercent,
+    stopDistanceRiskRatio: stopDistanceRiskRatio
   },signal)
 
   // if (!goodStopDistance) {
@@ -450,9 +475,11 @@ async function getSignal(tradeExchange,setup,position) {
     }
   }
 
-  const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,'BTC-USDC')
-  if (coinbaseUSDCSignal.condition != '-') {
-    return coinbaseUSDCSignal
+  if (!mock) {
+    const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,'BTC-USDC')
+    if (coinbaseUSDCSignal.condition != '-') {
+      return coinbaseUSDCSignal
+    }
   }
 
   if (tradeExchange != bitstamp) {

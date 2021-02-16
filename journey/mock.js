@@ -90,6 +90,7 @@ function authorize() {
 
 async function getTradeBucketed({symbol,interval,startTime,endTime}) { try {
   return await bitmexdata.readMarket(symbol,interval,startTime,endTime)
+  // return await bitstampdata.readMarket('btcusd',interval,startTime,endTime)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getCurrentTradeBucketed(interval) { try {
@@ -150,6 +151,11 @@ function getCost({side,cumQty,price,execInst}) {
   return [homeNotional,foreignNotional,execComm]
 }
 
+function getPositionCost({homeNotional}) {
+  let coinPairRate = 1 //lastPrice/XBTUSDRate
+  return Math.round(homeNotional * coinPairRate * 100000000)
+}
+
 async function nextOrder(lastPrice) {
   var execOrders = orders.filter(o => {
     let {ordStatus,ordType,side,orderQty,price,stopPx,execInst} = o
@@ -180,8 +186,7 @@ async function nextOrder(lastPrice) {
         position.foreignNotional += foreignNotional
         position.execComm += execComm
         if (position.currentQty == 0) {
-          let coinPairRate = 1 //lastPrice/XBTUSDRate
-          let cost = Math.round(position.homeNotional * coinPairRate * 100000000)
+          let cost = getPositionCost(position)
           let fee = position.execComm
           position.homeNotional = 0
           position.execComm = 0
@@ -278,6 +283,12 @@ async function nextInstrument() { try {
     bidPrice: price,
     askPrice: price
   }]
+
+  const positionCost = getPositionCost(position)
+  margin.unrealisedPnl = (positionCost - position.execComm)
+  // margin.unrealizedBalance = margin.walletBalance + margin.unrealisedPnl
+  await handleMargin([margin])
+  // if (margin.unrealisedPnl) debugger
 
   if (size) {
     await nextOrder(price)
@@ -428,7 +439,10 @@ async function init(sp) {
   oneCandleMs = sp.interval * 60000
   margin = {
     walletBalance: 100000000,
-    marginBalance: 100000000
+    marginBalance: 100000000,
+    unrealizedBalance: 100000000,
+    positionSize: 0,
+    unrealisedPnl: 0
   }
   walletHistory = []
   orders = []
