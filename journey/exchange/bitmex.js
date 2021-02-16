@@ -1043,7 +1043,7 @@ const makerFee = -0.00025
 const takerFee = 0.00075
 function getCost({side,cumQty,price,execInst}) {
   var foreignNotional = (side == 'Buy' ? -cumQty : cumQty)
-  var homeNotional = -foreignNotional / price
+  var homeNotional = (-foreignNotional / price) * 100000000
   var coinPairRate = 1 //lastPrice/XBTUSDRate
   var fee = execInst.indexOf('ParticipateDoNotInitiate') >= 0 ? makerFee : takerFee
   var execComm = Math.round(Math.abs(homeNotional * coinPairRate) * fee * 100000000)
