@@ -290,7 +290,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   switch(signal.condition) {
     case 'LONG':
       const lows = market.lows.slice(market.lows.length-stopLossLookBack,market.lows.length)
-      signal.stopLoss = Math.min(...lows)
+      signal.stopLoss = setup.exchange[tradeExchange.name].stopLoss || Math.min(...lows)
       signal.entryPrice = Math.min(lastCandle.close,quote.bidPrice)
       if (signal.entryPrice <= signal.stopLoss) {
         signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
