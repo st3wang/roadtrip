@@ -16,6 +16,7 @@ var tradeExchanges
 const winston = require('winston')
 const storage = require('../storage')
 const candlestick = require('../candlestick')
+const email = require('../email/email.js')
 
 const oneCandleMS = setup.candle.interval*60000
 
@@ -519,6 +520,12 @@ function cancelOrder(params) {
   || base.exitTarget(cancelParams) || base.exitStop(cancelParams))
 }
 
+function sendEmail(entrySignal) {
+  const {entryOrders} = entrySignal
+  const {side,price,orderQty} = entryOrders[0]
+  email.send('MoonBoy Enter ' + side + ' ' + price + ' ' + orderQty, JSON.stringify(entrySignal, null, 2))
+}
+
 async function orderEntry(tradeExchange,entrySignal) { try {
   var {entryOrders,closeOrders,takeProfitOrders} = getEntryExitOrders(entrySignal.signal)
   var now = getTimeNow()
@@ -532,7 +539,7 @@ async function orderEntry(tradeExchange,entrySignal) { try {
   else {
     if (!mock) logger.info('ENTER ORDER',entrySignal)
     closeOrders = closeOrders.slice(0,1)
-    let response = await tradeExchange.order(entryOrders.concat(closeOrders),true)
+    const response = await tradeExchange.order(entryOrders.concat(closeOrders),true)
     /*TODO: wait for order confirmations*/
     if (response.status == 200) {
       entrySignal.entryOrders = entryOrders
@@ -540,6 +547,7 @@ async function orderEntry(tradeExchange,entrySignal) { try {
       entrySignal.takeProfitOrders = takeProfitOrders
       base.setEntrySignal(tradeExchange.name,entrySignal)
       storage.writeEntrySignalTable(entrySignal)
+      sendEmail(entrySignal)
     }
     else {
       console.error(response)
