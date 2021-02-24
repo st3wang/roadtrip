@@ -557,7 +557,6 @@ async function orderEntry(tradeExchange,entrySignal) { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function isBear({fib_50}, {lastPrice}) {
-  debugger
   const lastPriceTooHigh = lastPrice > fib_50
   if (lastPriceTooHigh) {
     console.log('lastPriceTooHigh', lastPrice, fib_50)
