@@ -556,8 +556,13 @@ async function orderEntry(tradeExchange,entrySignal) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-function isBear() {
-  return false
+function isBear({fib_50}, {lastPrice}) {
+  debugger
+  const lastPriceTooHigh = lastPrice > fib_50
+  if (lastPriceTooHigh) {
+    console.log('lastPriceTooHigh', lastPrice, fib_50)
+  }
+  return lastPriceTooHigh
   const now = getTimeNow()
   if (now >= 1483660800000 && now < 1484697600000) return true
 
@@ -601,7 +606,7 @@ async function checkEntry(tradeExchange) { try {
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
-  if (!isBear() && signal.orderQtyUSD) {
+  if (!isBear(setup.exchange[tradeExchange.name],position) && signal.orderQtyUSD) {
     var entrySignal = {signal:signal}
     await orderEntry(tradeExchange,entrySignal)
   }
