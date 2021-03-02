@@ -403,7 +403,7 @@ async function readLog() {
 async function updateData() {
   console.time('updateData')
   var start = 20210101
-  var end = 20210214
+  var end = 20210222
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)

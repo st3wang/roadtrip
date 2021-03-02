@@ -226,6 +226,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   const market = await tradeExchange.getCurrentMarket()
   const existingSignal = getEntrySignal(tradeExchange.name).signal
   var riskPerTradePercent = setup.exchange[tradeExchange.name].riskPerTradePercent, stopLossLookBack = 24
+  const fib = setup.exchange[tradeExchange.name].fib
 
   // linear
   // if (existingSignal && position.positionSize) {
@@ -305,6 +306,20 @@ async function getOrder(tradeExchange,setup,position,signal) {
       //   signal.reason = 'Will have to pay funding.'
       //   return signal
       // }
+      if (fib) {
+        if (signal.entryPrice > fib[786]) {
+          riskPerTradePercent /= 20
+          console.log('entryPrice > fib[786]',riskPerTradePercent)
+        }
+        else if (signal.entryPrice > fib[618]) {
+          riskPerTradePercent /= 10
+          console.log('entryPrice > fib[618]',riskPerTradePercent)
+        }
+        else if (signal.entryPrice > fib[500]) {
+          riskPerTradePercent /= 2
+          console.log('entryPrice > fib[500]',riskPerTradePercent)
+        }
+      }
       break
     case 'SHORT':
       const highs = market.highs.slice(market.highs.length-stopLossLookBack,market.highs.length)
@@ -556,12 +571,7 @@ async function orderEntry(tradeExchange,entrySignal) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-function isBear({fib_50}, {lastPrice}) {
-  const lastPriceTooHigh = lastPrice > fib_50
-  if (lastPriceTooHigh) {
-    console.log('lastPriceTooHigh', lastPrice, fib_50)
-  }
-  return lastPriceTooHigh
+function isBear({lastPrice}) {
   const now = getTimeNow()
   if (now >= 1483660800000 && now < 1484697600000) return true
 
@@ -605,7 +615,7 @@ async function checkEntry(tradeExchange) { try {
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
-  if (!isBear(setup.exchange[tradeExchange.name],position) && signal.orderQtyUSD) {
+  if (!isBear(position) && signal.orderQtyUSD) {
     var entrySignal = {signal:signal}
     await orderEntry(tradeExchange,entrySignal)
   }
