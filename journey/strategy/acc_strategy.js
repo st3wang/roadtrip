@@ -307,17 +307,29 @@ async function getOrder(tradeExchange,setup,position,signal) {
       //   return signal
       // }
       if (fib) {
-        if (signal.entryPrice > fib[786]) {
-          riskPerTradePercent /= 20
-          console.log('entryPrice > fib[786]',riskPerTradePercent)
+        if (signal.entryPrice > fib[214]) {
+          riskPerTradePercent /= 16
+          console.log('entryPrice > fib[214]',riskPerTradePercent)
         }
-        else if (signal.entryPrice > fib[618]) {
-          riskPerTradePercent /= 10
-          console.log('entryPrice > fib[618]',riskPerTradePercent)
+        else if (signal.entryPrice > fib[382]) {
+          riskPerTradePercent /= 8
+          console.log('entryPrice > fib[382]',riskPerTradePercent)
         }
         else if (signal.entryPrice > fib[500]) {
-          riskPerTradePercent /= 2
+          riskPerTradePercent /= 4
           console.log('entryPrice > fib[500]',riskPerTradePercent)
+        }
+        else if (signal.entryPrice > fib[618]) {
+          riskPerTradePercent /= 2
+          console.log('entryPrice > fib[618]',riskPerTradePercent)
+        }
+        else if (signal.entryPrice > fib[786]) {
+          riskPerTradePercent
+          console.log('entryPrice > fib[786]',riskPerTradePercent)
+        }
+        else {
+          riskPerTradePercent *= 2
+          console.log('entryPrice < fib[786]',riskPerTradePercent)
         }
       }
       break
