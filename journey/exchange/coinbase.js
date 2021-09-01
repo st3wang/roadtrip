@@ -11,7 +11,85 @@ const oneCandleMs = setup.candle.interval*60000
 const name = 'coinbase'
 const symbols = {
   XBTUSD: 'BTC-USD',
-  BTCUSDC: 'BTC-USDC'
+  BTCUSDC: 'BTC-USDC',
+  COMPUSD: 'COMP-USD',
+  UMAUSD: 'UMA-USD',
+  IOTXUSD: 'IOTX-USD',
+  RENUSD: 'REN-USD',
+  CRVUSD: 'CRV-USD',
+  QUICKUSD: 'QUICK-USD',
+  PAXUSD: 'PAX-USD',
+  XTZUSD: 'XTZ-USD',
+  GTCUSD: 'GTC-USD',
+  DASHUSD: 'DASH-USD',
+  TRBUSD: 'TRB-USD',
+  YFIUSD: 'YFI-USD',
+  OXTUSD: 'OXT-USD',
+  BALUSD: 'BAL-USD',
+  CHZUSD: 'CHZ-USD',
+  AXSUSD: 'AXS-USD',
+  ANKRUSD: 'ANKR-USD',
+  TRUUSD: 'TRU-USD',
+  QNTUSD: 'QNT-USD',
+  XLMUSD: 'XLM-USD',
+  FORTHUSD: 'FORTH-USD',
+  MASKUSD: 'MASK-USD',
+  ETCUSD: 'ETC-USD',
+  DOGEUSD: 'DOGE-USD',
+  ALGOUSD: 'ALGO-USD',
+  ZRXUSD: 'ZRX-USD',
+  BANDUSD: 'BAND-USD',
+  OGNUSD: 'OGN-USD',
+  SUSHIUSD: 'SUSHI-USD',
+  REPUSD: 'REP-USD',
+  CLVUSD: 'CLV-USD',
+  GRTUSD: 'GRT-USD',
+  REQUSD: 'REQ-USD',
+  BATUSD: 'BAT-USD',
+  OMGUSD: 'OMG-USD',
+  COTIUSD: 'COTI-USD',
+  RLCUSD: 'RLC-USD',
+  BNTUSD: 'BNT-USD',
+  MATICUSD: 'MATIC-USD',
+  UNIUSD: 'UNI-USD',
+  DAIUSD: 'DAI-USD',
+  LTCUSD: 'LTC-USD',
+  SNXUSD: 'SNX-USD',
+  ETHUSD: 'ETH-USD',
+  TRIBEUSD: 'TRIBE-USD',
+  NKNUSD: 'NKN-USD',
+  LRCUSD: 'LRC-USD',
+  BTCUSD: 'BTC-USD',
+  ICPUSD: 'ICP-USD',
+  STORJUSD: 'STORJ-USD',
+  NMRUSD: 'NMR-USD',
+  DOTUSD: 'DOT-USD',
+  CTSIUSD: 'CTSI-USD',
+  BCHUSD: 'BCH-USD',
+  SOLUSD: 'SOL-USD',
+  MKRUSD: 'MKR-USD',
+  MIRUSD: 'MIR-USD',
+  BONDUSD: 'BOND-USD',
+  FARMUSD: 'FARM-USD',
+  FETUSD: 'FET-USD',
+  ENJUSD: 'ENJ-USD',
+  ATOMUSD: 'ATOM-USD',
+  SKLUSD: 'SKL-USD',
+  KNCUSD: 'KNC-USD',
+  '1INCHUSD': '1INCH-USD',
+  EOSUSD: 'EOS-USD',
+  ADAUSD: 'ADA-USD',
+  MANAUSD: 'MANA-USD',
+  ZECUSD: 'ZEC-USD',
+  LINKUSD: 'LINK-USD',
+  MLNUSD: 'MLN-USD',
+  AAVEUSD: 'AAVE-USD',
+  KEEPUSD: 'KEEP-USD',
+  ORNUSD: 'ORN-USD',
+  LPTUSD: 'LPT-USD',
+  NUUSD: 'NU-USD',
+  YFIIUSD: 'YFII-USD',
+  FILUSD: 'FIL-USD'
 }
 
 var mock, strategy, ws, wsKeepAliveInterval
@@ -260,6 +338,44 @@ async function getQuote() { try {
     lastPrice: ticker.price*1
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
+
+async function getBook(symbol) { try {
+  // GET /products/<product-id>/book
+  var orders = await request('GET','/products/' + symbols[symbol] + '/book?level=2')
+  var book = {
+    asks: [],
+    bids: []
+  }
+  if (orders && orders.asks && orders.bids) {
+    orders.asks.forEach(o => {
+      book.asks.push({
+        price: parseFloat(o[0]),
+        size: parseFloat(o[1])
+      })
+    })
+    orders.bids.forEach(o => {
+      book.bids.push({
+        price: parseFloat(o[0]),
+        size: parseFloat(o[1])
+      })
+    })
+  }
+  else {
+    debugger
+  }
+  return book
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function getProducts() {
+  var products = await request('GET','/products/')
+  var symbols = []
+  products.forEach(p => {
+    if (p.quote_currency == 'USD') {
+      symbols.push(p.base_currency + p.quote_currency)
+    }
+  })
+  debugger
+}
 
 async function getCurrentCandle() { try {
   const now = getTimeNow()
@@ -616,6 +732,8 @@ module.exports = {
 
   findOrders: findOrders,
   getQuote: getQuote,
+  getBook: getBook,
+  getProducts: getProducts,
   getLastCandle: getLastCandle,
   getCurrentCandle: getCurrentCandle,
   getRate: getRate,

@@ -48,7 +48,10 @@ const coinbase = require('./exchange/coinbase')
 const bitstamp = require('./exchange/bitstamp')
 const binance = require('./exchange/binance')
 const bitfinex = require('./exchange/bitfinex')
-const exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
+var exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
+if (shoes.strategy == 'abi') {
+  exchanges = {coinbase: coinbase, binance: binance}
+}
 var tradeExchanges = []
 var tradeExchangesByName = {}
 Object.keys(setup.exchange).forEach(exchangeName => {
@@ -447,11 +450,15 @@ async function init() { try {
     debugger
   }
   else {
-    await initExchanges()
+    // await initExchanges()
     next()
-    createInterval(6000*2**0) // 6s after candle close
-    createInterval(6000*2**1) // 12s
-    createInterval(6000*2**3) // 48s for bitstamp
+    // createInterval(6000*2**0) // 6s after candle close
+    // createInterval(6000*2**1) // 12s
+    // createInterval(6000*2**3) // 48s for bitstamp
+    createInterval(60000*15*0)
+    createInterval(60000*15*1)
+    createInterval(60000*15*2)
+    createInterval(60000*15*3)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
