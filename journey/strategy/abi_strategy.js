@@ -202,13 +202,13 @@ async function checkSymbol(symbol) {
   var coinbasePremium = (coinbaseBid.price - binanceAsk.price) / binanceAsk.price
   if (binancePremium > 0) {
     console.log(symbol, 'binancePremium', binancePremium)
-    if (binancePremium > 0.0005) {
+    if (binancePremium > 0.01) {
       email.send(symbol + ' binancePremium ' + binancePremium)
     }
   }
   if (coinbasePremium > 0) {
     console.log(symbol, 'coinbasePremium',coinbasePremium)
-    if (coinbasePremium > 0.0005) {
+    if (coinbasePremium > 0.01) {
       email.send(symbol + ' coinbasePremium ' + coinbasePremium)
     }
   }
