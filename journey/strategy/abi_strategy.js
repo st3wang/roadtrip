@@ -201,13 +201,13 @@ async function checkSymbol(symbol) {
   var coinbasePremium = (coinbaseBid.price - binanceAsk.price) / binanceAsk.price
   // if (binancePremium > 0) {
     // console.log(symbol, 'binancePremium', binancePremium)
-    if (binancePremium > 0.01) {
+    if (binancePremium > 0.02) {
       email.send(symbol + ' binancePremium ' + (Math.round(binancePremium*10000)/100) + '%')
     }
   // }
   // if (coinbasePremium > 0) {
     // console.log(symbol, 'coinbasePremium',coinbasePremium)
-    if (coinbasePremium > 0.01) {
+    if (coinbasePremium > 0.02) {
       email.send(symbol + ' coinbasePremium ' + (Math.round(coinbasePremium*10000)/100) + '%')
     }
   // }
