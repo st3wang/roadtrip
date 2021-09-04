@@ -199,18 +199,18 @@ async function checkSymbol(symbol) {
   var binanceBid = getAverageOrder(binanceBook.bids, 10000)
   var binancePremium = (binanceBid.price - coinbaseAsk.price) / coinbaseAsk.price
   var coinbasePremium = (coinbaseBid.price - binanceAsk.price) / binanceAsk.price
-  if (binancePremium > 0) {
+  // if (binancePremium > 0) {
     // console.log(symbol, 'binancePremium', binancePremium)
-    if (binancePremium > 0.015) {
-      email.send(symbol + ' binancePremium ' + binancePremium)
+    if (binancePremium > 0.01) {
+      email.send(symbol + ' binancePremium ' + (Math.round(binancePremium*10000)/100) + '%')
     }
-  }
-  if (coinbasePremium > 0) {
+  // }
+  // if (coinbasePremium > 0) {
     // console.log(symbol, 'coinbasePremium',coinbasePremium)
-    if (coinbasePremium > 0.015) {
-      email.send(symbol + ' coinbasePremium ' + coinbasePremium)
+    if (coinbasePremium > 0.01) {
+      email.send(symbol + ' coinbasePremium ' + (Math.round(coinbasePremium*10000)/100) + '%')
     }
-  }
+  // }
 }
 
 async function checkPosition() {
