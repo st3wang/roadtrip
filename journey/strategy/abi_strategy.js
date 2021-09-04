@@ -201,14 +201,14 @@ async function checkSymbol(symbol) {
   var binancePremium = (binanceBid.price - coinbaseAsk.price) / coinbaseAsk.price
   var coinbasePremium = (coinbaseBid.price - binanceAsk.price) / binanceAsk.price
   if (binancePremium > 0) {
-    console.log(symbol, 'binancePremium', binancePremium)
-    if (binancePremium > 0.01) {
+    // console.log(symbol, 'binancePremium', binancePremium)
+    if (binancePremium > 0.02) {
       email.send(symbol + ' binancePremium ' + binancePremium)
     }
   }
   if (coinbasePremium > 0) {
-    console.log(symbol, 'coinbasePremium',coinbasePremium)
-    if (coinbasePremium > 0.01) {
+    // console.log(symbol, 'coinbasePremium',coinbasePremium)
+    if (coinbasePremium > 0.02) {
       email.send(symbol + ' coinbasePremium ' + coinbasePremium)
     }
   }
