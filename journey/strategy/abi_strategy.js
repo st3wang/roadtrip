@@ -24,6 +24,7 @@ const {getTimeNow, isoTimestamp, colorizer} = global
 
 
 const symbols = ["COMPUSD","UMAUSD","IOTXUSD","RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD","REPUSD","CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD","COTIUSD","RLCUSD","BNTUSD","MATICUSD","UNIUSD","DAIUSD","LTCUSD","SNXUSD","ETHUSD","TRIBEUSD","NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD","KNCUSD","1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD","MLNUSD","AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"]
+const startCost = 10000
 
 function typeColor(type) {
   return (type == 'LONG' ? '\x1b[36m' : type == 'SHORT' ? '\x1b[35m' : '') + type + '\x1b[39m'
@@ -190,27 +191,48 @@ function getAverageOrder(orders, costUSD) {
   return order
 }
 
+async function getPremium(bookA,bookB,cost) {
+  var ask = getAverageOrder(bookA.asks, cost)
+  var bid = getAverageOrder(bookB.bids, cost)
+
+  return (bid.price - ask.price) / ask.price
+}
+
 async function checkSymbol(symbol) {
   var coinbaseBook = await coinbase.getBook(symbol)
-  var coinbaseAsk = getAverageOrder(coinbaseBook.asks, 10000)
-  var coinbaseBid = getAverageOrder(coinbaseBook.bids, 10000)
   var binanceBook = await binance.getBook(symbol)
-  var binanceAsk = getAverageOrder(binanceBook.asks, 10000)
-  var binanceBid = getAverageOrder(binanceBook.bids, 10000)
-  var binancePremium = (binanceBid.price - coinbaseAsk.price) / coinbaseAsk.price
-  var coinbasePremium = (coinbaseBid.price - binanceAsk.price) / binanceAsk.price
-  // if (binancePremium > 0) {
-    // console.log(symbol, 'binancePremium', binancePremium)
-    if (binancePremium > 0.02) {
-      email.send(symbol + ' binancePremium ' + (Math.round(binancePremium*10000)/100) + '%')
+  var premiumPercent
+  const coinbasePremium = await getPremium(binanceBook,coinbaseBook,startCost)
+  if (coinbasePremium > 0.001) {
+    premiumPercent = (Math.round(coinbasePremium*10000)/100) + '%'
+    let title = symbol + ' coinbasePremium ' + premiumPercent
+    let body = startCost + ' ' + premiumPercent
+    console.log(title)
+    for (let i = 2; i < 11; i++) {
+      let cost = startCost * i
+      let p = await getPremium(binanceBook,coinbaseBook,cost)
+      premiumPercent = (Math.round(p*10000)/100) + '%'
+      body += ('\n' + cost + ' ' + premiumPercent)
     }
-  // }
-  // if (coinbasePremium > 0) {
-    // console.log(symbol, 'coinbasePremium',coinbasePremium)
-    if (coinbasePremium > 0.02) {
-      email.send(symbol + ' coinbasePremium ' + (Math.round(coinbasePremium*10000)/100) + '%')
+    console.log(body)
+    email.send(title,body)
+    return
+  }
+  const binancePremium = await getPremium(coinbaseBook,binanceBook,startCost)
+  if (binancePremium > 0.001) {
+    premiumPercent = (Math.round(binancePremium*10000)/100) + '%'
+    let title = symbol + ' binancePremium ' + premiumPercent
+    let body = startCost + ' ' + premiumPercent
+    console.log(title)
+    for (let i = 2; i < 11; i++) {
+      let cost = startCost * i
+      let p = await getPremium(coinbaseBook,binanceBook,cost)
+      premiumPercent = (Math.round(p*10000)/100) + '%'
+      body += ('\n' + cost + ' ' + premiumPercent)
     }
-  // }
+    console.log(body)
+    email.send(title,body)
+  }
 }
 
 async function checkPosition() {
