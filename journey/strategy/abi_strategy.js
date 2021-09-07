@@ -203,7 +203,7 @@ async function checkSymbol(symbol) {
   var binanceBook = await binance.getBook(symbol)
   var premiumPercent
   const coinbasePremium = await getPremium(binanceBook,coinbaseBook,startCost)
-  if (coinbasePremium > 0.02) {
+  if (coinbasePremium > 0.002) {
     premiumPercent = (Math.round(coinbasePremium*10000)/100) + '%'
     let title = symbol + ' coinbasePremium ' + premiumPercent
     let body = startCost + ' ' + premiumPercent
@@ -219,7 +219,7 @@ async function checkSymbol(symbol) {
     return
   }
   const binancePremium = await getPremium(coinbaseBook,binanceBook,startCost)
-  if (binancePremium > 0.02) {
+  if (binancePremium > 0.002) {
     premiumPercent = (Math.round(binancePremium*10000)/100) + '%'
     let title = symbol + ' binancePremium ' + premiumPercent
     let body = startCost + ' ' + premiumPercent
