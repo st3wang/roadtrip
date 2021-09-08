@@ -219,7 +219,7 @@ function getPremiumOrder(bookA,bookB,maxCost,minPremium) {
     cost: 0, size: 0
   }
   var depth = []
-  var csv = 'totalPremium, totalProfit, avgBuyPrice, avgsSellPrice, totalBuySize, totalBuyCost, premium, profit, buyPrice, sellPrice, buySize, buyCost'
+  var csv = 'totalPremium, totalProfit, totalBuySize, totalBuyCost, avgBuyPrice, avgsSellPrice, premium, profit, buySize, buyCost, buyPrice, sellPrice'
   asks.some(({price,size}) => {
     let askCost = price * size
     let bidCost = 0, bidSize = 0
@@ -271,15 +271,17 @@ function getPremiumOrder(bookA,bookB,maxCost,minPremium) {
     trade.totalPremium = trade.totalProfit / -trade.buy.totalCost
     trade.profit = trade.buy.cost + trade.buy.fee + trade.sell.cost + trade.sell.fee
     trade.premium = trade.profit / -trade.buy.cost
-    let csvLine = '\n' + (Math.round(trade.totalPremium*10000)/100)+'%, ' + Math.round(trade.totalProfit*100)/100 + ', ' + trade.buy.avgPrice + ', ' + trade.sell.avgPrice + ', ' + trade.buy.totalSize + ', ' + Math.round(trade.buy.totalCost*100)/100
-    + ', ' + (Math.round(trade.premium*10000)/100)+'%, ' + Math.round(trade.profit*100)/100 + ', ' + trade.buy.price + ', ' + trade.sell.price + ', ' + trade.buy.size + ', ' + Math.round(trade.buy.cost*100)/100
+    
+    let csvLine = '\n' + (Math.round(trade.totalPremium*10000)/100)+'%, ' + Math.round(trade.totalProfit*100)/100 + ', ' + trade.buy.totalSize + ', ' + Math.round(trade.buy.totalCost*100)/100 + ', ' + trade.buy.avgPrice + ', ' + trade.sell.avgPrice
+    + ', ' + (Math.round(trade.premium*10000)/100)+'%, ' + Math.round(trade.profit*100)/100 + ', ' + trade.buy.size + ', ' + Math.round(trade.buy.cost*100)/100 + ', ' + trade.buy.price + ', ' + trade.sell.price
+    csv += csvLine
+
     if (trade.premium > minPremium && 
       trade.totalProfit > lastTrade.totalProfit) {
       depth.push(trade)
-      csv += csvLine
     }
     else {
-      console.log('last line', csvLine)
+      // console.log('last line', csvLine)
       return true
     }
   })
