@@ -1,8 +1,9 @@
+var crypto = require('crypto')
 const binancedata = require('./binancedata')
 const https = require('https')
 const winston = require('winston')
 const shoes = require('../shoes')
-const {symbol,account,setup} = shoes
+const {symbol,account,exchange,setup} = shoes
 const oneCandleMs = setup.candle.interval*60000
 const name = 'binance'
 const symbols = {
@@ -106,24 +107,68 @@ async function getCurrentMarket() { try {
   else {
     marketCache = await binancedata.getMarket(symbols.XBTUSD,60,startTime,endTime)
   }
-  // console.log('now',new Date(now).toISOString())
-  // console.log('startTime',startTime)
-  // console.log('endTime',endTime)
-  // console.log(marketCache.candles.length)
-  // console.log(marketCache.candles[0].time)
-  // console.log(marketCache.candles[marketCache.candles.length-1].time)
   return marketCache
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init() { try {
 
+} catch(e) {debugger} }
+
+function getSignature(queryString,timestamp) { try {
+  var what
+  if (queryString && queryString.length) {
+    what = queryString + '&'
+  }
+  else {
+    what = ''
+  }
+  what += 'timestamp=' + timestamp
+  var hmac = crypto.createHmac('sha256', exchange.binance.secret)
+  var signature = hmac.update(what).digest('hex')
+  return signature
+} catch(e) {debgger} }
+
+async function request(method,path,queryString) { try {
+  return new Promise((resolve,reject) => {
+    const timestamp = new Date().getTime()
+    const options = {
+      method: method,
+      hostname: 'api.binance.com',
+      path: path + '?' + queryString + '&timestamp=' + timestamp + '&signature=' + getSignature(queryString,timestamp),
+      headers: {
+        'X-MBX-APIKEY': exchange.binance.key,
+      }
+    }
+    const req = https.request(options, function(response) {
+        let data = ''
+        response.on('data', (chunk) => {data += chunk})
+        response.on('end', () => {
+          let value = JSON.parse(data)
+          resolve(value)
+        })
+      }
+    )
+    req.on('error', (e) => {
+      console.error(e.message)
+      debugger
+    })
+    req.end()
+  })
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-// GET /api/v3/exchangeInfo
+async function getAccount() { try {
+  var response = await request('GET','/sapi/v1/accountSnapshot','type=SPOT')
+  return response
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function createOrder() { try {
+  var response = await request('POST','/api/v3/order/test','symbol=BTCUSDT&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1')
+  debugger
+  return response
+} catch(e) {console.error(e.stack||e);debugger} }
 
 async function getBook(symbol) { try {
   return new Promise((resolve,reject) => {
-    //https://api.binance.com/api/v3/depth?symbol=FARMUSDT
     const options = {
       hostname: 'api.binance.com',
       path: '/api/v3/depth?symbol=' + symbols[symbol]

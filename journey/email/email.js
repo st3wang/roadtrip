@@ -11,7 +11,7 @@ const transporter = nodemailer.createTransport({
 
 const mailOptions = {
   from: 'bitmoonboy@gmail.com',
-  to: 'st3wangi@gmail.com',
+  to: 'bitmoonboy@gmail.com',
   subject: 'Trade Enter',
   text: 'Trade entered with price ...'
 }
