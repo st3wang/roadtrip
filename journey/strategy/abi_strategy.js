@@ -22,14 +22,14 @@ if (shoes.setup.startTime) mock = require('../mock.js')
 
 const {getTimeNow, isoTimestamp, colorizer} = global
 
-
-const symbols = ["COMPUSD","UMAUSD",
-//"IOTXUSD",
+// "IOTXUSD","DAIUSD","REPUSD",
+const symbols = [
+"COMPUSD","UMAUSD",
 "RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD",
-// "REPUSD",
 "CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD","COTIUSD","RLCUSD","BNTUSD","MATICUSD","UNIUSD",
-// "DAIUSD",
-"LTCUSD","SNXUSD","ETHUSD","TRIBEUSD","NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD","KNCUSD","1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD","MLNUSD","AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
+"LTCUSD","SNXUSD","ETHUSD","TRIBEUSD","NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD",
+"KNCUSD",
+"1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD","MLNUSD","AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
 ]
 const startCost = 10000
 
@@ -208,74 +208,86 @@ function getPremium(bookA,bookB,cost) {
   }
 }
 
-function getPremiumOrder(bookA,bookB,limitCost) {
+function getPremiumOrder(bookA,bookB,maxCost,minPremium) {
+  console.log(getPremiumOrder, minPremium)
   var asks = bookA.asks
   var bids = JSON.parse(JSON.stringify(bookB.bids))
-  var buyOrder = {
+  var totalBuy = {
     cost: 0, size: 0
   }
-  var bidIndex = 0
-  var sellOrder = {
+  var totalSell = {
     cost: 0, size: 0
   }
   var depth = []
-  var log = 'premium, profit, buyPrice, sellPrice, size, buyCost'
+  var csv = 'totalPremium, totalProfit, avgBuyPrice, avgsSellPrice, totalBuySize, totalBuyCost, premium, profit, buyPrice, sellPrice, buySize, buyCost'
   asks.some(({price,size}) => {
     let askCost = price * size
-    if (buyOrder.cost + askCost > limitCost) {
+    let bidCost = 0, bidSize = 0
+    if (totalBuy.cost + askCost > maxCost) {
       return true
     }
-    buyOrder.cost += askCost
-    buyOrder.size = parseFloat((buyOrder.size + size).toPrecision(12))
-    // console.log('buy size', size, buyOrder.size)
-    while (buyOrder.size > sellOrder.size && bids.length > 0) {
+    totalBuy.cost += askCost
+    totalBuy.size = parseFloat((totalBuy.size + size).toPrecision(12))
+    while (totalBuy.size > totalSell.size && bids.length > 0) {
       let bid = bids[0]
-      let sizeToBeFilled = buyOrder.size - sellOrder.size
+      let sizeToBeFilled = totalBuy.size - totalSell.size
       if (bid.size < sizeToBeFilled) {
-        let bidCost = bid.price * bid.size
-        sellOrder.cost += bidCost
-        sellOrder.size += bid.size
+        sizeToBeFilled = bid.size
         bids.shift()
-        // console.log('sell size', bid.size, sellOrder.size)
       }
       else {
-        sellOrder.cost += bid.price * sizeToBeFilled
-        sellOrder.size += sizeToBeFilled
         bids[0].size -= sizeToBeFilled
-        // console.log('sizeToBeFilled', sizeToBeFilled, sellOrder.size)
       }
+      let fillCost = bid.price * sizeToBeFilled
+      bidCost += fillCost
+      bidSize += sizeToBeFilled
+      totalSell.cost += fillCost
+      totalSell.size += sizeToBeFilled
     }
-    let lastTrade = depth[depth.length-1] || {profit:0,premium:0}
+    let lastTrade = depth[depth.length-1] || {totalProfit:0,totalPremium:0}
     let trade = {
-      buyOrder: {
-        cost: -buyOrder.cost,
-        size: buyOrder.size,
-        // price: buyOrder.cost / buyOrder.size, 
-        price: parseFloat((buyOrder.cost / buyOrder.size).toPrecision(12)),
-        fee: buyOrder.cost * -0.005
+      buy: {
+        totalCost: -totalBuy.cost,
+        totalSize: totalBuy.size,
+        avgPrice: parseFloat((totalBuy.cost / totalBuy.size).toPrecision(12)),
+        totalFee: totalBuy.cost * -0.005,
+        cost: -askCost,
+        size: size,
+        price: price,
+        fee: askCost * -0.005
       },
-      sellOrder: {
-        cost: sellOrder.cost,
-        size: sellOrder.size,
-        // price: sellOrder.cost / sellOrder.size,
-        price: parseFloat((sellOrder.cost / sellOrder.size).toPrecision(12)),
-        fee: buyOrder.cost * -0.005
+      sell: {
+        totalCost: totalSell.cost,
+        totalSize: totalSell.size,
+        avgPrice: parseFloat((totalSell.cost / totalSell.size).toPrecision(12)),
+        totalFee: totalBuy.cost * -0.005,
+        cost: bidCost,
+        size: bidSize,
+        price: parseFloat((bidCost / bidSize).toPrecision(12)),
+        fee: bidCost * -0.005
       }
     }
-    trade.profit = trade.buyOrder.cost + trade.buyOrder.fee + trade.sellOrder.cost + trade.sellOrder.fee
-    trade.premium = trade.profit / -trade.buyOrder.cost
-    if (trade.profit > lastTrade.profit) {
+    trade.totalProfit = trade.buy.totalCost + trade.buy.totalFee + trade.sell.totalCost + trade.sell.totalFee
+    trade.totalPremium = trade.totalProfit / -trade.buy.totalCost
+    trade.profit = trade.buy.cost + trade.buy.fee + trade.sell.cost + trade.sell.fee
+    trade.premium = trade.profit / -trade.buy.cost
+    let csvLine = '\n' + (Math.round(trade.totalPremium*10000)/100)+'%, ' + Math.round(trade.totalProfit*100)/100 + ', ' + trade.buy.avgPrice + ', ' + trade.sell.avgPrice + ', ' + trade.buy.totalSize + ', ' + Math.round(trade.buy.totalCost*100)/100
+    + ', ' + (Math.round(trade.premium*10000)/100)+'%, ' + Math.round(trade.profit*100)/100 + ', ' + trade.buy.price + ', ' + trade.sell.price + ', ' + trade.buy.size + ', ' + Math.round(trade.buy.cost*100)/100
+    if (trade.premium > minPremium && 
+      trade.totalProfit > lastTrade.totalProfit) {
       depth.push(trade)
-      log += '\n' + (Math.round(trade.premium*10000)/100)+'%, ' + Math.round(trade.profit*100)/100 + ', ' + trade.buyOrder.price + ', ' + trade.sellOrder.price + ', ' + trade.buyOrder.size + ', ' + Math.round(trade.buyOrder.cost*100)/100
+      csv += csvLine
     }
     else {
+      console.log('last line', csvLine)
       return true
     }
   })
-  // console.log(log)
+  // console.log(csv)
+  // debugger
   return {
     depth: depth,
-    log: log
+    csv: csv
   }
 }
 
@@ -295,18 +307,18 @@ async function checkSymbol(symbol) { try {
     let title = symbol + ' coinbasePremium ' + premiumPercent
     let body = startCost + ' ' + premiumPercent
     console.log(title)
-    let premiumOrder = getPremiumOrder(binanceBook,coinbaseBook,100000)
+    let premiumOrder = getPremiumOrder(binanceBook,coinbaseBook,100000,coinbasePremium.premium*0.6)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
     debugger
-    // if (depth.profit > 500 && depth.premium > 0.05) {
+    if (depth.totalProfit > 100) {
       // binance.createOrder({
       //   symbol: symbol,
       //   side: 'BUY',
       //   type: 'MARKET',
-      //   size: depth.buyOrder.size
+      //   size: depth.buyOrder.totalSize
       // })
-      email.send(title,premiumOrder.log)
-    // }
+      email.send(title,premiumOrder.csv)
+    }
     return
   }
   const binancePremium = getPremium(coinbaseBook,binanceBook,startCost)
@@ -315,18 +327,12 @@ async function checkSymbol(symbol) { try {
     let title = symbol + ' binancePremium ' + premiumPercent
     let body = startCost + ' ' + premiumPercent
     console.log(title)
-    let premiumOrder = getPremiumOrder(coinbaseBook,binanceBook,100000)
+    let premiumOrder = getPremiumOrder(coinbaseBook,binanceBook,100000,coinbasePremium.premium*0.6)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
     debugger
-    // if (depth.profit > 500 && depth.premium > 0.05) {
-      // binance.createOrder({
-      //   symbol: symbol,
-      //   side: 'BUY',
-      //   type: 'MARKET',
-      //   size: depth.buyOrder.size
-      // })
-      email.send(title,premiumOrder.log)
-    // }
+    if (depth.totalProfit > 100) {
+      email.send(title,premiumOrder.csv)
+    }
   }
   // console.log('done')
 } catch(e) {console.error(e.stack||e);debugger} }
