@@ -318,7 +318,7 @@ async function checkSymbol(symbol) { try {
     let premiumOrder = getPremiumOrder(coinbaseBook,binanceBook,100000)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
     debugger
-    if (depth.profit > 500 && depth.premium > 0.05) {
+    if (depth.profit > 500 && depth.premium > 0.03) {
       // binance.createOrder({
       //   symbol: symbol,
       //   side: 'BUY',
