@@ -127,7 +127,7 @@ function getSignature(queryString,timestamp) { try {
   var hmac = crypto.createHmac('sha256', exchange.binance.secret)
   var signature = hmac.update(what).digest('hex')
   return signature
-} catch(e) {debgger} }
+} catch(e) {console.error(e);debugger} }
 
 async function request(method,path,queryString) { try {
   debugger

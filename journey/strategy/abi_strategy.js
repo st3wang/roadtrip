@@ -22,13 +22,12 @@ if (shoes.setup.startTime) mock = require('../mock.js')
 
 const {getTimeNow, isoTimestamp, colorizer} = global
 
-// "IOTXUSD","DAIUSD","REPUSD",
+// "IOTXUSD","DAIUSD","REPUSD","KNCUSD",
 const symbols = [
 "COMPUSD","UMAUSD",
 "RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD",
 "CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD","COTIUSD","RLCUSD","BNTUSD","MATICUSD","UNIUSD",
 "LTCUSD","SNXUSD","ETHUSD","TRIBEUSD","NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD",
-"KNCUSD",
 "1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD","MLNUSD","AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
 ]
 const startCost = 10000
@@ -311,13 +310,14 @@ async function checkSymbol(symbol) { try {
     console.log(title)
     let premiumOrder = getPremiumOrder(binanceBook,coinbaseBook,100000,coinbasePremium.premium*0.6)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
-    debugger
     if (depth.totalProfit > 100) {
+      console.log(premiumOrder.csv)
+      debugger
       // binance.createOrder({
       //   symbol: symbol,
       //   side: 'BUY',
       //   type: 'MARKET',
-      //   size: depth.buyOrder.totalSize
+      //   size: depth.buy.totalSize
       // })
       email.send(title,premiumOrder.csv)
     }
