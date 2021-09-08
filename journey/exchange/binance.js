@@ -111,7 +111,8 @@ async function getCurrentMarket() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function init() { try {
-
+  // var response = await createOrder()
+  // debugger
 } catch(e) {debugger} }
 
 function getSignature(queryString,timestamp) { try {
@@ -129,6 +130,7 @@ function getSignature(queryString,timestamp) { try {
 } catch(e) {debgger} }
 
 async function request(method,path,queryString) { try {
+  debugger
   return new Promise((resolve,reject) => {
     const timestamp = new Date().getTime()
     const options = {
@@ -161,8 +163,12 @@ async function getAccount() { try {
   return response
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function createOrder() { try {
-  var response = await request('POST','/api/v3/order/test','symbol=BTCUSDT&side=BUY&type=LIMIT&timeInForce=GTC&quantity=1&price=0.1')
+async function createOrder({symbol,side,type,size,price}) { try {
+  debugger
+  return
+  // var response = await request('POST','/api/v3/order','symbol=USDCUSDT&side=SELL&type=LIMIT&timeInForce=GTC&quantity=132336&price=1')
+  var response = await request('POST','/api/v3/order','symbol=' + symbols[symbol] + '&side=' + side + '&type=' + type + '&quantity=' + size)
+
   debugger
   return response
 } catch(e) {console.error(e.stack||e);debugger} }
@@ -230,12 +236,15 @@ async function getProducts() {
   })
 }
 
+init()
+
 module.exports = {
   name: name,
   init: init,
   getCurrentMarket: getCurrentMarket,
   getBook: getBook,
   getProducts: getProducts,
+  createOrder: createOrder,
   symbols: symbols,
   position: position,
 }

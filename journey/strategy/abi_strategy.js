@@ -23,7 +23,14 @@ if (shoes.setup.startTime) mock = require('../mock.js')
 const {getTimeNow, isoTimestamp, colorizer} = global
 
 
-const symbols = ["COMPUSD","UMAUSD","IOTXUSD","RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD","REPUSD","CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD","COTIUSD","RLCUSD","BNTUSD","MATICUSD","UNIUSD","DAIUSD","LTCUSD","SNXUSD","ETHUSD","TRIBEUSD","NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD","KNCUSD","1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD","MLNUSD","AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"]
+const symbols = ["COMPUSD","UMAUSD",
+//"IOTXUSD",
+"RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD",
+"REPUSD",
+"CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD","COTIUSD","RLCUSD","BNTUSD","MATICUSD","UNIUSD",
+// "DAIUSD",
+"LTCUSD","SNXUSD","ETHUSD","TRIBEUSD","NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD","KNCUSD","1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD","MLNUSD","AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
+]
 const startCost = 10000
 
 function typeColor(type) {
@@ -167,73 +174,162 @@ const logger = winston.createLogger({
   ]
 })
 
-function sendEmail(entrySignal) {
-  const {entryOrders} = entrySignal
-  const {side,price,orderQty} = entryOrders[0]
-  email.send('MoonBoy Enter ' + side + ' ' + price + ' ' + orderQty, JSON.stringify(entrySignal, null, 2))
-}
-
-function getAverageOrder(orders, costUSD) {
+function getAverageOrder(orders, limitCost) {
+  limitCost = limitCost || 0
   var order = {
+    cost: 0,
     price: 0,
     size: 0
   }
-  var cost = 0
   for (let i = 0; i < orders.length; i++) {
     let {price, size} = orders[i]
-    order.size += size
-    cost += (price * size)
-    if (cost >= costUSD) {
+    let cost = price * size
+    if (order.cost + cost < limitCost) {
+      order.size += size
+      order.cost += cost
+    }
+    else {
       i = orders.length
     }
   }
-  order.price = cost / order.size
+  order.price = order.cost / order.size
+  debugger
   return order
 }
 
-async function getPremium(bookA,bookB,cost) {
-  var ask = getAverageOrder(bookA.asks, cost)
-  var bid = getAverageOrder(bookB.bids, cost)
+function getPremium(bookA,bookB,cost) {
+  var ask = bookA.asks[0] // getAverageOrder(bookA.asks, cost)
+  var bid = bookB.bids[0] // getAverageOrder(bookB.bids, cost)
 
-  return (bid.price - ask.price) / ask.price
+  return {
+    premium: (bid.price - ask.price) / ask.price,
+    ask: ask,
+    bid: bid
+  }
 }
 
-async function checkSymbol(symbol) {
-  var coinbaseBook = await coinbase.getBook(symbol)
-  var binanceBook = await binance.getBook(symbol)
+function getPremiumOrder(bookA,bookB,limitCost) {
+  var asks = bookA.asks
+  var bids = JSON.parse(JSON.stringify(bookB.bids))
+  var buyOrder = {
+    cost: 0, size: 0
+  }
+  var bidIndex = 0
+  var sellOrder = {
+    cost: 0, size: 0
+  }
+  var depth = []
+  var log = 'premium, profit, buyPrice, sellPrice, size, buyCost'
+  asks.some(({price,size}) => {
+    let askCost = price * size
+    if (buyOrder.cost + askCost > limitCost) {
+      return true
+    }
+    buyOrder.cost += askCost
+    buyOrder.size = parseFloat((buyOrder.size + size).toPrecision(12))
+    // console.log('buy size', size, buyOrder.size)
+    while (buyOrder.size > sellOrder.size && bids.length > 0) {
+      let bid = bids[0]
+      let sizeToBeFilled = buyOrder.size - sellOrder.size
+      if (bid.size < sizeToBeFilled) {
+        let bidCost = bid.price * bid.size
+        sellOrder.cost += bidCost
+        sellOrder.size += bid.size
+        bids.shift()
+        // console.log('sell size', bid.size, sellOrder.size)
+      }
+      else {
+        sellOrder.cost += bid.price * sizeToBeFilled
+        sellOrder.size += sizeToBeFilled
+        bids[0].size -= sizeToBeFilled
+        // console.log('sizeToBeFilled', sizeToBeFilled, sellOrder.size)
+      }
+    }
+    let lastTrade = depth[depth.length-1] || {profit:0,premium:0}
+    let trade = {
+      buyOrder: {
+        cost: -buyOrder.cost,
+        size: buyOrder.size,
+        // price: buyOrder.cost / buyOrder.size, 
+        price: parseFloat((buyOrder.cost / buyOrder.size).toPrecision(12)),
+        fee: buyOrder.cost * -0.005
+      },
+      sellOrder: {
+        cost: sellOrder.cost,
+        size: sellOrder.size,
+        // price: sellOrder.cost / sellOrder.size,
+        price: parseFloat((sellOrder.cost / sellOrder.size).toPrecision(12)),
+        fee: buyOrder.cost * -0.005
+      }
+    }
+    trade.profit = trade.buyOrder.cost + trade.buyOrder.fee + trade.sellOrder.cost + trade.sellOrder.fee
+    trade.premium = trade.profit / -trade.buyOrder.cost
+    if (trade.profit > lastTrade.profit) {
+      depth.push(trade)
+      log += '\n' + (Math.round(trade.premium*10000)/100)+'%, ' + Math.round(trade.profit*100)/100 + ', ' + trade.buyOrder.price + ', ' + trade.sellOrder.price + ', ' + trade.buyOrder.size + ', ' + Math.round(trade.buyOrder.cost*100)/100
+    }
+    else {
+      return true
+    }
+  })
+  // console.log(log)
+  return {
+    depth: depth,
+    log: log
+  }
+}
+
+async function checkSymbol(symbol) { try {
+  var coinbaseBook = await coinbase.getBook(symbol) //testBookCoinbase
+  var binanceBook = await binance.getBook(symbol) // testBookCoinbase
   var premiumPercent
-  const coinbasePremium = await getPremium(binanceBook,coinbaseBook,startCost)
-  if (coinbasePremium > 0.02) {
-    premiumPercent = (Math.round(coinbasePremium*10000)/100) + '%'
+  // console.log(symbol)
+  if (!coinbaseBook || !coinbaseBook.asks || coinbaseBook.asks.length == 0 || !coinbaseBook.bids || coinbaseBook.bids.length == 0 ||
+    !binanceBook || !binanceBook.asks || binanceBook.asks.length == 0 || !binanceBook.bids || binanceBook.bids.length == 0) {
+      console.log('Invalid book', symbol, coinbaseBook, binanceBook)
+      return 
+    }
+  const coinbasePremium = getPremium(binanceBook,coinbaseBook,startCost)
+  if (coinbasePremium.premium > 0.02) {
+    premiumPercent = (Math.round(coinbasePremium.premium*10000)/100) + '%'
     let title = symbol + ' coinbasePremium ' + premiumPercent
     let body = startCost + ' ' + premiumPercent
     console.log(title)
-    for (let i = 2; i < 11; i++) {
-      let cost = startCost * i
-      let p = await getPremium(binanceBook,coinbaseBook,cost)
-      premiumPercent = (Math.round(p*10000)/100) + '%'
-      body += ('\n' + cost + ' ' + premiumPercent)
+    let premiumOrder = getPremiumOrder(binanceBook,coinbaseBook,100000)
+    let depth = premiumOrder.depth[premiumOrder.depth.length-1]
+    debugger
+    if (depth.profit > 500 && depth.premium > 0.05) {
+      // binance.createOrder({
+      //   symbol: symbol,
+      //   side: 'BUY',
+      //   type: 'MARKET',
+      //   size: depth.buyOrder.size
+      // })
+      email.send(title,premiumOrder.log)
     }
-    console.log(body)
-    email.send(title,body)
     return
   }
-  const binancePremium = await getPremium(coinbaseBook,binanceBook,startCost)
-  if (binancePremium > 0.02) {
-    premiumPercent = (Math.round(binancePremium*10000)/100) + '%'
+  const binancePremium = getPremium(coinbaseBook,binanceBook,startCost)
+  if (binancePremium.premium > 0.02) {
+    premiumPercent = (Math.round(binancePremium.premium*10000)/100) + '%'
     let title = symbol + ' binancePremium ' + premiumPercent
     let body = startCost + ' ' + premiumPercent
     console.log(title)
-    for (let i = 2; i < 11; i++) {
-      let cost = startCost * i
-      let p = await getPremium(coinbaseBook,binanceBook,cost)
-      premiumPercent = (Math.round(p*10000)/100) + '%'
-      body += ('\n' + cost + ' ' + premiumPercent)
+    let premiumOrder = getPremiumOrder(coinbaseBook,binanceBook,100000)
+    let depth = premiumOrder.depth[premiumOrder.depth.length-1]
+    debugger
+    if (depth.profit > 500 && depth.premium > 0.05) {
+      // binance.createOrder({
+      //   symbol: symbol,
+      //   side: 'BUY',
+      //   type: 'MARKET',
+      //   size: depth.buyOrder.size
+      // })
+      email.send(title,premiumOrder.log)
     }
-    console.log(body)
-    email.send(title,body)
   }
-}
+  // console.log('done')
+} catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkPosition() {
   // var binanceSymbols = await binance.getProducts()
