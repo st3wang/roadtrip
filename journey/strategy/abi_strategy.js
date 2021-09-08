@@ -298,7 +298,7 @@ async function checkSymbol(symbol) { try {
     let premiumOrder = getPremiumOrder(binanceBook,coinbaseBook,100000)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
     debugger
-    if (depth.profit > 500 && depth.premium > 0.05) {
+    // if (depth.profit > 500 && depth.premium > 0.05) {
       // binance.createOrder({
       //   symbol: symbol,
       //   side: 'BUY',
@@ -306,7 +306,7 @@ async function checkSymbol(symbol) { try {
       //   size: depth.buyOrder.size
       // })
       email.send(title,premiumOrder.log)
-    }
+    // }
     return
   }
   const binancePremium = getPremium(coinbaseBook,binanceBook,startCost)
@@ -318,7 +318,7 @@ async function checkSymbol(symbol) { try {
     let premiumOrder = getPremiumOrder(coinbaseBook,binanceBook,100000)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
     debugger
-    if (depth.profit > 500 && depth.premium > 0.05) {
+    // if (depth.profit > 500 && depth.premium > 0.05) {
       // binance.createOrder({
       //   symbol: symbol,
       //   side: 'BUY',
@@ -326,7 +326,7 @@ async function checkSymbol(symbol) { try {
       //   size: depth.buyOrder.size
       // })
       email.send(title,premiumOrder.log)
-    }
+    // }
   }
   // console.log('done')
 } catch(e) {console.error(e.stack||e);debugger} }
