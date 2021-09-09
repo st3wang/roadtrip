@@ -85,7 +85,8 @@ const symbols = {
   LPTUSD: 'LPTUSDT',
   NUUSD: 'NUUSDT',
   YFIIUSD: 'YFIIUSDT',
-  FILUSD: 'FILUSDT'
+  FILUSD: 'FILUSDT',
+  USDCUSD: 'USDCUSDT'
 }
 
 var position = {exchange:name}
@@ -165,10 +166,35 @@ async function getAccount() { try {
 
 async function createOrder({symbol,side,type,size,price}) { try {
   debugger
-  return
   // var response = await request('POST','/api/v3/order','symbol=USDCUSDT&side=SELL&type=LIMIT&timeInForce=GTC&quantity=132336&price=1')
   var response = await request('POST','/api/v3/order','symbol=' + symbols[symbol] + '&side=' + side + '&type=' + type + '&quantity=' + size)
+  
+  debugger
+  return response
+} catch(e) {console.error(e.stack||e);debugger} }
 
+async function marketBuy(order) { try {
+  order.side = 'BUY'
+  order.type = 'MARKET'
+  return await createOrder(order)
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function getOrder({symbol,orderId}) { try {
+  var response = await request('GET','/api/v3/order','symbol=' + symbols[symbol] + '&orderId=' + orderId)
+  debugger
+  return response
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function getOrders({symbol}) { try {
+  var response = await request('GET','/api/v3/allOrders','symbol=' + symbols[symbol])
+  debugger
+  return response
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function withdraw({coin,amount,address}) { try {
+  console.log('withdraw')
+  var response = await request('POST','/sapi/v1/capital/withdraw/apply','coin=' + coin + '&amount=' + amount + '&address=' + address)
+  console.log(response)
   debugger
   return response
 } catch(e) {console.error(e.stack||e);debugger} }
@@ -245,6 +271,10 @@ module.exports = {
   getBook: getBook,
   getProducts: getProducts,
   createOrder: createOrder,
+  marketBuy: marketBuy,
+  getOrder: getOrder,
+  getOrders: getOrders,
+  withdraw: withdraw,
   symbols: symbols,
   position: position,
 }

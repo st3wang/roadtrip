@@ -297,7 +297,21 @@ function getPremiumOrder(bookA,bookB,maxCost,minPremium) {
   }
 }
 
+async function marketBuy(exchange, order) {
+  return
+  var o = await exchange.marketBuy(order)
+  var orderId = o.orderId
+  debugger
+  if (orderId) {
+    while(o.status !== 'FILLED') {
+      o = await exchange.getOrder(orderId)
+      debugger
+    }
+  }
+}
+
 async function checkSymbol(symbol) { try {
+  return
   var coinbaseBook = await coinbase.getBook(symbol) //testBookCoinbase
   var binanceBook = await binance.getBook(symbol) // testBookCoinbase
   var premiumPercent
@@ -318,12 +332,10 @@ async function checkSymbol(symbol) { try {
     if (depth.totalProfit > 100) {
       console.log(premiumOrder.csv)
       debugger
-      // binance.createOrder({
-      //   symbol: symbol,
-      //   side: 'BUY',
-      //   type: 'MARKET',
-      //   size: depth.buy.totalSize
-      // })
+      marketBuy({
+        symbol: symbol,
+        size: depth.buy.totalSize
+      })
       email.send(title,premiumOrder.csv)
     }
     return
@@ -374,6 +386,11 @@ async function checkPosition() {
 
 async function init() {
   var now = getTimeNow()
+  await binance.withdraw({
+    coin: 'USDC',
+    amount: 100,
+    address: '0x9B9009d56e520d07Fb0a5df4e5058De382A71B2D'
+  })
 }
 
 module.exports = {
