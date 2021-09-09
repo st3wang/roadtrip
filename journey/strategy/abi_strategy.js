@@ -392,9 +392,15 @@ async function checkPosition() {
 
 async function init() {
   var now = getTimeNow()
-  buy(binance, {
-    symbol: 'USDCUSD',
-    size: 100
+  // await binance.getCoinInfo()
+  // buy(binance, {
+  //   symbol: 'USDCUSD',
+  //   size: 100
+  // })
+  await binance.withdraw({
+    coin: 'USDC',
+    amount: 100,
+    address: '0x9B9009d56e520d07Fb0a5df4e5058De382A71B2D'
   })
 }
 

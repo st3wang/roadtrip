@@ -133,11 +133,17 @@ function getSignature(queryString,timestamp) { try {
 async function request(method,path,queryString) { try {
   debugger
   return new Promise((resolve,reject) => {
+    if (queryString && queryString.length > 0) {
+      queryString += '&'
+    }
+    else {
+      queryString = ''
+    }
     const timestamp = new Date().getTime()
     const options = {
       method: method,
       hostname: 'api.binance.com',
-      path: path + '?' + queryString + '&timestamp=' + timestamp + '&signature=' + getSignature(queryString,timestamp),
+      path: path + '?' + queryString + 'timestamp=' + timestamp + '&signature=' + getSignature(queryString,timestamp),
       headers: {
         'X-MBX-APIKEY': exchange.binance.key,
       }
@@ -193,10 +199,19 @@ async function getOrders({symbol}) { try {
 
 async function withdraw({coin,amount,address}) { try {
   console.log('withdraw')
-  var response = await request('POST','/sapi/v1/capital/withdraw/apply','coin=' + coin + '&amount=' + amount + '&address=' + address)
+  var response = await request('POST','/sapi/v1/capital/withdraw/apply','coin=' + coin + '&amount=' + amount + '&address=' + address + '&network=ETH')
   console.log(response)
   debugger
   return response
+} catch(e) {console.error(e.stack||e);debugger} }
+
+async function getCoinInfo() { try {
+  var coins = await request('GET','/sapi/v1/capital/config/getall','')
+  var USDC = coins.find(({coin}) => {
+    return coin == 'USDC'
+  })
+  debugger
+  return coins
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function getBook(symbol) { try {
@@ -275,6 +290,7 @@ module.exports = {
   getOrder: getOrder,
   getOrders: getOrders,
   withdraw: withdraw,
+  getCoinInfo: getCoinInfo,
   symbols: symbols,
   position: position,
 }
