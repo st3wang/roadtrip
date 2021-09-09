@@ -297,10 +297,10 @@ function getPremiumOrder(bookA,bookB,maxCost,minPremium) {
   }
 }
 
-async function marketBuy(exchange, order) {
-  return
+async function buy(exchange, order) {
   var o = await exchange.marketBuy(order)
   var orderId = o.orderId
+  console.log(o)
   debugger
   if (orderId) {
     while(o.status !== 'FILLED') {
@@ -308,6 +308,11 @@ async function marketBuy(exchange, order) {
       debugger
     }
   }
+  await binance.withdraw({
+    coin: order.symbol.replace('USD',''),
+    amount: order.size,
+    address: '0x9B9009d56e520d07Fb0a5df4e5058De382A71B2D'
+  })
 }
 
 async function checkSymbol(symbol) { try {
@@ -332,7 +337,8 @@ async function checkSymbol(symbol) { try {
     if (depth.totalProfit > 100) {
       console.log(premiumOrder.csv)
       debugger
-      marketBuy({
+      return
+      buy({
         symbol: symbol,
         size: depth.buy.totalSize
       })
@@ -386,10 +392,9 @@ async function checkPosition() {
 
 async function init() {
   var now = getTimeNow()
-  await binance.withdraw({
-    coin: 'USDC',
-    amount: 100,
-    address: '0x9B9009d56e520d07Fb0a5df4e5058De382A71B2D'
+  buy(binance, {
+    symbol: 'USDCUSD',
+    size: 100
   })
 }
 
