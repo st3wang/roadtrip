@@ -133,17 +133,12 @@ function getSignature(queryString,timestamp) { try {
 async function request(method,path,queryString) { try {
   debugger
   return new Promise((resolve,reject) => {
-    if (queryString && queryString.length > 0) {
-      queryString += '&'
-    }
-    else {
-      queryString = ''
-    }
+    queryString = queryString || ''
     const timestamp = new Date().getTime()
     const options = {
       method: method,
       hostname: 'api.binance.com',
-      path: path + '?' + queryString + 'timestamp=' + timestamp + '&signature=' + getSignature(queryString,timestamp),
+      path: path + '?' + queryString + (queryString.length ? '&' : '') + 'timestamp=' + timestamp + '&signature=' + getSignature(queryString,timestamp),
       headers: {
         'X-MBX-APIKEY': exchange.binance.key,
       }
