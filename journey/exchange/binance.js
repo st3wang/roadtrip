@@ -166,9 +166,14 @@ async function getAccount() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function createOrder({symbol,side,type,size,price}) { try {
-  debugger
+  symbol = symbols[symbol]
+  // symbol = 'USDCUSDT'
+  // side = 'SELL'
+  // size = 88410
+  // debugger
   // var response = await request('POST','/api/v3/order','symbol=USDCUSDT&side=SELL&type=LIMIT&timeInForce=GTC&quantity=132336&price=1')
-  var response = await request('POST','/api/v3/order','symbol=' + symbols[symbol] + '&side=' + side + '&type=' + type + '&quantity=' + size)
+  size = Math.round(size)
+  var response = await request('POST','/api/v3/order','symbol=' + symbol + '&side=' + side + '&type=' + type + '&quantity=' + size)
   
   debugger
   return response

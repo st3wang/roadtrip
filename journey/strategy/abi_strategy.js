@@ -28,12 +28,16 @@ const symbols = [
   // "KNCUSD", // Binance is KNC v2. Coinbase is v1.
   // "REPUSD", // Binance REP is v2. Coinbase is v1, does not support REPv2 trading
   // "TRIBEUSD", // Binance TRIBE withdrawal suspended
-"COMPUSD","UMAUSD",
-"RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD",
-"CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD","COTIUSD","RLCUSD","BNTUSD","MATICUSD","UNIUSD",
-"LTCUSD","SNXUSD","ETHUSD",
-"NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD",
-"1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD","MLNUSD","AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
+// "COMPUSD","UMAUSD",
+// "RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD",
+// "CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD",
+"COTIUSD",
+//"RLCUSD","BNTUSD","MATICUSD","UNIUSD",
+// "LTCUSD","SNXUSD","ETHUSD",
+// "NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD",
+// "1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD",
+// "MLNUSD",
+// "AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
 ]
 const startCost = 10000
 
@@ -298,7 +302,7 @@ function getPremiumOrder(bookA,bookB,maxCost,minPremium) {
 }
 
 async function buy(exchange, order) {
-  return
+  debugger
   var o = await exchange.marketBuy(order)
   var orderId = o.orderId
   if (orderId) {
@@ -310,7 +314,7 @@ async function buy(exchange, order) {
   await binance.withdraw({
     coin: order.symbol.replace('USD',''),
     amount: order.size,
-    address: '0x9B9009d56e520d07Fb0a5df4e5058De382A71B2D'
+    address: '0x37B3a3A8afEEC0e5D63e52c8158829aa9D7fc613' // COTI
   })
 }
 
@@ -332,13 +336,13 @@ async function checkSymbol(symbol) { try {
     console.log(title)
     let premiumOrder = getPremiumOrder(binanceBook,coinbaseBook,100000,coinbasePremium.premium*0.6)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
-    if (depth.totalProfit > 100) {
+    if (depth && depth.totalProfit > 100) {
       console.log(premiumOrder.csv)
       debugger
-      // buy({
-      //   symbol: symbol,
-      //   size: depth.buy.totalSize
-      // })
+      buy(binance, {
+        symbol: symbol,
+        size: depth.buy.totalSize/2
+      })
       email.send(title,premiumOrder.csv)
     }
     return
@@ -389,16 +393,15 @@ async function checkPosition() {
 
 async function init() {
   var now = getTimeNow()
-  // await binance.getCoinInfo()
+  // var response = await binance.marketBuy({
+  //   symbol: 'USDCUSDT',
+  //   size: 0.1
+  // })
   // buy(binance, {
   //   symbol: 'USDCUSD',
   //   size: 100
   // })
-  // await binance.withdraw({
-  //   coin: 'USDC',
-  //   amount: 100,
-  //   address: '0x9B9009d56e520d07Fb0a5df4e5058De382A71B2D'
-  // })
+
 }
 
 module.exports = {
