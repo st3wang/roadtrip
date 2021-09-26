@@ -343,10 +343,10 @@ async function checkSymbol(symbol) { try {
     if (depth && depth.totalProfit > 100) {
       console.log(premiumOrder.csv)
       debugger
-      buy(binance, {
-        symbol: symbol,
-        size: depth.buy.totalSize/2
-      })
+      // buy(binance, {
+      //   symbol: symbol,
+      //   size: depth.buy.totalSize/2
+      // })
       email.send(title,premiumOrder.csv)
     }
     return
