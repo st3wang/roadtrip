@@ -28,16 +28,16 @@ const symbols = [
   // "KNCUSD", // Binance is KNC v2. Coinbase is v1.
   // "REPUSD", // Binance REP is v2. Coinbase is v1, does not support REPv2 trading
   // "TRIBEUSD", // Binance TRIBE withdrawal suspended
-// "COMPUSD","UMAUSD",
-// "RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD",
-// "CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD",
+"COMPUSD","UMAUSD",
+"RENUSD","CRVUSD","QUICKUSD","XTZUSD","GTCUSD","DASHUSD","TRBUSD","YFIUSD","OXTUSD","BALUSD","CHZUSD","AXSUSD","ANKRUSD","TRUUSD","QNTUSD","XLMUSD","FORTHUSD","MASKUSD","ETCUSD","DOGEUSD","ALGOUSD","ZRXUSD","BANDUSD","OGNUSD","SUSHIUSD",
+"CLVUSD","GRTUSD","REQUSD","BATUSD","OMGUSD",
 "COTIUSD",
-//"RLCUSD","BNTUSD","MATICUSD","UNIUSD",
-// "LTCUSD","SNXUSD","ETHUSD",
-// "NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD",
-// "1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD",
-// "MLNUSD",
-// "AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
+"RLCUSD","BNTUSD","MATICUSD","UNIUSD",
+"LTCUSD","SNXUSD","ETHUSD",
+"NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD",
+"1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD",
+"MLNUSD",
+"AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
 ]
 const startCost = 10000
 
@@ -302,20 +302,24 @@ function getPremiumOrder(bookA,bookB,maxCost,minPremium) {
 }
 
 async function buy(exchange, order) {
+  console.log('buy', order)
   debugger
   var o = await exchange.marketBuy(order)
+  console.log('buy marketBuy', o)
   var orderId = o.orderId
   if (orderId) {
     while(o.status !== 'FILLED') {
       o = await exchange.getOrder(orderId)
+      console.log('buy getOrder', o)
       debugger
     }
   }
-  await binance.withdraw({
+  var withdrawResult = await binance.withdraw({
     coin: order.symbol.replace('USD',''),
     amount: order.size,
     address: '0x37B3a3A8afEEC0e5D63e52c8158829aa9D7fc613' // COTI
   })
+  console.log('buy withdraw', withdrawResult)
 }
 
 async function checkSymbol(symbol) { try {

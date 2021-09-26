@@ -131,6 +131,7 @@ function getSignature(queryString,timestamp) { try {
 } catch(e) {console.error(e);debugger} }
 
 async function request(method,path,queryString) { try {
+  console.log('request',method,path,queryString)
   debugger
   return new Promise((resolve,reject) => {
     queryString = queryString || ''
@@ -167,12 +168,14 @@ async function getAccount() { try {
 
 async function createOrder({symbol,side,type,size,price}) { try {
   symbol = symbols[symbol]
-  // symbol = 'USDCUSDT'
-  // side = 'SELL'
-  // size = 88410
+  // size = Math.round(size)
+  
+  // symbol = 'BTCUSDT'
+  // side = 'BUY'
+  // size = 1.0055
   // debugger
+
   // var response = await request('POST','/api/v3/order','symbol=USDCUSDT&side=SELL&type=LIMIT&timeInForce=GTC&quantity=132336&price=1')
-  size = Math.round(size)
   var response = await request('POST','/api/v3/order','symbol=' + symbol + '&side=' + side + '&type=' + type + '&quantity=' + size)
   
   debugger
