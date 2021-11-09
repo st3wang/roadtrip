@@ -368,28 +368,7 @@ async function checkSymbol(symbol) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkPosition() {
-  // var binanceSymbols = await binance.getProducts()
-  // var matchSymbols = []
-  // symbols.forEach(s => {
-  //   if (binanceSymbols.indexOf(s) > -1) {
-  //     matchSymbols.push(s)
-  //   }
-  //   else {
-  //     console.log(s)
-  //   }
-  // })
-  // debugger
-  // var cbSymbols = {}
-  // var coinbaseSymbols = symbols.forEach(s => {
-  //   cbSymbols[s] = s.replace('USD', '-USD')
-  // })
-  // console.log('coinbase', cbSymbols)
-  // var bnSymbols = {}
-  // var binanceSymbols = symbols.forEach(s => {
-  //   bnSymbols[s] = s.replace('USD', '-USD')
-  // })
-  // console.log('binance', bnSymbols)
-  // debugger
+  console.log('checkPosition', new Date().toString())
   for (let i = 0; i < symbols.length; i++) {
     await checkSymbol(symbols[i])
   }
@@ -398,9 +377,10 @@ async function checkPosition() {
 async function init() {
   var now = getTimeNow()
   // var response = await binance.marketBuy({
-  //   symbol: 'USDCUSDT',
+  //   symbol: 'BTCUSDC',
   //   size: 0.1
   // })
+  
   // buy(binance, {
   //   symbol: 'USDCUSD',
   //   size: 100

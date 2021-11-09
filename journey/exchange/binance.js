@@ -170,10 +170,10 @@ async function createOrder({symbol,side,type,size,price}) { try {
   symbol = symbols[symbol]
   // size = Math.round(size)
   
-  // symbol = 'BTCUSDT'
+  // symbol = 'BTCUSDC'
   // side = 'BUY'
-  // size = 1.0055
-  // debugger
+  // size = 0.74
+  debugger
 
   // var response = await request('POST','/api/v3/order','symbol=USDCUSDT&side=SELL&type=LIMIT&timeInForce=GTC&quantity=132336&price=1')
   var response = await request('POST','/api/v3/order','symbol=' + symbol + '&side=' + side + '&type=' + type + '&quantity=' + size)
