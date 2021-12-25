@@ -361,7 +361,7 @@ async function checkSymbol(symbol) { try {
     console.log(title)
     let premiumOrder = getPremiumOrder(coinbaseBook,binanceBook,100000,coinbasePremium.premium*0.6)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
-    if (depth.totalProfit > 100) {
+    if (depth && depth.totalProfit > 100) {
       console.log(premiumOrder.csv)
       debugger
       email.send(title,premiumOrder.csv)
