@@ -326,13 +326,14 @@ async function checkSymbol(symbol) { try {
   var coinbaseBook = await coinbase.getBook(symbol) //testBookCoinbase
   var binanceBook = await binance.getBook(symbol) // testBookCoinbase
   var premiumPercent
-  // console.log(symbol)
+  // console.log('checkSymbol',symbol)
   if (!coinbaseBook || !coinbaseBook.asks || coinbaseBook.asks.length == 0 || !coinbaseBook.bids || coinbaseBook.bids.length == 0 ||
     !binanceBook || !binanceBook.asks || binanceBook.asks.length == 0 || !binanceBook.bids || binanceBook.bids.length == 0) {
       console.log('Invalid book', symbol, coinbaseBook, binanceBook)
       return 
     }
   const coinbasePremium = getPremium(binanceBook,coinbaseBook,startCost)
+  // console.log('coinbasePremium',coinbasePremium)
   if (coinbasePremium.premium > 0.02) {
     premiumPercent = (Math.round(coinbasePremium.premium*10000)/100) + '%'
     let title = symbol + ' coinbasePremium ' + premiumPercent
@@ -352,6 +353,7 @@ async function checkSymbol(symbol) { try {
     return
   }
   const binancePremium = getPremium(coinbaseBook,binanceBook,startCost)
+  // console.log('binancePremium',binancePremium)
   if (binancePremium.premium > 0.02) {
     premiumPercent = (Math.round(binancePremium.premium*10000)/100) + '%'
     let title = symbol + ' binancePremium ' + premiumPercent
@@ -359,8 +361,9 @@ async function checkSymbol(symbol) { try {
     console.log(title)
     let premiumOrder = getPremiumOrder(coinbaseBook,binanceBook,100000,coinbasePremium.premium*0.6)
     let depth = premiumOrder.depth[premiumOrder.depth.length-1]
-    debugger
     if (depth.totalProfit > 100) {
+      console.log(premiumOrder.csv)
+      debugger
       email.send(title,premiumOrder.csv)
     }
   }
