@@ -48,7 +48,11 @@ const coinbase = require('./exchange/coinbase')
 const bitstamp = require('./exchange/bitstamp')
 const binance = require('./exchange/binance')
 const bitfinex = require('./exchange/bitfinex')
-var exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
+var exchanges = {bitmex: bitmex, 
+  coinbase: coinbase, 
+  bitstamp: bitstamp, 
+  binance: binance, 
+  bitfinex: bitfinex}
 if (shoes.strategy == 'abi') {
   exchanges = {coinbase: coinbase, binance: binance}
 }
@@ -154,7 +158,7 @@ async function next(logOnly) { try {
     tradeExchange.getCurrentMarket() // to start a new candle if necessary
     tradeExchange.position.caller = 'interval' // for logging
   })
-  if (!logOnly) checkPosition()
+  if (!logOnly) await checkPosition()
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 var gettingTradeJson = false
@@ -450,8 +454,8 @@ async function init() { try {
     debugger
   }
   else {
-    // await initExchanges()
-    next()
+    await initExchanges()
+    await next()
     // createInterval(6000*2**0) // 6s after candle close
     // createInterval(6000*2**1) // 12s
     // createInterval(6000*2**3) // 48s for bitstamp

@@ -518,12 +518,12 @@ async function getSignal(tradeExchange,setup,position) {
     }
   }
 
-  if (tradeExchange != binance) {
-    const binanceSignal = await getAccumulationSignal(binance,setup)
-    if (binanceSignal.condition != '-') {
-      return binanceSignal
-    }
-  }
+  // if (tradeExchange != binance) {
+  //   const binanceSignal = await getAccumulationSignal(binance,setup)
+  //   if (binanceSignal.condition != '-') {
+  //     return binanceSignal
+  //   }
+  // }
 
   if (tradeExchange != bitfinex) {
     const bitfinexSignal = await getAccumulationSignal(bitfinex,setup)

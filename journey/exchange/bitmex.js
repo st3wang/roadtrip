@@ -150,7 +150,8 @@ async function connect() { try {
     apiKeySecret: exchange.bitmex.secret,
     maxTableLen:100
   })
-  ws.on('error', (e) => logger.error(e));
+  // 'Unable to parse incoming data:' is coming from heartbeat ping
+  ws.on('error', (e) => {if (e == 'Unable to parse incoming data:') return; logger.error(e);debugger});
   ws.on('open', () => console.log('Connection opened.'));
   ws.on('close', () => console.log('Connection closed.'));
   // ws.on('initialize', () => console.log('Client initialized, data is flowing.'));
@@ -870,7 +871,10 @@ async function orderNewBulk(orders) { try {
   if (tooSmall.length > 0) {
     return ({status:400,message:'orderTooSmall'})
   }
-  var response = await client.Order.Order_newBulk({orders:JSON.stringify(orders)})
+  if (orders.length > 1) {
+    debugger
+  }
+  var response = await client.Order.Order_new(orders[0])
   .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
@@ -889,6 +893,7 @@ async function orderNewBulk(orders) { try {
   })
 
   if (response && response.status == 200) {
+    response.obj = [response.obj] // bulk order was removed
     response.data = undefined
     response.statusText = undefined
     logger.info('orderNewBulk',response)
@@ -897,6 +902,7 @@ async function orderNewBulk(orders) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderAmendBulk(orders) { try {
+  // TODO change it to Order_amend
   let response = await client.Order.Order_amendBulk({orders:JSON.stringify(orders)})
   .catch(function(e) {
     e.data = undefined
