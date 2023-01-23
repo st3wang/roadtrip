@@ -145,7 +145,7 @@ function handleOrder(orders) { try {
       else {
         lastOrders.push(o)
       }
-      if (o.ordType == 'Stop' && o.execInst == 'Close,LastPrice' && o.ordStatus == 'New' && o.stopPx > 1) {
+      if (o.ordType == 'Stop' && o.execInst == 'LastPrice,Close' && o.ordStatus == 'New' && o.stopPx > 1) {
         position.currentStopPx = o.stopPx
       }
     }
@@ -417,7 +417,7 @@ function translateOrders(orders) { try {
     }
     if (o.stop == 'loss') {
       order.ordType = 'Market'
-      order.execInst = 'Close,LastPrice'
+      order.execInst = 'LastPrice,Close'
       order.stopPx = o.stop_price
     }
     else {

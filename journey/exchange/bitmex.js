@@ -214,7 +214,7 @@ async function handleOrder(orders) { try {
       else {
         lastOrders.push(o)
       }
-      if (o.ordType == 'Stop' && o.execInst == 'Close,LastPrice' && o.ordStatus == 'New' && o.stopPx > 1) {
+      if (o.ordType == 'Stop' && o.execInst == 'LastPrice,Close' && o.ordStatus == 'New' && o.stopPx > 1) {
         position.currentStopPx = o.stopPx
       }
     }
@@ -826,7 +826,7 @@ async function orderBulk(orders) { try {
   var response
 
   if (orders[0].execInst == 'ParticipateDoNotInitiate,ReduceOnly' ||
-      orders[0].execInst == 'Close,LastPrice') {
+      orders[0].execInst == 'LastPrice,Close') {
     let ordersToAmend = findOrdersToAmend(orders)
     if (ordersToAmend.length == 0) {
       response = await orderNewBulk(orders)
@@ -1012,7 +1012,7 @@ function findOrdersToAmend(orders) {
 
   orders.forEach(o => {
     var orderToAmend = openOrders.find(a => {
-      if(o.execInst == 'Close,LastPrice') {
+      if(o.execInst == 'LastPrice,Close') {
         return (a.stopPx != 1 && (a.execInst == o.execInst && a.side == o.side && a.ordType && o.ordType))
       }
       else {
@@ -1085,7 +1085,7 @@ async function initOrders() { try {
       stopPx: 1,
       side: 'Sell',
       ordType: 'Stop',
-      execInst: 'Close,LastPrice'
+      execInst: 'LastPrice,Close'
     }])
   }
 } catch(e) {logger.error(e.stack||e);debugger} }

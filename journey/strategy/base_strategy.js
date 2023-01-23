@@ -198,7 +198,7 @@ function getEntryExitOrders({orderQtyUSD,entryPrice,stopLoss,stopMarket,takeProf
     stopPx: stopMarket,
     side: exitSide,
     ordType: 'Stop',
-    execInst: 'Close,LastPrice'
+    execInst: 'LastPrice,Close'
   },
   // {
   //   price: stopLoss,

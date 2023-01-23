@@ -51,14 +51,14 @@ function getStopRisk({exchange,positionSize,lastPrice,walletBalance,marginBalanc
     side: 'Sell',
     cumQty: -positionSize,
     price: lastPrice,
-    execInst: 'Close,LastPrice'
+    execInst: 'LastPrice,Close'
   })
   // console.log('lastCost',lastCost)
   const stopCost = exchanges[exchange].getCost({
     side: 'Sell',
     cumQty: -positionSize,
     price: stopLoss,
-    execInst: 'Close,LastPrice'
+    execInst: 'LastPrice,Close'
   })
   // console.log('stopCost',stopCost)
 

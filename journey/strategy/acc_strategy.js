@@ -35,14 +35,14 @@ function getStopRisk({exchange,positionSize,lastPrice,walletBalance,marginBalanc
     side: 'Sell',
     cumQty: -positionSize,
     price: lastPrice,
-    execInst: 'Close,LastPrice'
+    execInst: 'LastPrice,Close'
   })
   // console.log('lastCost',lastCost)
   const stopCost = exchanges[exchange].getCost({
     side: 'Sell',
     cumQty: -positionSize,
     price: stopLoss,
-    execInst: 'Close,LastPrice'
+    execInst: 'LastPrice,Close'
   })
   // console.log('stopCost',stopCost)
 
@@ -670,7 +670,7 @@ async function checkExit(tradeExchange,position) { try {
     let closeOrder = tradeExchange.findOrders(/New/,[{
       side: (positionSize < 0 ? 'Buy' : 'Sell'),
       ordType: 'Stop',
-      execInst: 'Close,LastPrice',
+      execInst: 'LastPrice,Close',
       stopPx: 'any'
     }])[0]
     if (!closeOrder) {
