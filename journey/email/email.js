@@ -1,29 +1,38 @@
-const nodemailer = require('nodemailer')
 const shoes = require('../shoes')
+const AWS = require('aws-sdk')
 
-const transporter = nodemailer.createTransport({
-  service: 'gmail',
-  auth: {
-    user: shoes.email.user,
-    pass: shoes.email.pass
-  }
-})
+AWS.config.update({ region: 'eu-west-1'})
+const SES = new AWS.SES({apiVersion: '2010-12-01'})
 
-const mailOptions = {
-  from: 'bitmoonboy@gmail.com',
-  to: 'bitmoonboy@gmail.com',
-  subject: 'Trade Enter',
-  text: 'Trade entered with price ...'
+// var credentials = new AWS.SharedIniFileCredentials({
+//   profile: ‘work - account’
+// });
+// AWS.config.credentials = credentials;
+
+let mailParams = {
+  Destination: {
+    ToAddresses: [shoes.email.to]
+  },
+  Message: {
+    Body: {
+      Text: {
+        Charset: "UTF-8",
+        Data: 'text'
+      }
+    },
+    Subject: {
+      Charset: 'UTF-8',
+      Data: 'subject'
+    }
+  },
+  Source: shoes.email.from,
+  ReplyToAddresses: [shoes.email.from],
 }
 
 async function send(subject, text) {
-  mailOptions.subject = subject
-  mailOptions.text = text
-  transporter.sendMail(mailOptions, function(error, info){
-    if (error) {
-      console.error(error);
-    }
-  })
+  mailParams.Message.Body.Text.Data = subject
+  mailParams.Message.Subject.Data = text
+  return SES.sendEmail(mailParams).promise()
 }
 
 module.exports = {
