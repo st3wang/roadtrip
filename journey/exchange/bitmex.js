@@ -673,15 +673,35 @@ async function order(orders,cancelAllBeforeOrder) { try {
     return {statusText:'Order is missing price or stopPx'}
   }
 
-  let response = await orderQueue({
-    orders:orders,
-    cancelAllBeforeOrder:cancelAllBeforeOrder
-  })
-  
-  if (!mock) {
-    logger.info('order',response)
+  if (cancelAllBeforeOrder) {
+    let cOrders = findOrders(/New/,lastOrders)
+    if (cOrders.length > 0) {
+      let execInstMap = orders.map(o => {return o.execInst})
+      cOrders = cOrders.filter(o => {
+        return execInstMap.indexOf(o.execInst) >= 0
+      })
+      if (cOrders.length > 0) {
+        if (cOrders[0].execInst != 'ParticipateDoNotInitiate,ReduceOnly' ||
+            cOrders[0].price != orders[0].price) {
+          await cancelOrders(cOrders)
+        }
+      }
+    }
+    // await cancelAll()
   }
-  return response
+
+  var responses = []
+  for (let i = 0; i < orders.length; i++) {
+    responses[i] = await orderQueue({
+      orders:[orders[i]],
+      cancelAllBeforeOrder:cancelAllBeforeOrder
+    })
+  }
+  debugger
+  if (!mock) {
+    logger.info('order',responses[0])
+  }
+  return responses[0]
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function wait(ms) {
@@ -746,23 +766,6 @@ async function orderQueue(ord) { try {
 } catch(e) {logger.error(e.stack||(e));debugger} }
 
 async function orderBulkRetry(ord) { try {
-  if (ord.cancelAllBeforeOrder) {
-    let execInstMap = ord.orders.map(o => {return o.execInst})
-    let cOrders = findOrders(/New/,lastOrders)
-    if (cOrders.length > 0) {
-      cOrders = cOrders.filter(o => {
-        return execInstMap.indexOf(o.execInst) >= 0
-      })
-      if (cOrders.length > 0) {
-        if (cOrders[0].execInst != 'ParticipateDoNotInitiate,ReduceOnly' ||
-            cOrders[0].price != ord.orders[0].price) {
-          await cancelOrders(cOrders)
-        }
-      }
-    }
-    // await cancelAll()
-  }
-  
   var retry = false,
       response, 
       count = 0,
@@ -878,7 +881,6 @@ async function orderNewBulk(orders) { try {
   .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
-    console.error('orderAmendBulk error',e)
     logger.error('orderNewBulk error',e,orders)
     if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
       return e
@@ -903,11 +905,11 @@ async function orderNewBulk(orders) { try {
 
 async function orderAmendBulk(orders) { try {
   // TODO change it to Order_amend
-  let response = await client.Order.Order_amendBulk({orders:JSON.stringify(orders)})
+  let response = await client.Order.Order_amend(orders[0]) //Bulk({orders:JSON.stringify(orders)})
   .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
-    console.error('orderAmendBulk error',e)
+    // console.error('orderAmendBulk error',e)
     logger.error('orderAmendBulk error',e,orders)
     if (e.obj.error.message.indexOf('The system is currently overloaded') >= 0) {
       return e

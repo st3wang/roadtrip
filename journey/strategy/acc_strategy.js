@@ -399,41 +399,44 @@ async function getOrder(tradeExchange,setup,position,signal) {
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
   qtyBTC = riskAmountBTC / -lossDistancePercent
-  var absQtyBTC = Math.abs(qtyBTC)
-  if (absQtyBTC < minOrderSizeBTC) {
-    qtyBTC = minOrderSizeBTC*side
-  }
+  // var absQtyBTC = Math.abs(qtyBTC)
+  // if (absQtyBTC < minOrderSizeBTC) {
+  //   qtyBTC = minOrderSizeBTC*side
+  // }
   orderQtyUSD = Math.round(qtyBTC * entryPrice)
-  var absOrderQtyUSD = Math.abs(orderQtyUSD)
-  var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
-  if (absOrderQtyUSD < minOrderSizeUSD*2) {
-    orderQtyUSD = minOrderSizeUSD*2*side
-    absOrderQtyUSD = Math.abs(orderQtyUSD)
-    qtyBTC = orderQtyUSD / entryPrice
-  }
+  // Order quantity must be a multiple of lot size: 100
+  orderQtyUSD = Math.ceil(orderQtyUSD/100)*100
+  // var absOrderQtyUSD = Math.abs(orderQtyUSD)
+  // var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
+  // if (absOrderQtyUSD < minOrderSizeUSD*2) {
+  //   orderQtyUSD = minOrderSizeUSD*2*side
+  //   absOrderQtyUSD = Math.abs(orderQtyUSD)
+  //   qtyBTC = orderQtyUSD / entryPrice
+  // }
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
   // var goodStopDistance = absLossDistancePercent >= minStopLoss && absLossDistancePercent <= maxStopLoss
 
   var scaleInSize = Math.round(orderQtyUSD / scaleInLength)
-  var absScaleInsize = Math.abs(scaleInSize)
-  if (absScaleInsize < minOrderSizeUSD) {
-    scaleInLength = Math.round(absOrderQtyUSD / minOrderSizeUSD)
-    scaleInSize = minOrderSizeUSD * side
-    orderQtyUSD = scaleInSize * scaleInLength
-    qtyBTC = orderQtyUSD / entryPrice
-  }
+  // var absScaleInsize = Math.abs(scaleInSize)
+  // if (absScaleInsize < minOrderSizeUSD) {
+  //   scaleInLength = Math.round(absOrderQtyUSD / minOrderSizeUSD)
+  //   scaleInSize = minOrderSizeUSD * side
+  //   orderQtyUSD = scaleInSize * scaleInLength
+  //   qtyBTC = orderQtyUSD / entryPrice
+  // }
 
-  var scaleInDistance = lossDistance * scaleInFactor
-  var minScaleInDistance = tick * (scaleInLength - 1)
-  if (scaleInDistance && Math.abs(scaleInDistance) < minScaleInDistance) {
-    scaleInDistance = scaleInDistance > 0 ? minScaleInDistance : -minScaleInDistance
-  }
-  var scaleInStep = scaleInDistance / (scaleInLength - 1)
-  if (Math.abs(scaleInStep) == Infinity) {
-    scaleInStep = 0
-  }
+  // var scaleInDistance = lossDistance * scaleInFactor
+  // var minScaleInDistance = tick * (scaleInLength - 1)
+  // if (scaleInDistance && Math.abs(scaleInDistance) < minScaleInDistance) {
+  //   scaleInDistance = scaleInDistance > 0 ? minScaleInDistance : -minScaleInDistance
+  // }
+  // var scaleInStep = scaleInDistance / (scaleInLength - 1)
+  // if (Math.abs(scaleInStep) == Infinity) {
+  //   scaleInStep = 0
+  // }
+  var scaleInStep = 0
   
   var scaleInOrders = []
   for (var i = 0; i < scaleInLength; i++) {
