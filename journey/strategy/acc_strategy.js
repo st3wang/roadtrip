@@ -404,8 +404,14 @@ async function getOrder(tradeExchange,setup,position,signal) {
   //   qtyBTC = minOrderSizeBTC*side
   // }
   orderQtyUSD = Math.round(qtyBTC * entryPrice)
+
   // Order quantity must be a multiple of lot size: 100
   orderQtyUSD = Math.ceil(orderQtyUSD/100)*100
+  // reculate after adjusting to 100 lot size
+  qtyBTC = orderQtyUSD/entryPrice
+  riskAmountBTC = qtyBTC * -lossDistancePercent
+  riskAmountUSD = riskAmountBTC * entryPrice
+
   // var absOrderQtyUSD = Math.abs(orderQtyUSD)
   // var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
   // if (absOrderQtyUSD < minOrderSizeUSD*2) {
@@ -413,6 +419,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   //   absOrderQtyUSD = Math.abs(orderQtyUSD)
   //   qtyBTC = orderQtyUSD / entryPrice
   // }
+
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
   var absLossDistancePercent = Math.abs(lossDistancePercent)
