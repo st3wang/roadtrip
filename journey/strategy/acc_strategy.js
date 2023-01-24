@@ -507,12 +507,12 @@ async function getSignal(tradeExchange,setup,position) {
     }
   }
 
-  if (!mock) {
-    const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,'BTC-USDC')
-    if (coinbaseUSDCSignal.condition != '-') {
-      return coinbaseUSDCSignal
-    }
-  }
+  // if (!mock) {
+  //   const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,'BTCUSDC')
+  //   if (coinbaseUSDCSignal.condition != '-') {
+  //     return coinbaseUSDCSignal
+  //   }
+  // }
 
   if (tradeExchange != bitstamp) {
     const bitstampSignal = await getAccumulationSignal(bitstamp,setup)
