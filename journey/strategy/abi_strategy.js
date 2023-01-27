@@ -326,7 +326,7 @@ async function checkSymbol(symbol) { try {
   var coinbaseBook = await coinbase.getBook(symbol) //testBookCoinbase
   var binanceBook = await binance.getBook(symbol) // testBookCoinbase
   var premiumPercent
-  // console.log('checkSymbol',symbol)
+  console.log('checkSymbol',symbol)
   if (!coinbaseBook || !coinbaseBook.asks || coinbaseBook.asks.length == 0 || !coinbaseBook.bids || coinbaseBook.bids.length == 0 ||
     !binanceBook || !binanceBook.asks || binanceBook.asks.length == 0 || !binanceBook.bids || binanceBook.bids.length == 0) {
       console.log('Invalid book', symbol, coinbaseBook, binanceBook)
@@ -371,10 +371,11 @@ async function checkSymbol(symbol) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkPosition() {
-  console.log('checkPosition', new Date().toString())
+  console.log('checkPosition begin', new Date().toString())
   for (let i = 0; i < symbols.length; i++) {
     await checkSymbol(symbols[i])
   }
+  console.log('checkPosition end', new Date().toString())
 }
 
 async function init() {

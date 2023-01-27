@@ -714,10 +714,10 @@ async function init(stg) { try {
   //   size: 0.01
   // })
   // debugger
-  handleOrder(await getOrders({endTime:getTimeNow() - oneDayMS}))
-  await updatePosition()
-  await subscribe()
-  await checkStopLoss()
+  // handleOrder(await getOrders({endTime:getTimeNow() - oneDayMS}))
+  // await updatePosition()
+  // await subscribe()
+  // await checkStopLoss()
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 module.exports = {

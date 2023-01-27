@@ -456,21 +456,9 @@ async function init() { try {
   else {
     await initExchanges()
     await next()
-    // createInterval(6000*2**0) // 6s after candle close
-    // createInterval(6000*2**1) // 12s
-    // createInterval(6000*2**3) // 48s for bitstamp
-    createInterval(60000*5*0)
-    createInterval(60000*5*1)
-    createInterval(60000*5*2)
-    createInterval(60000*5*3)
-    createInterval(60000*5*4)
-    createInterval(60000*5*5)
-    createInterval(60000*5*6)
-    createInterval(60000*5*7)
-    createInterval(60000*5*8)
-    createInterval(60000*5*9)
-    createInterval(60000*5*10)
-    createInterval(60000*5*11)
+    shoes.intervals.forEach(intervalDelay => {
+      createInterval(intervalDelay)
+    })
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
