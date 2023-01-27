@@ -34,7 +34,8 @@ const symbols = [
 "COTIUSD",
 "RLCUSD","BNTUSD","MATICUSD","UNIUSD",
 "LTCUSD","SNXUSD","ETHUSD",
-"NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD","MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD",
+"NKNUSD","LRCUSD","BTCUSD","ICPUSD","STORJUSD","NMRUSD","DOTUSD","CTSIUSD","BCHUSD","SOLUSD","MKRUSD",
+"MIRUSD","BONDUSD","FARMUSD","FETUSD","ENJUSD","ATOMUSD","SKLUSD",
 "1INCHUSD","EOSUSD","ADAUSD","MANAUSD","ZECUSD","LINKUSD",
 "MLNUSD",
 "AAVEUSD","KEEPUSD","ORNUSD","LPTUSD","NUUSD","YFIIUSD","FILUSD"
@@ -326,12 +327,49 @@ async function checkSymbol(symbol) { try {
   var coinbaseBook = await coinbase.getBook(symbol) //testBookCoinbase
   var binanceBook = await binance.getBook(symbol) // testBookCoinbase
   var premiumPercent
-  console.log('checkSymbol',symbol)
-  if (!coinbaseBook || !coinbaseBook.asks || coinbaseBook.asks.length == 0 || !coinbaseBook.bids || coinbaseBook.bids.length == 0 ||
-    !binanceBook || !binanceBook.asks || binanceBook.asks.length == 0 || !binanceBook.bids || binanceBook.bids.length == 0) {
-      console.log('Invalid book', symbol, coinbaseBook, binanceBook)
-      return 
-    }
+  // console.log('checkSymbol',symbol)
+  if (!coinbaseBook) {
+    console.log('Invalid coinbaseBook', symbol, coinbaseBook)
+    return
+  }
+  if (!coinbaseBook.asks) {
+    console.log('Invalid coinbaseBook.asks', symbol, coinbaseBook.asks)
+    return
+  }
+  if (coinbaseBook.asks.length == 0) {
+    console.log('Invalid coinbaseBook.asks.length', symbol, coinbaseBook.asks.length)
+    return
+  }
+  if (!coinbaseBook.bids) {
+    console.log('Invalid coinbaseBook.bids', symbol, coinbaseBook.bids)
+    return
+  }
+  if (coinbaseBook.bids.length == 0) {
+    console.log('Invalid coinbaseBook.bids.length', symbol, coinbaseBook.bids.length)
+    return
+  }
+
+  if (!binanceBook) {
+    console.log('Invalid binanceBook', symbol, binanceBook)
+    return
+  }
+  if (!binanceBook.asks) {
+    console.log('Invalid binanceBook.asks', symbol, binanceBook.asks)
+    return
+  }
+  if (binanceBook.asks.length == 0) {
+    console.log('Invalid binanceBook.asks.length', symbol, binanceBook.asks.length)
+    return
+  }
+  if (!binanceBook.bids) {
+    console.log('Invalid binanceBook.bids', symbol, binanceBook.bids)
+    return
+  }
+  if (binanceBook.bids.length == 0) {
+    console.log('Invalid binanceBook.bids.length', symbol, binanceBook.bids.length)
+    return
+  }
+
   const coinbasePremium = getPremium(binanceBook,coinbaseBook,startCost)
   // console.log('coinbasePremium',coinbasePremium)
   if (coinbasePremium.premium > 0.02) {
