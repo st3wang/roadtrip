@@ -358,7 +358,7 @@ async function checkSymbol(symbol) { try {
     return
   }
   if (binanceBook.asks.length == 0) {
-    console.log('Invalid binanceBook.asks.length', symbol, binanceBook.asks.length)
+    // console.log('Invalid binanceBook.asks.length', symbol, binanceBook.asks.length)
     return
   }
   if (!binanceBook.bids) {
@@ -409,11 +409,11 @@ async function checkSymbol(symbol) { try {
 } catch(e) {console.error(e.stack||e);debugger} }
 
 async function checkPosition() {
-  console.log('checkPosition begin', new Date().toString())
+  // console.log('checkPosition begin', new Date().toString())
   for (let i = 0; i < symbols.length; i++) {
     await checkSymbol(symbols[i])
   }
-  console.log('checkPosition end', new Date().toString())
+  // console.log('checkPosition end', new Date().toString())
 }
 
 async function init() {
