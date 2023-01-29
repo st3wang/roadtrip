@@ -30,8 +30,8 @@ let mailParams = {
 }
 
 async function send(subject, text) {
-  mailParams.Message.Body.Text.Data = subject
-  mailParams.Message.Subject.Data = text
+  mailParams.Message.Subject.Data = subject
+  mailParams.Message.Body.Text.Data = text
   return SES.sendEmail(mailParams).promise()
 }
 
