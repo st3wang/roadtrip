@@ -44,7 +44,7 @@ function orderString({timestamp,ordStatus,ordType,side,cumQty,orderQty,price=NaN
 function orderStringBulk(orders) {
   if (orders.reduce) {
     return orders.reduce((a,c) => {
-      return a + '\n' + orderString(c)
+      return a + '<-- response: ' + orderString(c)
     },'')
   }
   else {
@@ -70,7 +70,8 @@ const logger = winston.createLogger({
             case 'orderAmendBulk':
             case 'orderBulkRetry':
             case 'orderQueue':
-            case 'order': {
+            case 'order': 
+            case 'cancelOrder' : {
               line += (splat[0].obj ? orderStringBulk(splat[0].obj) : ('splat[0].obj is null ' + JSON.stringify(splat[0])))
             } break
             case 'cancelAll': {
@@ -690,6 +691,11 @@ async function order(orders,cancelAllBeforeOrder) { try {
     // await cancelAll()
   }
 
+  
+  if (!mock) {
+    logger.info('order -->',orders)
+  }
+
   var responses = []
   for (let i = 0; i < orders.length; i++) {
     responses[i] = await orderQueue({
@@ -697,9 +703,11 @@ async function order(orders,cancelAllBeforeOrder) { try {
       cancelAllBeforeOrder:cancelAllBeforeOrder
     })
   }
-  debugger
+  
   if (!mock) {
-    logger.info('order',responses[0])
+    responses.forEach(r => {
+      logger.info('order',r)
+    })
   }
   return responses[0]
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
@@ -766,6 +774,7 @@ async function orderQueue(ord) { try {
 } catch(e) {logger.error(e.stack||(e));debugger} }
 
 async function orderBulkRetry(ord) { try {
+  logger.info('orderBulkRetry -->', ord)
   var retry = false,
       response, 
       count = 0,
@@ -819,6 +828,7 @@ async function orderBulkRetry(ord) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderBulk(orders) { try {
+  logger.info('orderBulk -->', orders)
   orders.forEach(o => {
     o.symbol = symbol
   })
@@ -870,6 +880,7 @@ function ordersTooSmall(orders){
 }
 
 async function orderNewBulk(orders) { try {
+  logger.info('orderNewBulk -->', orders)
   var tooSmall = ordersTooSmall(orders)
   if (tooSmall.length > 0) {
     return ({status:400,message:'orderTooSmall'})
