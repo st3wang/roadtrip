@@ -507,12 +507,12 @@ async function getSignal(tradeExchange,setup,position) {
     }
   }
 
-  if (tradeExchange != coinbase) {
-    const coinbaseSignal = await getAccumulationSignal(coinbase,setup)
-    if (coinbaseSignal.condition != '-') {
-      return coinbaseSignal
-    }
-  }
+  // if (tradeExchange != coinbase) {
+  //   const coinbaseSignal = await getAccumulationSignal(coinbase,setup)
+  //   if (coinbaseSignal.condition != '-') {
+  //     return coinbaseSignal
+  //   }
+  // }
 
   // if (!mock) {
   //   const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,'BTCUSDC')
@@ -521,12 +521,12 @@ async function getSignal(tradeExchange,setup,position) {
   //   }
   // }
 
-  if (tradeExchange != bitstamp) {
-    const bitstampSignal = await getAccumulationSignal(bitstamp,setup)
-    if (bitstampSignal.condition != '-') {
-      return bitstampSignal
-    }
-  }
+  // if (tradeExchange != bitstamp) {
+  //   const bitstampSignal = await getAccumulationSignal(bitstamp,setup)
+  //   if (bitstampSignal.condition != '-') {
+  //     return bitstampSignal
+  //   }
+  // }
 
   if (tradeExchange != binance) {
     const binanceSignal = await getAccumulationSignal(binance,setup)
@@ -558,6 +558,7 @@ function cancelOrder(params) {
 }
 
 function sendEmail(entrySignal) {
+  if (mock) return
   const {entryOrders} = entrySignal
   const {side,price,orderQty} = entryOrders[0]
   email.send('MoonBoy Enter ' + side + ' ' + price + ' ' + orderQty, JSON.stringify(entrySignal, null, 2))
