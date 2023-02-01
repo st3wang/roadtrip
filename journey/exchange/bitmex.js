@@ -485,6 +485,7 @@ function toCandle(group) {
   return candle
 }
 
+async function getUserxecutionHistory() { try {
 async function getCurrentTradeBucketed(interval) { try {
   interval = interval || 15
   let now = getTimeNow()
@@ -702,7 +703,6 @@ async function order(orders,cancelAllBeforeOrder) { try {
     }
     // await cancelAll()
   }
-
   
   if (!mock) {
     logger.info('order -->',orders)
@@ -1136,6 +1136,8 @@ async function init(strategy,checkPositionCb) { try {
     return
   }
   // inspect(client.apis)
+  // await getUserxecutionHistory()
+  // debugger
   await initMarket()
   await initOrders()
   await updateLeverage(0) // cross margin
