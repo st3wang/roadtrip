@@ -486,6 +486,34 @@ function toCandle(group) {
 }
 
 async function getUserxecutionHistory() { try {
+  let realisedPnl = 0
+  let totalFees = 0
+  let pnl = 0
+  for (let i = 26; i <= 30; i++) {
+    let response = await client.User.User_getExecutionHistory({
+      symbol: 'XBTUSD',
+      timestamp: '2023-01-' + i + 'T00:00:00.000Z'
+    })
+    response.obj.forEach(o => {
+      if (o.execID !== '00000000-0000-0000-0000-000000000000') {
+        realisedPnl += o.realisedPnl
+        totalFees += o.execComm
+        if (o.execType == 'Trade') {
+          pnl += o.execCost 
+        }
+        console.log(i, o.execType, o.execCost, o.execComm)
+      }
+    })
+  }
+  debugger
+  let type = []
+  response.obj.forEach(o => {
+    type[o.transactType] = type[o.transactType] || 0
+    type[o.transactType]++
+  })
+  debugger
+} catch(e) {logger.error(e.stack||e); debugger} }
+
 async function getCurrentTradeBucketed(interval) { try {
   interval = interval || 15
   let now = getTimeNow()
