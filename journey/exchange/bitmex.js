@@ -3,6 +3,7 @@ const SwaggerClient = require("swagger-client")
 const BitMEXRealtimeAPI = require('bitmex-realtime-api')
 const winston = require('winston')
 const shoes = require('../shoes')
+const email = require('../email/email.js')
 const {symbol,exchange,setup} = shoes
 const oneCandleMs = setup.candle.interval*60000
 const oneCandleEndMs = oneCandleMs-1
@@ -209,14 +210,25 @@ async function handleOrder(orders) { try {
       let lastOrderIndex = lastOrders.findIndex(lo => {
         return (lo.orderID == o.orderID)
       })
+      let lastOrder
       if (lastOrderIndex >= 0) {
+        lastOrder = lastOrders[lastOrderIndex]
         lastOrders[lastOrderIndex] = o
       }
       else {
         lastOrders.push(o)
       }
-      if (o.ordType == 'Stop' && o.execInst == 'LastPrice,Close' && o.ordStatus == 'New' && o.stopPx > 1) {
-        position.currentStopPx = o.stopPx
+      if (o.ordType == 'Stop' && o.execInst == 'LastPrice,Close' && o.stopPx > 1) {
+        switch (o.ordStatus) {
+          case 'New':
+            position.currentStopPx = o.stopPx
+            break;
+          case 'Filled':
+            if (lastOrder && lastOrder.ordStatus == 'New') {
+              email.send('MoonBoy Exit ' + o.side + ' ' + o.price + ' ' + o.orderQty, JSON.stringify(o, null, 2))
+            }
+            break;
+        }
       }
     }
     else {
@@ -774,7 +786,9 @@ async function orderQueue(ord) { try {
 } catch(e) {logger.error(e.stack||(e));debugger} }
 
 async function orderBulkRetry(ord) { try {
-  logger.info('orderBulkRetry -->', ord)
+  if (!mock) {
+    logger.info('orderBulkRetry -->', ord)
+  }
   var retry = false,
       response, 
       count = 0,
@@ -828,7 +842,9 @@ async function orderBulkRetry(ord) { try {
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 async function orderBulk(orders) { try {
-  logger.info('orderBulk -->', orders)
+  if (!mock) {
+    logger.info('orderBulk -->', orders)
+  }
   orders.forEach(o => {
     o.symbol = symbol
   })
@@ -880,7 +896,9 @@ function ordersTooSmall(orders){
 }
 
 async function orderNewBulk(orders) { try {
-  logger.info('orderNewBulk -->', orders)
+  if (!mock) {
+    logger.info('orderNewBulk -->', orders)
+  }
   var tooSmall = ordersTooSmall(orders)
   if (tooSmall.length > 0) {
     return ({status:400,message:'orderTooSmall'})
