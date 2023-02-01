@@ -39,7 +39,7 @@ var lastCandle, currentCandle
 const {getTimeNow, isoTimestamp, colorizer} = global
 
 function orderString({timestamp,ordStatus,ordType,side,cumQty,orderQty,price=NaN,stopPx,execInst}) {
-  return timestamp+' '+ordStatus+' '+ordType+' '+side+' '+cumQty+'/'+orderQty+' '+price+' '+stopPx+' '+execInst
+  return timestamp+' '+ordStatus.padEnd(8)+' '+ordType.padEnd(6)+' '+side.padEnd(4)+' '+(cumQty+'/'+(orderQty||'0')).padEnd(11)+' '+((price || stopPx)+'').padEnd(8)+' '+execInst
 }
 
 function orderStringBulk(orders) {
@@ -225,7 +225,9 @@ async function handleOrder(orders) { try {
             break;
           case 'Filled':
             if (lastOrder && lastOrder.ordStatus == 'New') {
-              email.send('MoonBoy Exit ' + o.side + ' ' + o.price + ' ' + o.orderQty, JSON.stringify(o, null, 2))
+              if (!mock && !shoes.test) {
+                email.send('MoonBoy Exit ' + o.side + ' ' + o.price + ' ' + o.orderQty, JSON.stringify(o, null, 2))
+              }
             }
             break;
         }
