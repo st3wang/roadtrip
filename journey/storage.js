@@ -121,7 +121,7 @@ async function writeTradesCSV(writePath,trades) { try {
       t.avgGroupHoursInTrade + ','
   })
   // console.log(outputString)
-  // await writeFile(writePath,outputString,writeFileOptions)
+  await writeFile(writePath,outputString,writeFileOptions)
   return outputString
 } catch(e) {global.logger.error(e.stack||e);debugger} }
 

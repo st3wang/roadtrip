@@ -558,7 +558,7 @@ function cancelOrder(params) {
 }
 
 function sendEmail(entrySignal) {
-  if (mock) return
+  if (mock || shoes.test) return
   const {entryOrders} = entrySignal
   const {side,price,orderQty} = entryOrders[0]
   email.send('MoonBoy Enter ' + side + ' ' + price + ' ' + orderQty, JSON.stringify(entrySignal, null, 2))

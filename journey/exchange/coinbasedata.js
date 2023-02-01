@@ -13,7 +13,7 @@ const writeFile = util.promisify(fs.writeFile)
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
 
 const exchange = 'coinbase'
-const symbols = ['BTC-USD', 'BTC-USDC']
+const symbols = ['BTC-USD'] //, 'BTC-USDC']
 
 const orderDirPath = path.resolve(__dirname, '../data/coinbase/order')
 const orderFilePath = path.resolve(__dirname, '../data/exchange/order/orderid.json')

@@ -350,20 +350,29 @@ async function getTradeJson(sp) { try {
     }
     trade.grouppnl = walletBalance - startWalletBalance
     trade.avgGroupHoursInTrade = Math.round(totalGroupHoursInTrade/groupLen*10)/10
+    if (trade.grouppnl) {
+      console.log(groupLen,trade.walletBalanceUSD,trade.drawdownPercent,trade.grouppnl,trade.winsPercent)
+    }
   })
   
   console.timeEnd('getTradeJson')
 
+  let lastTrade = trades[trades.length-1]
+  let avgTotalHoursInTrade = (Math.round(totalHoursInTrade / trades.length * 100) / 100).toFixed(2)
+  console.log(trades.length, Math.round(trades[0].walletBalanceUSD), Math.round(lastTrade.walletBalanceUSD), 
+    lastTrade.winsPercent+'%', avgTotalHoursInTrade)
+
   trades[trades.length-1].drawdownPercent = '-100'
   let tradeObject = {trades:trades}
-  const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test.csv'),tradeObject.trades)
+  const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test3.csv'),tradeObject.trades)
+  debugger
   const sheetName = '2% normal'
   await gsheet.upload(setup.startTime.substr(0,13) + ' ' + setup.endTime.substr(0,13) + ' ' + sheetName,csvString)
   console.log('getTradeJson done')
-  debugger
   // return tradeObject
   let tradeJSON = JSON.stringify(tradeObject)
   fs.writeFileSync(cachePath,tradeJSON,writeFileOptions)
+  debugger
   return tradeJSON
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -409,8 +418,8 @@ async function readLog() {
 
 async function updateData() {
   console.time('updateData')
-  var start = 20210101
-  var end = 20210222
+  var start = 20181201
+  var end = 20230129
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
