@@ -686,7 +686,7 @@ async function checkExit(tradeExchange) { try {
 
   var lastDistance = lastPrice - signal.signal.entryPrice
   console.log('lastDistance', lastDistance, 'lossDistance', signal.signal.lossDistance)
-  if (lastDistance >= 100) { //-signal.signal.lossDistance) {
+  if (lastDistance >= -signal.signal.lossDistance) {
     let market = await tradeExchange.getCurrentMarket()
     let newStopLoss = getStopLoss(market,signal.signal.stopLossLookBack)
     console.log('Move stop ', newStopLoss)
