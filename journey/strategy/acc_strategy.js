@@ -166,7 +166,7 @@ const logger = winston.createLogger({
   ]
 })
 
-async function getAccumulationSignal(signalExchange,{rsi},symbol) { try {
+async function getAccumulationSignal(signalExchange,{rsi},side,symbol) { try {
   var now = getTimeNow()
   var signal = {
     timestamp: new Date(now).toISOString(),
@@ -192,28 +192,36 @@ async function getAccumulationSignal(signalExchange,{rsi},symbol) { try {
   // if (!bullRun) return signal
   
   var rsis = (market.rsis || await base.getRsi(market.closes,rsi.rsiLength))
-  var [isWRsi,wrb1,wrt1,wrb2] = candlestick.findW(rsis,last,rsis,rsis[last-1],rsis[last])
-  // var [isMRsi,mrt1,mrb1,mrt2] = candlestick.findM(rsis,last,rsis,rsis[last-1],rsis[last])
 
   var [avgBodies,bodyHighs,bodyLows] = candlestick.getBody(market)
-  var [isWPrice,wbottom1,wtop1,wbottom2] = candlestick.findW(avgBodies,last,bodyHighs,open,close)
-  // var [isMPrice,mtop1,mbottom1,mtop2] = candlestick.findM(avgBodies,last,bodyLows,open,close)
 
   // signal.stopLoss = market.lows[wbottom2]
   // signal.stopLoss = Math.min(...(market.lows.slice(6,market.lows.length-1)))
 
-  if (isWPrice == 3 && isWRsi == 3) {
-    signal.condition = 'LONG'
+  if (side == 'LONG') {
+    var [isWRsi,wrb1,wrt1,wrb2] = candlestick.findW(rsis,last,rsis,rsis[last-1],rsis[last])
+    var [isWPrice,wbottom1,wtop1,wbottom2] = candlestick.findW(avgBodies,last,bodyHighs,open,close)
+    if (isWPrice == 3 && isWRsi == 3) {
+      signal.condition = 'LONG'
+    }
   }
-
-  // if (isMPrice == 3 && isMRsi == 3) {
-    // signal.condition = 'SHORT'
-  // }
+  else if (side == 'SHORT') {
+    var [isMRsi,mrt1,mrb1,mrt2] = candlestick.findM(rsis,last,rsis,rsis[last-1],rsis[last])
+    var [isMPrice,mtop1,mbottom1,mtop2] = candlestick.findM(avgBodies,last,bodyLows,open,close)
+    if (isMPrice == 3 && isMRsi == 3) {
+      signal.condition = 'SHORT'
+    }
+  }
   
   await basedata.writeSignal(signalExchange.name,signalExchange.symbols[setup.symbol],setup.candle.interval,now,signal)
 
   return signal
 } catch(e) {console.error(e.stack||e);debugger} }
+
+function getStopLoss(market, stopLossLookBack) {
+  const lows = market.lows.slice(market.lows.length-stopLossLookBack,market.lows.length)
+  return Math.min(...lows)
+}
 
 async function getOrder(tradeExchange,setup,position,signal) {
   var lastCandle = tradeExchange.getLastCandle()
@@ -291,8 +299,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
 
   switch(signal.condition) {
     case 'LONG':
-      const lows = market.lows.slice(market.lows.length-stopLossLookBack,market.lows.length)
-      signal.stopLoss = setup.exchange[tradeExchange.name].stopLoss || Math.min(...lows)
+      signal.stopLoss = setup.exchange[tradeExchange.name].stopLoss || getStopLoss(market,stopLossLookBack)
       signal.entryPrice = Math.min(lastCandle.close,quote.bidPrice)
       if (signal.entryPrice <= signal.stopLoss) {
         signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
@@ -494,49 +501,49 @@ async function getOrder(tradeExchange,setup,position,signal) {
   return order
 }
 
-async function getSignal(tradeExchange,setup,position) {
-  const tradeExchangeSignal = await getAccumulationSignal(tradeExchange,setup)
+async function getSignal(tradeExchange,setup,position,side) {
+  const tradeExchangeSignal = await getAccumulationSignal(tradeExchange,setup,side)
   if (tradeExchangeSignal.condition != '-') {
     return tradeExchangeSignal
   }
   
   if (tradeExchange != bitmex) {
-    const bitmexSignal = await getAccumulationSignal(bitmex,setup)
+    const bitmexSignal = await getAccumulationSignal(bitmex,setup,side)
     if (bitmexSignal.condition != '-') {
       return bitmexSignal
     }
   }
 
   // if (tradeExchange != coinbase) {
-  //   const coinbaseSignal = await getAccumulationSignal(coinbase,setup)
+  //   const coinbaseSignal = await getAccumulationSignal(coinbase,setup,side)
   //   if (coinbaseSignal.condition != '-') {
   //     return coinbaseSignal
   //   }
   // }
 
   // if (!mock) {
-  //   const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,'BTCUSDC')
+  //   const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,side,'BTCUSDC')
   //   if (coinbaseUSDCSignal.condition != '-') {
   //     return coinbaseUSDCSignal
   //   }
   // }
 
   // if (tradeExchange != bitstamp) {
-  //   const bitstampSignal = await getAccumulationSignal(bitstamp,setup)
+  //   const bitstampSignal = await getAccumulationSignal(bitstamp,setup,side)
   //   if (bitstampSignal.condition != '-') {
   //     return bitstampSignal
   //   }
   // }
 
-  if (tradeExchange != binance) {
-    const binanceSignal = await getAccumulationSignal(binance,setup)
+  if (tradeExchange != binance && !shoes.test) {
+    const binanceSignal = await getAccumulationSignal(binance,setup,side)
     if (binanceSignal.condition != '-') {
       return binanceSignal
     }
   }
 
   if (tradeExchange != bitfinex) {
-    const bitfinexSignal = await getAccumulationSignal(bitfinex,setup)
+    const bitfinexSignal = await getAccumulationSignal(bitfinex,setup,side)
     if (bitfinexSignal.condition != '-') {
       return bitfinexSignal
     }
@@ -557,11 +564,20 @@ function cancelOrder(params) {
   || base.exitTarget(cancelParams) || base.exitStop(cancelParams))
 }
 
-function sendEmail(entrySignal) {
+function sendEmailEnter(entrySignal) {
   if (mock || shoes.test) return
   const {entryOrders} = entrySignal
   const {side,price,orderQty} = entryOrders[0]
   email.send('MoonBoy Enter ' + side + ' ' + price + ' ' + orderQty, JSON.stringify(entrySignal, null, 2))
+}
+
+function sendEmailMoveStop(response) {
+  if (mock || shoes.test) return
+  var subject = 'MoonBoy MoveStop '
+  if (response && response.status == 200 && response.obj && response.obj[0] && response.obj[0].stopPx) {
+    subject += response.obj[0].stopPx
+  }
+  email.send(subject, JSON.stringify(response, null, 2))
 }
 
 async function orderEntry(tradeExchange,entrySignal) { try {
@@ -585,12 +601,30 @@ async function orderEntry(tradeExchange,entrySignal) { try {
       entrySignal.takeProfitOrders = takeProfitOrders
       base.setEntrySignal(tradeExchange.name,entrySignal)
       storage.writeEntrySignalTable(entrySignal)
-      sendEmail(entrySignal)
+      sendEmailEnter(entrySignal)
     }
     else {
       console.error(response)
       debugger
     }
+  }
+} catch(e) {logger.error(e.stack||e);debugger} }
+
+async function orderExit(tradeExchange,stopPx) { try {
+  var closeOrders = [{
+    stopPx: stopPx,
+    side: 'Sell',
+    ordType: 'Stop',
+    execInst: 'LastPrice,Close',
+    test: 'Exit'
+  }]
+  const response = await tradeExchange.order(closeOrders,true)
+  /*TODO: wait for order confirmations*/
+  if (response.status == 200) {
+    sendEmailMoveStop(response)
+  }
+  else {
+    sendEmailMoveStop(response)
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
@@ -629,12 +663,12 @@ async function checkEntry(tradeExchange) { try {
       // there is an existing signal
       let entryOrders = tradeExchange.findOrders(/New|Fill/,position.signal.entryOrders)
       if (entryOrders.length > 0) {
-        if (!mock) logger.info('EXISTING SIGNAL ENTRY ORDER EXISTS')
+        if (!mock) logger.info('SIGNAL ENTRY ORDER EXISTS')
         return
       }
     }
   }
-  var signal = await getOrder(tradeExchange,setup,position,await getSignal(tradeExchange,setup,position))
+  var signal = await getOrder(tradeExchange,setup,position,await getSignal(tradeExchange,setup,position,'LONG'))
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
@@ -644,33 +678,54 @@ async function checkEntry(tradeExchange) { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
-async function checkExit(tradeExchange,position) { try {
-  position.signal = getEntrySignal(tradeExchange.name)
+async function checkExit(tradeExchange) { try {
+  const position = tradeExchange.position
+
   var {positionSize,bid,ask,lastPrice,signal} = position
-  if (positionSize == 0 || !lastPrice || !signal || !signal.signal) return
+  if (positionSize == 0 || !lastPrice || !signal || signal.signal.condition != 'LONG') return
 
-  var {signal:{entryPrice,stopLoss,lossDistance},entryOrders,takeProfitOrders,closeOrders} = signal
-
-  var exit = base.exitTooLong(position) || base.exitFunding(position) || isBear()
-  if (exit) {
+  var lastDistance = lastPrice - signal.signal.entryPrice
+  console.log('lastDistance', lastDistance)
+  if (lastDistance >= -signal.signal.lossDistance) {
+    console.log('Move stop ', newStopLoss)
+    let market = await tradeExchange.getCurrentMarket()
+    let newStopLoss = getStopLoss(market,signal.signal.stopLossLookBack)
+    // console.log('entryPrice',signal.signal.entryPrice, 'newStopLoss', newStopLoss)
     let exitOrders = [{
-      price: (positionSize < 0 ? bid : ask),
-      side: (positionSize < 0 ? 'Buy' : 'Sell'),
-      ordType: 'Limit',
-      execInst: 'Close,ParticipateDoNotInitiate'
+      stopPx: newStopLoss,
+      side: 'Sell',
+      ordType: 'Stop',
+      execInst: 'LastPrice,Close'
     }]
-    exit.exitOrders = exitOrders
-
     let existingExitOrders = tradeExchange.findOrders(/New/,exitOrders)
-    if (existingExitOrders.length == 1) {
-      // logger.debug('EXIT EXISTING ORDER',exit)
-      return existingExitOrders
+    if (existingExitOrders.length > 0) {
+      // if (!mock) 
+      logger.info('EXIT ORDER EXISTS', exitOrders[0].stopPx)
+      return
     }
-
-    if (!mock) logger.info('CLOSE ORDER', exit)
-    let response = await tradeExchange.order(exitOrders,true)
-    return response
+    orderExit(tradeExchange,newStopLoss)
   }
+
+  // var exit = base.exitTooLong(position) || base.exitFunding(position) || isBear()
+  // if (exit) {
+  //   let exitOrders = [{
+  //     price: (positionSize < 0 ? bid : ask),
+  //     side: (positionSize < 0 ? 'Buy' : 'Sell'),
+  //     ordType: 'Limit',
+  //     execInst: 'Close,ParticipateDoNotInitiate'
+  //   }]
+  //   exit.exitOrders = exitOrders
+
+  //   let existingExitOrders = tradeExchange.findOrders(/New/,exitOrders)
+  //   if (existingExitOrders.length == 1) {
+  //     // logger.debug('EXIT EXISTING ORDER',exit)
+  //     return existingExitOrders
+  //   }
+
+  //   if (!mock) logger.info('CLOSE ORDER', exit)
+  //   let response = await tradeExchange.order(exitOrders,true)
+  //   return response
+  // }
   /*
   // move stop loss. it reduced draw down in the side way market. see Test 4
   else if ((positionSize > 0 && lastPrice > entryPrice) || (positionSize < 0 && lastPrice < entryPrice)) {
@@ -729,10 +784,8 @@ async function checkPosition() {
     }
     await tradeExchange.updatePosition()
     await checkEntry(tradeExchange)
+    await checkExit(tradeExchange)
   }
-  // if (position.positionSize != 0) {
-    // await checkExit(bitex,position)
-  // }
 }
 
 function resetEntrySignal(exchange) {

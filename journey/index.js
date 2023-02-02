@@ -213,7 +213,7 @@ async function getTradeJson(sp) { try {
     let trade = {
       signal: s,
       entryOrders: bitmex.findOrders(/.+/,s.entryOrders,ords[i]),
-      closeOrders: ords[i].filter(o => {return o.ordType == 'Stop'}),
+      closeOrders: [ords[i][ords[i].length-1]], //ords[i].filter(o => {return o.ordType == 'Stop'}),
       takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
       fee: 0, cost: 0, costPercent: '%', feePercent: '%', pnl:0, pnlPercent:'%',
       group: 0, grouppnl: 0,
@@ -290,7 +290,8 @@ async function getTradeJson(sp) { try {
         t.group = groupid
         let entryCost = mock.getCost(entryOrder)
         let entryTime = new Date(entryOrder.timestamp).getTime()
-        let partialCloseOrder = t.closeOrders[0]
+        let partialCloseOrder = t.closeOrders[t.closeOrders.length-1]
+        if (t.closeOrders.length > 1) debugger
         partialCloseOrder.cumQty = entryOrder.cumQty
         partialCloseOrder.price = closeOrder.price
         let closeCost = mock.getCost(partialCloseOrder)
@@ -359,12 +360,12 @@ async function getTradeJson(sp) { try {
 
   let lastTrade = trades[trades.length-1]
   let avgTotalHoursInTrade = (Math.round(totalHoursInTrade / trades.length * 100) / 100).toFixed(2)
-  console.log(trades.length, Math.round(trades[0].walletBalanceUSD), Math.round(lastTrade.walletBalanceUSD), 
+  console.log(trades.length, lastTrade.walletBalancePercent+'%', 
     lastTrade.winsPercent+'%', avgTotalHoursInTrade)
 
   trades[trades.length-1].drawdownPercent = '-100'
   let tradeObject = {trades:trades}
-  const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test3.csv'),tradeObject.trades)
+  const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test1.csv'),tradeObject.trades)
   debugger
   const sheetName = '2% normal'
   await gsheet.upload(setup.startTime.substr(0,13) + ' ' + setup.endTime.substr(0,13) + ' ' + sheetName,csvString)
@@ -419,7 +420,7 @@ async function readLog() {
 async function updateData() {
   console.time('updateData')
   var start = 20181201
-  var end = 20230129
+  var end = 20230201
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)
