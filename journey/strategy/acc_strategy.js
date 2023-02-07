@@ -118,8 +118,9 @@ const logger = winston.createLogger({
               candlesTillFunding = (candlesTillFunding > 1 ? candlesTillFunding.toFixed(1) : ('\x1b[33m' + candlesTillFunding.toFixed(1) + '\x1b[39m'))
               let payFunding = fundingRate*positionSize/lastPrice
               payFunding = (payFunding > 0 ? '\x1b[31m' : payFunding < 0 ? '\x1b[32m' : '') + payFunding.toFixed(5) + '\x1b[39m'
+              let fundingRateString = (fundingRate > 0 ? '\x1b[32m' : '\x1b[31m') + (fundingRate*100).toFixed(4) + '\x1b[39m'
               line += exchange + ' ' + caller + ' B:'+walletBalance.toFixed(4)+' M:'+marginBalanceString+' S:'+stopBalanceString+' R:'+stopDistanceRiskRatioString+' P:'+positionSizeString+' L:'+lastPriceString+
-                ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' D:'+lossDistancePercentString
+                ' E:'+entryPrice.toFixed(1)+' S:'+stopLoss.toFixed(1)+' D:'+lossDistancePercentString+' F:'+fundingRateString
                 //+' T:'+takeProfit.toFixed(1)+' C:'+candlesInTrade+' F:'+candlesTillFunding+' R:'+payFunding
             } break
             case 'ENTER SIGNAL': {
@@ -649,12 +650,17 @@ async function checkEntry(tradeExchange) { try {
   const existingSignal = getEntrySignal(tradeExchange.name)
   const position = tradeExchange.position
 
+  let now = getTimeNow()
+  let nowDT = new Date(now)
+  if (position.fundingRate < 0 && nowDT.getMinutes() == 0 && nowDT.getSeconds() < 10) {
+    email.send('Funding ' + position.fundingRate, JSON.stringify(position,null,2))
+  }
+
   position.signal = existingSignal // for logging try to remove it
   if (!mock) logger.info('checkEntry',position)
 
   if (existingSignal.signal) {
     let existingSignalTime = new Date(existingSignal.signal.timestamp).getTime()
-    let now = getTimeNow()
     let ts = new Date(now).toISOString()
     let st = existingSignalTime - existingSignalTime % oneCandleMS
     let et = st + oneCandleMS - 1
@@ -685,11 +691,11 @@ async function checkExit(tradeExchange) { try {
   if (positionSize == 0 || !lastPrice || !signal || signal.signal.condition != 'LONG') return
 
   var lastDistance = lastPrice - signal.signal.entryPrice
-  console.log('lastDistance', lastDistance, 'lossDistance', signal.signal.lossDistance)
+  // console.log('lastDistance', lastDistance, 'lossDistance', signal.signal.lossDistance)
   if (lastDistance >= -signal.signal.lossDistance) {
     let market = await tradeExchange.getCurrentMarket()
     let newStopLoss = getStopLoss(market,signal.signal.stopLossLookBack)
-    console.log('Move stop ', newStopLoss)
+    // console.log('Move stop ', newStopLoss)
     let exitOrders = [{
       stopPx: newStopLoss,
       side: 'Sell',
@@ -698,8 +704,9 @@ async function checkExit(tradeExchange) { try {
     }]
     let existingExitOrders = tradeExchange.findOrders(/New/,exitOrders)
     if (existingExitOrders.length > 0) {
-      // if (!mock) 
-      logger.info('EXIT ORDER EXISTS', exitOrders[0].stopPx)
+      if (!mock) {
+        logger.info('EXIT ORDER EXISTS', exitOrders[0].stopPx)
+      }
       return
     }
     orderExit(tradeExchange,newStopLoss)
