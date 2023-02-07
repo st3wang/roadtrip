@@ -652,7 +652,7 @@ async function checkEntry(tradeExchange) { try {
 
   let now = getTimeNow()
   let nowDT = new Date(now)
-  if (position.fundingRate < 0 && nowDT.getMinutes() == 0 && nowDT.getSeconds() < 10) {
+  if (position.fundingRate < 0 && ((nowDT.getHours() - 4) % 8 == 0) && nowDT.getMinutes() == 0 && nowDT.getSeconds() < 10) {
     email.send('Funding ' + position.fundingRate, JSON.stringify(position,null,2))
   }
 
