@@ -487,33 +487,24 @@ function toCandle(group) {
   return candle
 }
 
-async function getUserxecutionHistory() { try {
-  let realisedPnl = 0
-  let totalFees = 0
-  let pnl = 0
-  for (let i = 26; i <= 30; i++) {
+async function getUserExecutionHistory(start,end) { try {
+  var requestTime = new Date(start).getTime() + 12*60*60000
+  const endTime = new Date(end).getTime() + 36*60*60000
+  const executions = []
+  while (requestTime < endTime) {
+    let timestamp = new Date(requestTime).toISOString()
     let response = await client.User.User_getExecutionHistory({
       symbol: 'XBTUSD',
-      timestamp: '2023-01-' + i + 'T00:00:00.000Z'
+      timestamp: timestamp
     })
     response.obj.forEach(o => {
-      if (o.execID !== '00000000-0000-0000-0000-000000000000') {
-        realisedPnl += o.realisedPnl
-        totalFees += o.execComm
-        if (o.execType == 'Trade') {
-          pnl += o.execCost 
-        }
-        console.log(i, o.execType, o.execCost, o.execComm)
+      if (!executions.find(e => {return e.execID == o.execID})) {
+        executions.push(o)
       }
     })
+    requestTime += 12*60*60*1000
   }
-  debugger
-  let type = []
-  response.obj.forEach(o => {
-    type[o.transactType] = type[o.transactType] || 0
-    type[o.transactType]++
-  })
-  debugger
+  return executions
 } catch(e) {logger.error(e.stack||e); debugger} }
 
 async function getCurrentTradeBucketed(interval) { try {
@@ -614,7 +605,10 @@ async function getCurrentMarket() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getWalletHistory() { try {
-  return []
+  let response = await client.User.User_getWalletHistory({
+    currency: 'XBt'
+  })
+  return response.obj
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
 // async function getTradeHistory(startTime) { try {
@@ -1149,6 +1143,259 @@ async function initOrders() { try {
   }
 } catch(e) {logger.error(e.stack||e);debugger} }
 
+async function getHistoryCSV(start,end) {
+  // const startTime = new Date(start).getTime()
+  // const endTime = new Date(end).getTime()
+  // var allTransactions = [], deposits = [], trades = [], fundings = []
+
+  // var walletTransactions = await getWalletHistory()
+  // walletTransactions = walletTransactions.filter(t => {
+  //   let transactTime = new Date(t.transactTime).getTime() 
+  //   return (transactTime >= startTime && transactTime <= endTime)// && (t.transactType != 'RealisedPNL')
+  // })
+  // walletTransactions.forEach(t => {
+  //   let wt = {
+  //     time: t.transactTime,
+  //     type: t.transactType,
+  //     side: '',
+  //     size: t.amount,
+  //     price: 0,
+  //     cost: (t.transactType == 'Deposit' ? t.amount : 0),
+  //     feeRate: 0,
+  //     feePaid: 0,
+  //     balance: t.walletBalance
+  //   }
+  //   allTransactions.push(wt)
+  //   // if (wt.type == 'Deposit') {
+  //     deposits.push(wt)
+  //   // }
+  // })
+
+  // var executionTransactions = await getUserExecutionHistory(start,end)
+  // console.log(executionTransactions.length)
+  // executionTransactions.forEach(t => {
+  //   if (t.execType == 'Settlement') return
+  //   let et = {
+  //     time: t.transactTime,
+  //     type: t.execType,
+  //     side: t.side,
+  //     size: t.lastQty,
+  //     price: t.price,
+  //     cost: (t.execType == 'Funding' ? 0 : -t.execCost),
+  //     feeRate: t.commission,
+  //     feePaid: t.execComm,
+  //     balance: 0
+  //   }
+  //   allTransactions.push(et)
+  //   if (et.type == 'Trade') {
+  //     trades.push(et)
+  //   }
+  //   else if (et.type == 'Funding') {
+  //     fundings.push(et)
+  //   }
+  //   else {
+  //     debugger
+  //   }
+  // })
+
+  // var allTransactionsCSV = getTransactionCSV(allTransactions)
+  // console.log(allTransactionsCSV)
+
+  // var depositsCSV = getTransactionCSV(deposits)
+  // console.log(depositsCSV)
+
+  // var tradesCSV = getTransactionCSV(trades)
+  // console.log(tradesCSV)
+
+  // var fundingsCSV = getTransactionCSV(fundings)
+  // console.log(fundingsCSV)
+
+  var allTransactionsCSV = `Date,Type,Side,Size,Price,Cost,FeeRate,FeePaid,Balance
+  2023-01-20T23:10:44.260Z,Deposit,,1000000,0,1000000,0,0,1000000
+  2023-01-25T19:00:27.537Z,Trade,Buy,200,22714.5,880494,0.0002,176,0
+  2023-01-25T20:00:00.000Z,Funding,,200,22756.09,0,0.0001,88,0
+  2023-01-26T04:00:00.000Z,Funding,,200,23136.47,0,0.0001,86,0
+  2023-01-26T05:25:22.012Z,Deposit,,26441059,0,26441059,0,0,27441059
+  2023-01-26T12:00:00.000Z,RealisedPNL,,-350,0,0,0,0,27440709
+  2023-01-26T12:00:00.000Z,Funding,,200,22991.63,0,0.0001,87,0
+  2023-01-26T20:00:00.000Z,Funding,,200,23072.61,0,0.0001,87,0
+  2023-01-27T04:00:00.000Z,Funding,,200,22773.76,0,0.0001,88,0
+  2023-01-27T12:00:00.000Z,RealisedPNL,,-262,0,0,0,0,27440447
+  2023-01-27T12:00:00.000Z,Funding,,200,22972.29,0,0.0001,87,0
+  2023-01-27T20:00:00.000Z,Funding,,200,23257.23,0,0.00008,69,0
+  2023-01-28T04:00:00.000Z,Funding,,200,23121.72,0,-0.000013,-11,0
+  2023-01-28T12:00:00.000Z,RealisedPNL,,-145,0,0,0,0,27440302
+  2023-01-28T12:00:00.000Z,Funding,,200,22982.97,0,0.0001,87,0
+  2023-01-28T20:00:00.000Z,Funding,,200,23043.38,0,0.0001,87,0
+  2023-01-28T20:02:29.022Z,Trade,Buy,9300,23032,40378647,0.0002,8075,0
+  2023-01-29T04:00:00.000Z,Funding,,9500,23196.37,0,0.000077,3154,0
+  2023-01-29T12:00:00.000Z,RealisedPNL,,-11403,0,0,0,0,27428899
+  2023-01-29T12:00:00.000Z,Funding,,9500,23434.38,0,0.0001,4054,0
+  2023-01-29T17:00:43.819Z,Trade,Buy,2300,23580,9754024,0.0002,1950,0
+  2023-01-29T20:00:00.000Z,Funding,,11800,23905.23,0,0.0001,4936,0
+  2023-01-30T01:34:08.952Z,Deposit,,24098808,0,24098808,0,0,51527707
+  2023-01-30T04:00:00.000Z,Funding,,11800,23700.24,0,0.0001,4979,0
+  2023-01-30T12:00:00.000Z,RealisedPNL,,-15919,0,0,0,0,51511788
+  2023-01-30T12:00:00.000Z,Funding,,11800,23085.57,0,0.0001,5111,0
+  2023-01-30T19:10:03.307Z,Trade,Sell,11800,22874.5,-51585824,0.00075,38689,0
+  2023-01-31T03:02:16.005Z,Trade,Buy,5700,22842,24954030,0.0002,4990,0
+  2023-01-31T04:00:00.000Z,Funding,,5700,22833.29,0,0.000094,2347,0
+  2023-01-31T05:00:28.734Z,Trade,Buy,1800,22857.5,7874874,0.0002,1574,0
+  2023-01-31T05:00:28.740Z,Trade,Buy,2400,22857.5,10499832,0.0002,2099,0
+  2023-01-31T05:00:28.745Z,Trade,Buy,1300,22857.5,5687409,0.0002,1137,0
+  2023-01-31T12:00:00.000Z,RealisedPNL,,-628606,0,0,0,0,50883182
+  2023-01-31T12:00:00.000Z,Funding,,11200,22862.85,0,-0.000067,-3282,0
+  2023-01-31T14:02:11.434Z,Trade,Buy,3800,23107.5,16444880,0.0002,3288,0
+  2023-01-31T18:00:13.861Z,Trade,Buy,3100,23135,13399626,0.0002,2679,0
+  2023-01-31T18:00:14.184Z,Trade,Buy,600,23135,2593476,0.0002,518,0
+  2023-01-31T20:00:00.000Z,Funding,,18700,23167.45,0,0.000034,2744,0
+  2023-02-01T04:00:00.000Z,Funding,,18700,23129.15,0,-0.000081,-6549,0
+  2023-02-01T12:00:00.000Z,RealisedPNL,,602,0,0,0,0,50883784
+  2023-02-01T12:00:00.000Z,Funding,,18700,23075.19,0,-0.000067,-5430,0
+  2023-02-01T20:00:00.000Z,Funding,,18700,23384.38,0,-0.000037,-2959,0
+  2023-02-02T04:00:00.000Z,Funding,,18700,23857.79,0,0.0001,7838,0
+  2023-02-02T12:00:00.000Z,RealisedPNL,,551,0,0,0,0,50884335
+  2023-02-02T12:00:00.000Z,Funding,,18700,23828.6,0,0.0001,7848,0
+  2023-02-02T20:00:00.000Z,Funding,,18700,23808.05,0,0.0001,7854,0
+  2023-02-03T04:00:00.000Z,Funding,,18700,23534.59,0,0.0001,7946,0
+  2023-02-03T12:00:00.000Z,RealisedPNL,,-23648,0,0,0,0,50860687
+  2023-02-03T12:00:00.000Z,Funding,,18700,23537.38,0,0.0001,7945,0
+  2023-02-03T20:00:00.000Z,Funding,,18700,23312.98,0,0.000078,6257,0
+  2023-02-04T04:00:00.000Z,Funding,,18700,23344.22,0,-0.000017,-1362,0
+  2023-02-04T04:10:42.887Z,Deposit,,544998,0,544998,0,0,51405685
+  2023-02-04T12:00:00.000Z,RealisedPNL,,-12840,0,0,0,0,51392845
+  2023-02-04T12:00:00.000Z,Funding,,18700,23363.93,0,0.000079,6323,0
+  2023-02-04T20:00:00.000Z,Funding,,18700,23430.03,0,0.0001,7981,0
+  2023-02-05T04:00:00.000Z,Funding,,18700,23347.1,0,-0.00003,-2403,0
+  2023-02-05T11:33:58.931Z,Deposit,,1002023,0,1002023,0,0,52394868
+  2023-02-05T12:00:00.000Z,RealisedPNL,,-11901,0,0,0,0,52382967
+  2023-02-05T12:00:00.000Z,Funding,,18700,23365.75,0,-0.00015,-12005,0
+  2023-02-05T20:00:00.000Z,Funding,,18700,22898.02,0,-0.000102,-8330,0
+  2023-02-06T04:00:00.000Z,Funding,,18700,22901.18,0,-0.000019,-1551,0
+  2023-02-06T05:27:30.131Z,Trade,Sell,18700,22678.5,-82456902,0.00075,61842,0
+  2023-02-06T12:00:00.000Z,RealisedPNL,,-1042731,0,0,0,0,51340236
+  2023-02-06T12:02:21.496Z,Trade,Buy,500,22877.5,2185555,0.0002,437,0
+  2023-02-06T12:02:21.780Z,Trade,Buy,10100,22877.5,44148211,0.0002,8829,0
+  2023-02-06T20:00:00.000Z,Funding,,10600,23030.3,0,0.0001,4603,0
+  2023-02-06T22:10:43.825Z,Deposit,,19193967,0,19193967,0,0,70534203
+  2023-02-07T04:00:00.000Z,Funding,,10600,22877.45,0,0.0001,4633,0
+  2023-02-07T06:04:07.731Z,Trade,Buy,4400,22926,19192184,0.0002,3838,0
+  2023-02-07T06:04:07.734Z,Trade,Buy,7900,22926,34458694,0.0002,6891,0
+  2023-02-07T10:01:54.509Z,Trade,Buy,500,23004,2173535,0.0002,434,0
+  2023-02-07T10:01:54.662Z,Trade,Buy,1500,23004,6520605,0.0002,1304,0
+  2023-02-07T10:01:54.664Z,Trade,Buy,1700,23004,7390019,0.0002,1478,0
+  2023-02-07T10:01:54.666Z,Trade,Buy,1900,23004,8259433,0.0002,1651,0
+  2023-02-07T10:01:54.667Z,Trade,Buy,4500,23004,19561815,0.0002,3912,0
+  2023-02-07T12:00:00.000Z,RealisedPNL,,-38010,0,0,0,0,70496193
+  2023-02-07T12:00:00.000Z,Funding,,33000,22979.18,0,0.00001,1436,0
+  2023-02-07T13:01:00.095Z,Trade,Buy,100,23007,434650,0.0002,86,0
+  2023-02-07T13:01:00.109Z,Trade,Buy,2500,23007,10866250,0.0002,2173,0
+  2023-02-07T13:01:00.116Z,Trade,Buy,7400,23007,32164100,0.0002,6432,0
+  2023-02-07T20:00:00.000Z,Funding,,43000,23092.81,0,-0.00003,-5586,0
+  2023-02-08T04:00:00.000Z,Funding,,43000,23262.1,0,0.000062,11461,0
+  2023-02-08T12:00:00.000Z,RealisedPNL,,-16002,0,0,0,0,70480191
+  2023-02-08T12:00:00.000Z,Funding,,43000,23160.81,0,0.000019,3528,0
+  2023-02-08T20:00:00.000Z,Funding,,43000,22876.33,0,0.000079,14849,0
+  2023-02-09T03:03:32.432Z,Trade,Sell,36400,22663,-160614272,0.00075,120460,0
+  2023-02-09T03:03:32.432Z,Trade,Sell,6600,22663,-29120454,0.00075,21840,0
+  `
+
+    var lines = allTransactionsCSV.trim().split('\n')
+    var allTransactions = []
+    lines.shift()
+    lines.forEach(line => {
+      line = line.trim()
+
+      let values = line.split(',')
+      allTransactions.push({
+          time: values[0],
+          type: values[1],
+          side: values[2],
+          size: parseFloat(values[3]),
+          price: parseFloat(values[4]),
+          cost: parseFloat(values[5]),
+          feeRate: parseFloat(values[6]),
+          feePaid: parseFloat(values[7]),
+          balance: parseFloat(values[8])
+      })
+    })
+
+    var sells = allTransactions.filter((t,i) => {
+      t.exitPrice = 0
+      t.exitCost = 0
+      t.pnlBTC = 0
+      t.pnlBTCPercent = 0
+      t.pnlUSDEnter = 0
+      t.pnlUSDEnterPercent = 0
+      t.pnlUSDExit = 0
+      t.pnlUSDExitPercent = 0
+      if (t.type == 'Trade' && t.side == 'Sell') {
+        t.index = i
+        return true
+      }
+      else {
+        return false
+      }
+    })
+
+    sells.forEach(sell => {
+      let sellSize = sell.size
+      for (let i = sell.index-1; i > 0; i--) {
+        let t = allTransactions[i]
+        if (t.type == 'Trade' && t.side == 'Buy') {
+          let buySize = 0
+          if (!t.exitPrice) {
+            buySize = t.size
+          }
+          else if (t.pendingSellSize) {
+            buySize = t.pendingSellSize
+          }
+          if (buySize > 0) {
+            let balanceBTC
+            for (let j = i - 1; j >= 0; j--) {
+              let tBalance = allTransactions[j]
+              if (tBalance.balance > 0) {
+                balanceBTC = tBalance.balance / 100000000
+                j = -1
+              }
+            }
+            let balanceUSD = balanceBTC * t.price
+            t.exitPrice = sell.price
+            t.exitCost = - Math.round(t.size / sell.price * 100000000)
+            t.pnlBTC = (t.cost + t.exitCost) / 100000000
+            t.pnlBTCPercent = ((t.pnlBTC / balanceBTC * 10000) / 100).toFixed(2)
+            t.pnlUSDEnter = t.pnlBTC * t.price
+            t.pnlUSDEnterPercent = ((t.pnlUSDEnter / balanceUSD * 10000) / 100).toFixed(2)
+            t.pnlUSDExit = t.pnlBTC * sell.price 
+            t.pnlUSDExitPercent = ((t.pnlUSDExit / balanceUSD * 10000) / 100).toFixed(2)
+            sellSize -= buySize
+            if (sellSize == 0) {
+              i = -1
+            }
+            else if (sellSize < 0) {
+              t.pendingSellSize = -sellSize
+              i = -1
+            }
+          }
+        }
+      }
+    })
+    allTransactionsCSV = getTransactionCSV(allTransactions)
+  console.log(allTransactionsCSV)
+  debugger
+}
+
+function getTransactionCSV(transactions) {
+  transactions.sort((a,b) => {
+    return (new Date(a.time).getTime() - new Date(b.time).getTime())
+  })
+  var csv = 'Date,Type,Side,Size,Price,Cost,FeeRate,FeePaid,Balance,exitPrice,exitCost,pnlBTC,pnlBTCPercent,pnlUSDEnter,pnlUSDEnterPercent,pnlUSDExit,pnlUSDExitPercent'
+  transactions.forEach(t => {
+    csv += '\n' + t.time + ',' + t.type + ',' + t.side + ',' + t.size + ',' + t.price + ',' + t.cost + ',' + t.feeRate + ',' + t.feePaid + ',' + t.balance + ',' + t.exitPrice + ',' + t.exitCost + ',' + t.pnlBTC + ',' + t.pnlBTCPercent + ',' + t.pnlUSDEnter + ',' + t.pnlUSDEnterPercent + ',' + t.pnlUSDExit + ',' +t.pnlUSDExitPercent
+  })
+  return csv
+}
+
 async function init(strategy,checkPositionCb) { try {
   console.log('bitmex init')
   lastMargin = {}
@@ -1166,7 +1413,7 @@ async function init(strategy,checkPositionCb) { try {
     return
   }
   // inspect(client.apis)
-  // await getUserxecutionHistory()
+  // await getHistoryCSV('2023-01-20T00:00:00.000Z','2023-02-09T00:00:00.000Z')
   // debugger
   await initMarket()
   await initOrders()
