@@ -195,6 +195,13 @@ async function getTradeJson(sp) { try {
   var startDrawDownWalletBalanceUSD = startDrawDownWalletBalance*firstEnterPrice/100000000
   var groupid = 0
   let totalHoursInTrade = 0
+  let totalPnlPercent = 0
+  let maxDrawDown = 0
+  let maxDrawDownUSD = 0
+  let cwlMin = 0, cwlMax = 0
+  let totalGroups = 0, totalGroupLen = 0
+  let totalWinGroups = 0, totalWinGroupLen = 0
+  let totalLoseGroups = 0, totalLoseGroupLen = 0
 
   signals.forEach((signal,i) => {
     let {timestamp} = signal.signal
@@ -312,6 +319,9 @@ async function getTradeJson(sp) { try {
         t.walletBalance = walletBalance
         t.walletBalancePercent = (walletBalance / walletHistory[0][1] * 100).toFixed(2)
         t.walletBalanceUSD = walletBalance*lastPrice/100000000
+        totalPnlPercent += parseFloat(t.pnlPercent)
+        cwlMin = Math.min(cwlMin, t.cwl)
+        cwlMax = Math.max(cwlMax, t.cwl)
 
         t.drawdown = pt.drawdown + t.pnl
         t.drawdownUSD = t.walletBalanceUSD - startDrawDownWalletBalanceUSD
@@ -326,6 +336,8 @@ async function getTradeJson(sp) { try {
         }
         t.drawdownPercent = (Math.round(t.drawdown / (startDrawDownWalletBalance) * 10000) / 100).toFixed(2)
         t.drawdownUSDPercent = (Math.round(t.drawdownUSD / (startDrawDownWalletBalanceUSD) * 10000) / 100).toFixed(2)
+        maxDrawDown = Math.min(maxDrawDown, parseFloat(t.drawdownPercent))
+        maxDrawDownUSD = Math.min(maxDrawDownUSD, parseFloat(t.drawdownUSDPercent))
 
         if (t.group == pt.group) {
           t.psize = pt.psize + entryOrder.cumQty
@@ -352,6 +364,16 @@ async function getTradeJson(sp) { try {
     trade.grouppnl = walletBalance - startWalletBalance
     trade.avgGroupHoursInTrade = Math.round(totalGroupHoursInTrade/groupLen*10)/10
     if (trade.grouppnl) {
+      totalGroups++
+      totalGroupLen += groupLen
+      if (trade.grouppnl > 0) {
+        totalWinGroups++
+        totalWinGroupLen += groupLen
+      }
+      else {
+        totalLoseGroups++
+        totalLoseGroupLen += groupLen
+      }
       console.log(groupLen,trade.walletBalanceUSD,trade.drawdownPercent,trade.grouppnl,trade.winsPercent)
     }
   })
@@ -360,8 +382,15 @@ async function getTradeJson(sp) { try {
 
   let lastTrade = trades[trades.length-1]
   let avgTotalHoursInTrade = (Math.round(totalHoursInTrade / trades.length * 100) / 100).toFixed(2)
-  console.log(trades.length, lastTrade.walletBalancePercent+'%', 
-    lastTrade.winsPercent+'%', avgTotalHoursInTrade)
+  let avgPnlPercent = (Math.round(totalPnlPercent / trades.length * 100) / 100).toFixed(2)
+  let avgGroupLen = (Math.round(totalGroupLen / totalGroups * 100) / 100)
+  let avgWinGroupLen = (Math.round(totalWinGroupLen / totalWinGroups * 100) / 100)
+  let avgLoseGroupLen = (Math.round(totalLoseGroupLen / totalLoseGroups * 100) / 100)
+  console.log('Number of Trades: ' + trades.length, 'Balance: ' + lastTrade.walletBalancePercent+'%', 
+    'WinPercent: ' + lastTrade.winsPercent+'%', 'avgTotalHoursInTrade: ' + avgTotalHoursInTrade,
+    'avgPnlPercent: ' + avgPnlPercent, 'maxDrawDown: ' + maxDrawDown, 'maxDrawDownUSD: ' + maxDrawDownUSD, 
+    'cwlMin: ' + cwlMin, 'cwlMax: ' + cwlMax, 'totalWinGroups: ' + totalWinGroups, 'totalLoseGroups: ' + totalLoseGroups, 
+    'avgGroupLen: ' + avgGroupLen, 'avgWinGroupLen: ' + avgWinGroupLen, 'avgLoseGroupLen: ' + avgLoseGroupLen)
 
   trades[trades.length-1].drawdownPercent = '-100'
   let tradeObject = {trades:trades}
@@ -420,7 +449,7 @@ async function readLog() {
 async function updateData() {
   console.time('updateData')
   var start = 20181201
-  var end = 20230201
+  var end = 20230219
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
   // await bitmexdata.testCandleDayFiles(start,end,60)

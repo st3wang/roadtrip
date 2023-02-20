@@ -216,7 +216,7 @@ async function getOrder(setup,signalCondition,walletBalance,entryPrice,lossDista
   }
   
   if (shoes.test ) {
-    goodStopDistance = true
+    // goodStopDistance = true
   }
 
   return {

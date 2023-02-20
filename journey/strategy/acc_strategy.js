@@ -536,7 +536,7 @@ async function getSignal(tradeExchange,setup,position,side) {
   //   }
   // }
 
-  if (tradeExchange != binance && !shoes.test) {
+  if (tradeExchange != binance) {
     const binanceSignal = await getAccumulationSignal(binance,setup,side)
     if (binanceSignal.condition != '-') {
       return binanceSignal
