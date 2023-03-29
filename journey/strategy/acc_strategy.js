@@ -689,7 +689,7 @@ async function checkExit(tradeExchange) { try {
   const position = tradeExchange.position
 
   var {positionSize,bid,ask,lastPrice,signal} = position
-  if (positionSize == 0 || !lastPrice || !signal || signal.signal.condition != 'LONG') return
+  if (positionSize == 0 || !lastPrice || !signal || !signal.signal || signal.signal.condition != 'LONG') return
 
   var lastDistance = lastPrice - signal.signal.entryPrice
   // console.log('lastDistance', lastDistance, 'lossDistance', signal.signal.lossDistance)
