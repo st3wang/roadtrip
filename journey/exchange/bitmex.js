@@ -83,7 +83,10 @@ const logger = winston.createLogger({
               line += (splat[0] ? orderString(splat[0]) : 'splat[0] is null')
             } break
             case 'orderNewBulk error':
-            case 'orderAmendBulk error': {
+            case 'orderAmendBulk error': 
+            case 'orderBulkRetry error': 
+            case 'orderQueue error':
+            case 'order error': {
               let {status,obj} = splat[0]
               line += status + ' ' + obj.error.message + ' ' + JSON.stringify(splat[1])
             } break
@@ -743,8 +746,13 @@ async function order(orders,cancelAllBeforeOrder) { try {
   }
   
   if (!mock) {
-    responses.forEach(r => {
-      logger.info('order',r)
+    responses.forEach(response => {
+      if (response.status == 200) {
+        logger.info('order', response)
+      }
+      else {
+        logger.error('order error', response, orders)
+      }
     })
   }
   return responses[0]
@@ -782,7 +790,13 @@ async function orderQueue(ord) { try {
   })
   if (foundPendingQueue) {
     logger.warn('orderQueue Duplicate')
-    return ({obj:{ordStatus:'Duplicate'}}) 
+    return ({
+      status: 400,
+      obj:{
+        ordStatus:'Duplicate',
+        error: {message: 'Duplicate'}
+      }
+    }) 
   }
   orderQueueArray.forEach(o => {
     logger.info('newer order, obsolete old ones',o)
@@ -805,7 +819,12 @@ async function orderQueue(ord) { try {
   var response = await pendingLimitOrderRetry
   pendingLimitOrderRetry = null
   if (!mock) {
-    logger.info('orderQueue',response)
+    if (response.status == 200) {
+      logger.info('orderQueue', response)
+    }
+    else {
+      logger.error('orderQueue error', response, ord)
+    }
   }
   popOrderQueue(ord)
   return response
@@ -862,7 +881,12 @@ async function orderBulkRetry(ord) { try {
     logger.info('orderBulkRetry obsoleted',ord)
   }
   if (!mock) {
-    logger.info('orderBulkRetry', response)
+    if (response.status == 200) {
+      logger.info('orderBulkRetry', response)
+    }
+    else {
+      logger.error('orderBulkRetry error', response, ord)
+    }
   }
   return response
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
@@ -973,6 +997,9 @@ async function orderAmendBulk(orders) { try {
       return e
     }
     else if (e.obj.error.message.indexOf('open sell orders exceed current position')) {
+      return e
+    }
+    else if (e.obj.error.message.indexOf('Invalid amend: orderQty, leavesQty, price, stopPx unchanged')) {
       return e
     }
     else {
