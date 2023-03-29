@@ -536,7 +536,8 @@ async function getSignal(tradeExchange,setup,position,side) {
   //   }
   // }
 
-  if (tradeExchange != binance) {
+  // binance api does not work with US IP
+  if (tradeExchange != binance && !shoes.test) {
     const binanceSignal = await getAccumulationSignal(binance,setup,side)
     if (binanceSignal.condition != '-') {
       return binanceSignal
