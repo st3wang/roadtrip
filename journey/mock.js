@@ -25,6 +25,7 @@ var setup, startTimeMs, endTimeMs, XBTUSDRate
 var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
 
 var margin, walletHistory, orders, historyOrders, position, bitmextrades, currentTradeIndex
+var contribution = 0
 var rsis
 
 var getAccumulationSignalFn
@@ -118,9 +119,14 @@ function updateLeverage() {
 
 async function nextMargin(cost,fee) {
   margin.walletBalance += (cost - fee)
+  // if (margin.walletBalance < 100000000) {
+  //   let newContribution = 100000000 - margin.walletBalance
+  //   contribution += newContribution
+  //   margin.walletBalance = 100000000
+  // }
   margin.marginBalance = margin.walletBalance
   if (!margin.walletBalance) debugger
-  walletHistory.push([getISOTimeNow(),margin.walletBalance,cost,fee])
+  walletHistory.push([getISOTimeNow(),margin.walletBalance,cost,fee,contribution])
   await handleMargin([margin])
 }
 
