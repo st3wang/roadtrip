@@ -579,6 +579,9 @@ function sendEmailMoveStop(response) {
   if (response && response.status == 200 && response.obj && response.obj[0] && response.obj[0].stopPx) {
     subject += response.obj[0].stopPx
   }
+  else {
+    subject += 'ERROR'
+  }
   email.send(subject, JSON.stringify(response, null, 2))
 }
 
@@ -622,12 +625,7 @@ async function orderExit(tradeExchange,stopPx) { try {
   }]
   const response = await tradeExchange.order(closeOrders,true)
   /*TODO: wait for order confirmations*/
-  if (response.status == 200) {
-    sendEmailMoveStop(response)
-  }
-  else {
-    sendEmailMoveStop(response)
-  }
+  sendEmailMoveStop(response)
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 function isBear({lastPrice}) {
