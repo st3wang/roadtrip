@@ -1444,6 +1444,31 @@ async function init(strategy,checkPositionCb) { try {
   }
   // inspect(client.apis)
   // await getHistoryCSV('2023-01-20T00:00:00.000Z','2023-03-23T00:00:00.000Z')
+  // await cancelAll()
+  // var testOrder = await order([
+  //   {
+  //     stopPx: 30200,
+  //     side: 'Sell',
+  //     ordType: 'Stop',
+  //     execInst: 'LastPrice,Close'
+  //   }
+  // ])
+  // debugger
+  // [
+  //   {
+  //     price: 30259.5,
+  //     side: 'Buy',
+  //     orderQty: 84700,
+  //     ordType: 'Limit',
+  //     execInst: 'ParticipateDoNotInitiate'
+  //   },
+  //   {
+  //     stopPx: 29954.5,
+  //     side: 'Sell',
+  //     ordType: 'Stop',
+  //     execInst: 'LastPrice,Close'
+  //   }
+  // ]
   // debugger
   await initMarket()
   await initOrders()
