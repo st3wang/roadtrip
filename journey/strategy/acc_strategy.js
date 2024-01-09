@@ -264,12 +264,13 @@ async function getOrder(tradeExchange,setup,position,signal) {
   // console.log(riskPerTradePercent)
 
   // stoploss going up
-  const stopLossLookBackStart = 24
+  const stopLossLookBackStart = 48 //24
+  const stopLossLookBackMax = stopLossLookBackStart * 1.5 //36
   if (existingSignal && position.positionSize && existingSignal.stopLossLookBack) {
     // stopLossLookBack = (existingSignal.stopLossLookBack - stopLossLookBackStart) * 2 + stopLossLookBackStart
     stopLossLookBack = existingSignal.stopLossLookBack + 2
-    if (stopLossLookBack > 36) {
-      stopLossLookBack = 36
+    if (stopLossLookBack > stopLossLookBackMax) {
+      stopLossLookBack = stopLossLookBackMax
     }
     if (stopLossLookBack <= stopLossLookBackStart) {
       stopLossLookBack = stopLossLookBackStart+1
