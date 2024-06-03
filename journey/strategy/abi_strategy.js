@@ -434,4 +434,3 @@ module.exports = {
   init: init,
   checkPosition: checkPosition
 }
-
