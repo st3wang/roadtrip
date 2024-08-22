@@ -199,7 +199,7 @@ async function pruneOrders(orders) { try {
 
 async function handleMargin(accounts) { try {
   lastMargin = accounts.find(account => {
-    return account.walletBalance > 0
+    return account.walletBalance > 0 && account.currency == 'XBt'
   })
   position.walletBalance = lastMargin.walletBalance
   position.marginBalance = lastMargin.marginBalance
