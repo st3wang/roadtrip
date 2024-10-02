@@ -457,20 +457,27 @@ async function readLog() {
 async function updateData() {
   console.time('updateData')
   var start = 20181201
-  var end = 20230219
+  var end = 20241001
+
+  // await bitmexdata.testCandleDayFiles(start,end,60)
+  // await bitmexdata.generateCandleDayFiles(start,end,1440)
+
   console.log('updateData bitmex')
   await bitmexdata.downloadTradeData(start,end)
-  // await bitmexdata.testCandleDayFiles(start,end,60)
   await bitmexdata.generateCandleDayFiles(start,end,60)
-  // await bitmexdata.generateCandleDayFiles(start,end,1440)
+
   console.log('updateData coinbase')
   await coinbasedata.generateCandleDayFiles(start,end,60)
+
   console.log('updateData bitstamp')
   await bitstampdata.generateCandleDayFiles(start,end,60)
+
   console.log('updateData binance')
   await binancedata.generateCandleDayFiles(start,end,60)
+
   console.log('updateData bitfinex')
   await bitfinexdata.generateCandleDayFiles(start,end,60)
+
   console.timeEnd('updateData')
   debugger
 }

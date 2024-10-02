@@ -69,7 +69,7 @@ async function readMarket(symbol,interval,st,et) { try {
 async function getMarket(symbol,interval,start,end) {
   return new Promise((resolve,reject) => {
     const options = {
-      hostname: 'api.pro.coinbase.com',
+      hostname: 'api.exchange.coinbase.com',
       path: '/products/' + symbol + 
         '/candles?granularity=' + (interval*60) + 
         '&start=' + start +

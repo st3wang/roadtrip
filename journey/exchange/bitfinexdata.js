@@ -65,6 +65,12 @@ async function getCandleDay(symbol,interval,ymd) { try {
   return await getMarket(symbol,interval,yyyy_mm_dd+'T00:00:00.000Z',yyyy_mm_dd+'T23:00:00Z')
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function wait(ms) {
+  return new Promise((resolve,reject) => {
+    setTimeout(_ => resolve(true), ms)
+  })
+}
+
 async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
   var len = symbols.length
   for (var i = 0; i < len; i++) {
@@ -95,6 +101,7 @@ async function generateCandleDayFiles(startYmd,endYmd,interval) { try {
         await writeFile(writeFeedPath,feedsString,writeFileOptions)
         console.log('done writing feed', writeFeedPath)
         lastPrice = feeds[feeds.length-1][3]
+        await wait(2000)
       }
       ymd = ymdHelper.nextDay(ymd)
     }

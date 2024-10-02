@@ -1,6 +1,6 @@
 const util = require('util')
 const fs = require('fs')
-const http 	= require('http')
+const https = require('https')
 const gunzip = require('gunzip-file')
 const base = require('./basedata')
 
@@ -51,8 +51,12 @@ async function writeCleanedFile(ymd,symbol,output) {
 function downloadTradeDay(ymd) { try {
   return new Promise((resolve, reject) => {
     console.log('downloadTradeDay',ymd)
-    const request = http.get(shoes.bitmexdata.url + ymd + '.csv.gz', function(response) {
-      const csvFilename = tradeFilePath.replace('YYYYMMDD',ymd) //'data/trade/' + ymd + '.csv'
+    const options = {
+      hostname: 's3-eu-west-1.amazonaws.com',
+      path: '/public.bitmex.com/data/trade/' + ymd + '.csv.gz'
+    }
+    https.get(options, function(response) {
+      const csvFilename = tradeFilePath.replace('YYYYMMDD',ymd)
       const gzFilename = csvFilename + '.gz'
       const ws = fs.createWriteStream(gzFilename);
       response.pipe(ws)
