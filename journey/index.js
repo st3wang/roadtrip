@@ -404,9 +404,10 @@ async function getTradeJson(sp) { try {
   let tradeObject = {trades:trades}
   const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test1.csv'),tradeObject.trades)
   debugger
-  const sheetName = '2% normal'
+  const sheetName = 'Sep 2024'
   await gsheet.upload(setup.startTime.substr(0,13) + ' ' + setup.endTime.substr(0,13) + ' ' + sheetName,csvString)
   console.log('getTradeJson done')
+  debugger
   // return tradeObject
   let tradeJSON = JSON.stringify(tradeObject)
   fs.writeFileSync(cachePath,tradeJSON,writeFileOptions)

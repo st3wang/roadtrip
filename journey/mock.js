@@ -24,9 +24,16 @@ var setup, startTimeMs, endTimeMs, XBTUSDRate
 
 var timeNow = 0, handleInterval,handleMargin,handleOrder,handlePosition,handleInstrument,handleXBTUSDInstrument
 
-var margin, walletHistory, orders, historyOrders, position, bitmextrades, currentTradeIndex
+var margin, walletHistory, orders, historyOrders, bitmextrades, currentTradeIndex
 var contribution = 0
 var rsis
+
+var position = {
+  currentQty: 0,
+  homeNotional: 0,
+  foreignNotional: 0,
+  execComm: 0
+}
 
 var getAccumulationSignalFn
 
@@ -290,11 +297,41 @@ async function nextInstrument() { try {
     askPrice: price
   }]
 
-  const positionCost = getPositionCost(position)
-  margin.unrealisedPnl = (positionCost - position.execComm)
-  // margin.unrealizedBalance = margin.walletBalance + margin.unrealisedPnl
+  if (position.currentQty) {
+    const pnlOrder = {
+      orderID: uuid.v1(),
+      side: 'Sell',
+      orderQty: position.currentQty,
+      price: price,
+      stopPx: price,
+      ordType: 'Stop',
+      execInst: 'LastPrice,Close',
+      ordStatus: 'New',
+      cumQty: 0,
+      transactTime: getISOTimeNow(),
+      timestamp: getISOTimeNow()
+    }
+
+    let [homeNotional,foreignNotional,execComm] = fillOrder(pnlOrder,price)
+
+    let pnlPosition = {
+      currentQty: position.currentQty,
+      homeNotional: position.homeNotional,
+      foreignNotional: position.foreignNotional,
+      execComm: position.execComm
+    }
+    pnlPosition.currentQty -= foreignNotional
+    pnlPosition.homeNotional += homeNotional
+    pnlPosition.foreignNotional += foreignNotional
+    pnlPosition.execComm += execComm
+
+    let cost = getPositionCost(pnlPosition)
+    let fee = pnlPosition.execComm
+    margin.unrealisedPnl = (cost - fee)
+    margin.marginBalance = margin.walletBalance + margin.unrealisedPnl
+  }
+
   await handleMargin([margin])
-  // if (margin.unrealisedPnl) debugger
 
   if (size) {
     await nextOrder(price)
@@ -444,21 +481,19 @@ async function init(sp) {
   setup = sp
   oneCandleMs = sp.interval * 60000
   margin = {
+    currency: 'XBt',
     walletBalance: 100000000,
     marginBalance: 100000000,
     unrealizedBalance: 100000000,
+    // walletBalance: 271840000,
+    // marginBalance: 271840000,
+    // unrealizedBalance: 271840000,
     positionSize: 0,
     unrealisedPnl: 0
   }
   walletHistory = []
   orders = []
   historyOrders = []
-  position = {
-    currentQty: 0,
-    homeNotional: 0,
-    foreignNotional: 0,
-    execComm: 0
-  }
   bitmextrades = []
   currentTradeIndex = -1
   if (sp) {
@@ -517,5 +552,7 @@ module.exports = {
   start: start,
 
   setGetAccumulationSignalFn: setGetAccumulationSignalFn,
-  getAccumulationSignal: getAccumulationSignal
+  getAccumulationSignal: getAccumulationSignal,
+  
+  position: position
 }
