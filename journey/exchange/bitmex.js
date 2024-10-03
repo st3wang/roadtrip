@@ -1129,7 +1129,7 @@ function getRate(symbol) {
   return lastRates[symbol]
 }
 
-const makerFee = -0.00025
+const makerFee = -0.0002
 const takerFee = 0.00075
 function getCost({side,cumQty,price,execInst}) {
   var foreignNotional = (side == 'Buy' ? -cumQty : cumQty)

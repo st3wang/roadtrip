@@ -393,7 +393,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   stopMarketTrigger = entryPrice + (stopMarketDistance/4)
   lossDistancePercent = lossDistance/entryPrice
 
-  const {stopRiskPercent, stopDistanceRiskRatio} = getStopRisk(position,stopMarket) 
+  const {stopBalance, stopRiskPercent, stopDistanceRiskRatio} = getStopRisk(position,stopMarket) 
   // console.log(stopRiskPercent)
   // if (stopDistanceRiskRatio > riskPerTradePercent*6000) {
   //   riskPerTradePercent /= 2
@@ -403,7 +403,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   //   riskPerTradePercent /= 10
   // }
 
-  var capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + marginBalance/100000000
+  var capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + stopBalance/100000000
   var capitalUSD = capitalBTC * entryPrice
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
