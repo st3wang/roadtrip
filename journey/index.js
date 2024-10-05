@@ -189,7 +189,7 @@ async function getTradeJson(sp) { try {
   })
   var firstEnterPrice = signals[0].signal.entryPrice
   var walletHistory = await bitmex.getWalletHistory()
-  var trades = [], ords = []
+  var trades = [], ords = [], tradesByNum = []
   var walletBalance = walletHistory[0][1]
   var startDrawDownWalletBalance = walletBalance
   var startDrawDownWalletBalanceUSD = startDrawDownWalletBalance*firstEnterPrice/100000000
@@ -269,6 +269,7 @@ async function getTradeJson(sp) { try {
     let closeTime = new Date(closeTimestamp).getTime()
     let len = trades.length
     let startIndex = len
+    let tradeNumberInGroup = 0
     let startWalletBalance = walletBalance
     let totalGroupHoursInTrade = 0
     let groupLen = 1
@@ -294,16 +295,26 @@ async function getTradeJson(sp) { try {
       let pt = trades[startIndex-1] || {drawdown:0,wl:0,cwl:0,wins:0,losses:0,positionSize:0}
       let signal = signals[startIndex].signal
       let entryOrder = t.entryOrders[0]
+      let entryTime = new Date(entryOrder.timestamp).getTime()
+
+      let lastPrice = entryOrder.price
+
+      t.group = groupid
+      tradeNumberInGroup++
+      t.tradeNumber = tradeNumberInGroup
+      t.cost = 0
+      t.fee = 0
+      t.pnl = 0
+      t.pnlPercent = 0
+
       if (entryOrder.ordStatus == 'Filled') {
-        t.group = groupid
         let entryCost = mock.getCost(entryOrder)
-        let entryTime = new Date(entryOrder.timestamp).getTime()
         let partialCloseOrder = t.closeOrders[t.closeOrders.length-1]
         if (t.closeOrders.length > 1) debugger
         partialCloseOrder.cumQty = entryOrder.cumQty
         partialCloseOrder.price = closeOrder.price
         let closeCost = mock.getCost(partialCloseOrder)
-        let lastPrice = (partialCloseOrder.price||entryOrder.price)
+        lastPrice = (partialCloseOrder.price||entryOrder.price)
         t.fee = entryCost[2] + closeCost[2]
         t.cost = Math.round((entryCost[0] + closeCost[0]) * 100000000)
         t.pnl = (t.cost - t.fee)
@@ -315,14 +326,8 @@ async function getTradeJson(sp) { try {
         t.feePercent = (Math.round(-t.fee / walletBalance * 10000) / 100).toFixed(2)
         t.costPercent = (Math.round(t.cost / walletBalance * 10000) / 100).toFixed(2)
         t.pnlPercent = (Math.round(t.pnl / walletBalance * 10000) / 100).toFixed(2)
-
+      }
         walletBalance += t.pnl
-        // if (walletBalance < 100000000) {
-        //   let newContribution = 100000000 - walletBalance
-        //   contribution += newContribution
-        //   walletBalance = 100000000
-        //   t.contribution = contribution
-        // }
         t.walletBalance = walletBalance
 
         t.walletBalancePercent = (walletBalance / walletHistory[0][1] * 100).toFixed(2)
@@ -358,15 +363,20 @@ async function getTradeJson(sp) { try {
         totalHoursInTrade += t.hoursInTrade
         totalGroupHoursInTrade += t.hoursInTrade
         t.avgHoursInTrade = Math.round(totalHoursInTrade/(startIndex+1) * 10) / 10
+
+      tradesByNum[t.tradeNumber] = tradesByNum[t.tradeNumber] || {
+        num: t.tradeNumber,
+        trades: [],
+        totalPnlPercent: 0,
+        pnlPercent: 0,
+        totalWins: 0,
+        winPercent: 0
       }
-      else {
-        t.drawdown = pt.drawdown
-        t.drawdownUSD = pt.drawdownUSD
-        t.walletBalanceUSD = pt.walletBalanceUSD
-        t.drawdownPercent = (Math.round(t.drawdown / (startDrawDownWalletBalance) * 10000) / 100).toFixed(2)
-        t.drawdownUSDPercent = (Math.round(t.drawdownUSD / (startDrawDownWalletBalanceUSD) * 10000) / 100).toFixed(2)
-        t.wl = 0
-        t.cwl = pt.cwl
+
+      tradesByNum[t.tradeNumber].trades.push(t)
+      tradesByNum[t.tradeNumber].totalPnlPercent += parseFloat(t.pnlPercent)
+      if (t.wl > 0) {
+        tradesByNum[t.tradeNumber].totalWins++
       }
     }
     trade.grouppnl = walletBalance - startWalletBalance
@@ -385,7 +395,16 @@ async function getTradeJson(sp) { try {
       console.log(groupLen,trade.walletBalanceUSD,trade.drawdownPercent,trade.grouppnl,trade.winsPercent)
     }
   })
-  
+
+  tradesByNum.forEach(t => {
+    if (t) {
+      t.pnlPercent = t.totalPnlPercent / t.trades.length
+      t.winPercent = t.totalWins / t.trades.length
+      console.log('trade num', t.num, t.trades.length, t.winPercent.toFixed(2), t.pnlPercent.toFixed(2), t.totalPnlPercent.toFixed(2))
+    }
+  })
+  debugger
+
   console.timeEnd('getTradeJson')
 
   let lastTrade = trades[trades.length-1]
@@ -403,8 +422,8 @@ async function getTradeJson(sp) { try {
   trades[trades.length-1].drawdownPercent = '-100'
   let tradeObject = {trades:trades}
   const csvString = await storage.writeTradesCSV(path.resolve(__dirname, 'test/test1.csv'),tradeObject.trades)
-  debugger
-  const sheetName = 'Sep 2024'
+  // debugger
+  const sheetName = 'Dec 2022 - Sep 2024'
   await gsheet.upload(setup.startTime.substr(0,13) + ' ' + setup.endTime.substr(0,13) + ' ' + sheetName,csvString)
   console.log('getTradeJson done')
   debugger
