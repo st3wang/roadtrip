@@ -28,10 +28,11 @@ async function getMarket(symbol,interval,start,end) {
     const startTime = new Date(start).getTime()
     const endTime = new Date(end).getTime()
     const limit = ((endTime - startTime) / (intervalHours*3600000)) + 1
+    const intervalString = interval >= 60 ? intervalHours + 'h' : interval + 'm'
     const options = {
       hostname: 'api.binance.com',
       path: '/api/v3/klines?symbol=' + symbol + 
-        '&interval=' + intervalHours + 'h' + 
+        '&interval=' + intervalString +
         '&startTime=' + startTime +
         '&limit=' + limit
     }

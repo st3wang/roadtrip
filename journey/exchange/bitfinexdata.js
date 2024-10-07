@@ -26,9 +26,10 @@ async function getMarket(symbol,interval,start,end) {
   return new Promise((resolve,reject) => {
     const startTime = new Date(start).getTime()
     const endTime = new Date(end).getTime()
+    const intervalString = interval >= 60 ? interval/60 + 'h:' : interval + 'm:'
     const options = {
       hostname: 'api-pub.bitfinex.com',
-      path: '/v2/candles/trade:' + (interval/60) + 'h:' + symbol + 
+      path: '/v2/candles/trade:' + intervalString + symbol + 
         '/hist?start=' + startTime + 
         '&end=' + endTime
     }
