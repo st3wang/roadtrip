@@ -234,9 +234,21 @@ async function getSMASignal(signalExchange,{rsi,sma},symbol) { try {
   return signal
 } catch(e) {console.error(e.stack||e);debugger} }
 
-function getStopLoss(market, stopLossLookBack) {
-  const lows = market.lows.slice(market.lows.length-stopLossLookBack,market.lows.length)
-  return Math.min(...lows)
+function getStopLoss(market, signal, stopLossLookBack) {
+  const lastIndex = market.lows.length
+
+  switch(signal.condition) {
+    case 'LONG': {
+      // lowest
+      return Math.min(...market.lows.slice(lastIndex-stopLossLookBack,lastIndex))
+    } break;
+    case 'SHORT': {
+      // highest
+      return Math.max(...market.highs.slice(lastIndex-stopLossLookBack,lastIndex))
+    } break;
+  }
+
+  return NaN
 }
 
 async function getOrder(tradeExchange,setup,position,signal) {
@@ -249,152 +261,65 @@ async function getOrder(tradeExchange,setup,position,signal) {
   const quote = await tradeExchange.getQuote()
   const market = await tradeExchange.getCurrentMarket()
   const existingSignal = getEntrySignal(tradeExchange.name).signal
-  var riskPerTradePercent = setup.exchange[tradeExchange.name].riskPerTradePercent, stopLossLookBack = 24
-  const fib = setup.exchange[tradeExchange.name].fib
+  const riskPerTradePercent = setup.exchange[tradeExchange.name].riskPerTradePercent
+  const stopLossLookBack = setup.candle.stopLossLookBack
 
-  // linear
-  // if (existingSignal && position.positionSize) {
-  //   riskPerTradePercent = existingSignal.riskPerTradePercent + riskPerTradePercent/10
-  //   if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
-  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent
-  //   }
-  // }
-  // else {
-  //   riskPerTradePercent = riskPerTradePercent/10
-  // }
+  // capital = strategy.equity
 
-  // exp
-  // if (existingSignal && position.positionSize && existingSignal.riskPerTradePercent) {
-  //   riskPerTradePercent = existingSignal.riskPerTradePercent * 2.2
-  //   if (riskPerTradePercent > setup.bankroll.riskPerTradePercent) {
-  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent
-  //   }
-  //   else if (riskPerTradePercent < setup.bankroll.riskPerTradePercent/40) {
-  //     riskPerTradePercent = setup.bankroll.riskPerTradePercent/40
-  //   }
-  // }
-  // else {
-  //   riskPerTradePercent = setup.bankroll.riskPerTradePercent/40
-  // }
-  // console.log(riskPerTradePercent)
+  var {profitFactor,stopMarketFactor,scaleInLength,minOrderSizeBTC,minStopLoss,maxStopLoss} = setup.bankroll
+  // var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
 
-  // stoploss going up
-  const stopLossLookBackStart = 48 //24
-  const stopLossLookBackMax = stopLossLookBackStart * 1.5 //36
-  if (existingSignal && position.positionSize && existingSignal.stopLossLookBack) {
-    // stopLossLookBack = (existingSignal.stopLossLookBack - stopLossLookBackStart) * 2 + stopLossLookBackStart
-    stopLossLookBack = existingSignal.stopLossLookBack + 2
-    if (stopLossLookBack > stopLossLookBackMax) {
-      stopLossLookBack = stopLossLookBackMax
-    }
-    if (stopLossLookBack <= stopLossLookBackStart) {
-      stopLossLookBack = stopLossLookBackStart+1
-    }
-  }
-  else {
-    stopLossLookBack = stopLossLookBackStart
-  }
-  // console.log(stopLossLookBack)
-  // debugger
-
-  // stoploss going down
-  // const stopLossLookBackStart = 36
-  // if (existingSignal && position.positionSize && existingSignal.stopLossLookBack) {
-  //   stopLossLookBack = (existingSignal.stopLossLookBack - stopLossLookBackStart) * 2 + stopLossLookBackStart
-  //   if (stopLossLookBack < 24) {
-  //     stopLossLookBack = 24
-  //   }
-  //   if (stopLossLookBack >= stopLossLookBackStart) {
-  //     stopLossLookBack = stopLossLookBackStart-1
-  //   }
-  // }
-  // else {
-  //   stopLossLookBack = stopLossLookBackStart
-  // }
-  // console.log(stopLossLookBack)
-  // debugger
-
-  switch(signal.condition) {
-    case 'LONG':
-      signal.stopLoss = setup.exchange[tradeExchange.name].stopLoss || getStopLoss(market,stopLossLookBack)
-      signal.entryPrice = Math.min(lastCandle.close,quote.bidPrice)
-      if (signal.entryPrice <= signal.stopLoss) {
-        signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
-        return signal
-      }
-      else if (currentCandle && currentCandle.low <= signal.stopLoss) {
-        signal.reason = 'currentCandle.low <= stopLoss ' + JSON.stringify(currentCandle)
-        return signal
-      }
-      // else if (base.isFundingWindow(fundingTimestamp) && fundingRate > 0) {
-      //   signal.reason = 'Will have to pay funding.'
-      //   return signal
-      // }
-      if (fib) {
-        if (signal.entryPrice > fib[214]) {
-          riskPerTradePercent /= 16
-          console.log('entryPrice > fib[214]',riskPerTradePercent)
-        }
-        else if (signal.entryPrice > fib[382]) {
-          riskPerTradePercent /= 8
-          console.log('entryPrice > fib[382]',riskPerTradePercent)
-        }
-        else if (signal.entryPrice > fib[500]) {
-          riskPerTradePercent /= 4
-          console.log('entryPrice > fib[500]',riskPerTradePercent)
-        }
-        else if (signal.entryPrice > fib[618]) {
-          riskPerTradePercent /= 2
-          console.log('entryPrice > fib[618]',riskPerTradePercent)
-        }
-        else if (signal.entryPrice > fib[786]) {
-          riskPerTradePercent
-          console.log('entryPrice > fib[786]',riskPerTradePercent)
-        }
-        else {
-          riskPerTradePercent *= 2
-          console.log('entryPrice < fib[786]',riskPerTradePercent)
-        }
-      }
-      break
-    case 'SHORT':
-      const highs = market.highs.slice(market.highs.length-stopLossLookBack,market.highs.length)
-      signal.stopLoss = Math.max(...highs)
-      signal.entryPrice = Math.max(lastCandle.close,quote.askPrice)
-      if (signal.entryPrice >= signal.stopLoss) {
-        signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
-        return signal
-      }
-      else if (currentCandle && currentCandle.high >= signal.stopLoss) {
-        signal.reason = 'currentCandle.high >= stopLoss ' + JSON.stringify(currentCandle)
-        return signal
-      }
-      // else if (base.isFundingWindow(fundingTimestamp) && fundingRate < 0) {
-      //   signal.reason = 'Will have to pay funding.'
-      //   return signal
-      // }
-      break
-  }
+  signal.stopLoss = base.roundPrice(tradeExchange, getStopLoss(market,signal,stopLossLookBack))
+  signal.entryPrice = base.roundPrice(tradeExchange, Math.min(lastCandle.close,quote.bidPrice))
+  signal.lossDistance = signal.stopLoss - signal.entryPrice
+  signal.takeProfit = base.roundPrice(tradeExchange, signal.entryPrice - (signal.lossDistance * profitFactor))
 
   var XBTUSDRate = quote.lastPrice
   signal.coinPairRate = quote.lastPrice/XBTUSDRate
   signal.marginBalance = position.marginBalance / signal.coinPairRate
-  signal.lossDistance = base.roundPrice(tradeExchange, signal.stopLoss - signal.entryPrice)
 
   if (!signal.lossDistance || !signal.marginBalance) {
+    debugger
     return signal
   }
 
+  if (position.positionSize != 0) {
+    console.log('already in position')
+    return signal
+  }
+
+  switch(signal.condition) {
+    case 'LONG':
+      if (signal.entryPrice <= signal.stopLoss) {
+        signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
+        debugger
+        return signal
+      }
+      else if (currentCandle && currentCandle.low <= signal.stopLoss) {
+        signal.reason = 'currentCandle.low <= stopLoss ' + JSON.stringify(currentCandle)
+        debugger
+        return signal
+      }
+      break
+    case 'SHORT':
+      if (signal.entryPrice >= signal.stopLoss) {
+        signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
+        debugger
+        return signal
+      }
+      else if (currentCandle && currentCandle.high >= signal.stopLoss) {
+        signal.reason = 'currentCandle.high >= stopLoss ' + JSON.stringify(currentCandle)
+        debugger
+        return signal
+      }
+      break
+  }
+
   var {marginBalance,entryPrice,lossDistance,coinPairRate} = signal
-  var tick = setup.candle.tick
   var leverageMargin = marginBalance*0.000000008
-  var profitDistance, takeProfit, stopMarketDistance, 
+  var profitDistance, stopMarketDistance, 
     stopLossTrigger, takeProfitTrigger,lossDistancePercent,
     riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
-
-  var {outsideCapitalBTC=0,outsideCapitalUSD=0,profitPercent,profitFactor,
-    stopMarketFactor,scaleInFactor,scaleInLength,minOrderSizeBTC,minStopLoss,maxStopLoss} = setup.bankroll
-  var side = -lossDistance/Math.abs(lossDistance) // 1 or -1
 
   minOrderSizeBTC /= coinPairRate
   stopMarketDistance = base.roundPrice(tradeExchange, lossDistance * stopMarketFactor)
@@ -407,7 +332,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   takeProfitTrigger = entryPrice + (profitDistance/8)
   stopMarketTrigger = entryPrice + (stopMarketDistance/4)
   lossDistancePercent = lossDistance/entryPrice
-
+console.log(signal)
   const {stopBalance, stopRiskPercent, stopDistanceRiskRatio} = getStopRisk(position,stopMarket) 
   // console.log(stopRiskPercent)
   // if (stopDistanceRiskRatio > riskPerTradePercent*6000) {
@@ -418,15 +343,11 @@ async function getOrder(tradeExchange,setup,position,signal) {
   //   riskPerTradePercent /= 10
   // }
 
-  var capitalBTC = (outsideCapitalUSD/entryPrice) + outsideCapitalBTC + stopBalance/100000000
+  var capitalBTC = stopBalance/100000000
   var capitalUSD = capitalBTC * entryPrice
   riskAmountBTC = capitalBTC * riskPerTradePercent
   riskAmountUSD = riskAmountBTC * entryPrice
   qtyBTC = riskAmountBTC / -lossDistancePercent
-  // var absQtyBTC = Math.abs(qtyBTC)
-  // if (absQtyBTC < minOrderSizeBTC) {
-  //   qtyBTC = minOrderSizeBTC*side
-  // }
   orderQtyUSD = Math.round(qtyBTC * entryPrice)
 
   // Order quantity must be a multiple of lot size: 100
@@ -436,37 +357,9 @@ async function getOrder(tradeExchange,setup,position,signal) {
   riskAmountBTC = qtyBTC * -lossDistancePercent
   riskAmountUSD = riskAmountBTC * entryPrice
 
-  // var absOrderQtyUSD = Math.abs(orderQtyUSD)
-  // var minOrderSizeUSD = Math.ceil(minOrderSizeBTC * entryPrice)
-  // if (absOrderQtyUSD < minOrderSizeUSD*2) {
-  //   orderQtyUSD = minOrderSizeUSD*2*side
-  //   absOrderQtyUSD = Math.abs(orderQtyUSD)
-  //   qtyBTC = orderQtyUSD / entryPrice
-  // }
-
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
 
-  var absLossDistancePercent = Math.abs(lossDistancePercent)
-  // var goodStopDistance = absLossDistancePercent >= minStopLoss && absLossDistancePercent <= maxStopLoss
-
   var scaleInSize = Math.round(orderQtyUSD / scaleInLength)
-  // var absScaleInsize = Math.abs(scaleInSize)
-  // if (absScaleInsize < minOrderSizeUSD) {
-  //   scaleInLength = Math.round(absOrderQtyUSD / minOrderSizeUSD)
-  //   scaleInSize = minOrderSizeUSD * side
-  //   orderQtyUSD = scaleInSize * scaleInLength
-  //   qtyBTC = orderQtyUSD / entryPrice
-  // }
-
-  // var scaleInDistance = lossDistance * scaleInFactor
-  // var minScaleInDistance = tick * (scaleInLength - 1)
-  // if (scaleInDistance && Math.abs(scaleInDistance) < minScaleInDistance) {
-  //   scaleInDistance = scaleInDistance > 0 ? minScaleInDistance : -minScaleInDistance
-  // }
-  // var scaleInStep = scaleInDistance / (scaleInLength - 1)
-  // if (Math.abs(scaleInStep) == Infinity) {
-  //   scaleInStep = 0
-  // }
   var scaleInStep = 0
   
   var scaleInOrders = []
@@ -476,10 +369,6 @@ async function getOrder(tradeExchange,setup,position,signal) {
       price:base.roundPrice(tradeExchange, entryPrice+scaleInStep*i, signal.condition == 'LONG' ? Math.floor : Math.ceil)
     })
   }
-  
-  // if (shoes.test ) {
-  //   if (scaleInOrders.length <= 1) goodStopDistance = false
-  // }
 
   var order = Object.assign({
     capitalBTC: capitalBTC,
@@ -571,7 +460,7 @@ async function orderEntry(tradeExchange,entrySignal) { try {
   else {
     if (!mock) logger.info('ENTER ORDER',entrySignal)
     closeOrders = closeOrders.slice(0,1)
-    const response = await tradeExchange.order(entryOrders.concat(closeOrders),true)
+    const response = await tradeExchange.order(entryOrders.concat(closeOrders).concat(takeProfitOrders),true)
     /*TODO: wait for order confirmations*/
     if (response.status == 200) {
       entrySignal.entryOrders = entryOrders

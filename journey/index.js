@@ -392,17 +392,18 @@ async function getTradeJson(sp) { try {
         totalLoseGroups++
         totalLoseGroupLen += groupLen
       }
-      console.log(groupLen,trade.walletBalanceUSD,trade.drawdownPercent,trade.grouppnl,trade.winsPercent)
+      // console.log(groupLen,trade.walletBalanceUSD,trade.drawdownPercent,trade.grouppnl,trade.winsPercent)
     }
+    console.log(trade.entryOrders[0].timestamp,trade.entryOrders[0].price,trade.signal.signal.qtyBTC,trade.closeOrders[0].price,trade.walletBalancePercent,trade.drawdownPercent,trade.winsPercent)
   })
 
-  tradesByNum.forEach(t => {
-    if (t) {
-      t.pnlPercent = t.totalPnlPercent / t.trades.length
-      t.winPercent = t.totalWins / t.trades.length
-      console.log('trade num', t.num, t.trades.length, t.winPercent.toFixed(2), t.pnlPercent.toFixed(2), t.totalPnlPercent.toFixed(2))
-    }
-  })
+  // tradesByNum.forEach(t => {
+  //   if (t) {
+  //     t.pnlPercent = t.totalPnlPercent / t.trades.length
+  //     t.winPercent = t.totalWins / t.trades.length
+  //     console.log('trade num', t.num, t.trades.length, t.winPercent.toFixed(2), t.pnlPercent.toFixed(2), t.totalPnlPercent.toFixed(2))
+  //   }
+  // })
   debugger
 
   console.timeEnd('getTradeJson')
