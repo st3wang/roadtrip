@@ -35,7 +35,7 @@ var position = {
   execComm: 0
 }
 
-var getAccumulationSignalFn
+var getSignalFn
 
 const logger = winston.createLogger({
   format: winston.format.label({label:'bitmex'}),
@@ -462,16 +462,16 @@ async function getRsisCache(market) {
   return rsis.slice(begin,begin+len)
 }
 
-async function setGetAccumulationSignalFn(fn) {
-  getAccumulationSignalFn = fn
+async function setGetSignalFn(fn) {
+  getSignalFn = fn
 }
 
-async function getAccumulationSignal(exchange,setup,symbol) {
+async function getSignal(exchange,setup,symbol) {
   const now = getTimeNow()
   var signal
   signal = await basedata.readSignal(exchange.name,exchange.symbols[symbol || setup.symbol],setup.candle.interval,now)
   if (!signal) {
-    signal = await getAccumulationSignalFn(exchange,setup,symbol)
+    signal = await getSignalFn(exchange,setup,symbol)
   }
   
   return signal
@@ -551,8 +551,8 @@ module.exports = {
   createInterval: createInterval,
   start: start,
 
-  setGetAccumulationSignalFn: setGetAccumulationSignalFn,
-  getAccumulationSignal: getAccumulationSignal,
+  setGetSignalFn: setGetSignalFn,
+  getSignal: getSignal,
   
   position: position
 }

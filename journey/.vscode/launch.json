@@ -2,7 +2,7 @@
   // Use IntelliSense to learn about possible attributes.
   // Hover to view descriptions of existing attributes.
   // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
-  "version": "0.2.0",
+  "version": "0.3.0",
   "configurations": [
     {
       "type": "node",
@@ -10,7 +10,8 @@
       "name": "Launch Program",
       "program": "${workspaceFolder}/index.js",
       "outputCapture": "std",
-      "args": ["acc","XBTUSD"]
+      "args": ["sma","XBTUSD"]
+      // "args": ["acc","XBTUSD"]
       // "args": ["abi","abi"]
     }
   ]

@@ -33,6 +33,7 @@ function roundPrice(exchange,p,roundFn) {
 }
 
 async function getRsi(closes,length) { try {
+  // closes = closes.map(c => {return Math.round(c*2)/2})
   var result = await talibExecute({
     name: "RSI",
     inReal: closes,
@@ -44,6 +45,17 @@ async function getRsi(closes,length) { try {
   return Array(length).fill(0).concat(result.result.outReal)
 } catch(e) {console.error(e.stack||e);debugger} }
 
+async function getSMA(closes,length) { try {
+  var result = await talibExecute({
+    name: "SMA",
+    inReal: closes,
+    startIdx: 0,
+    endIdx: closes.length - 1,
+    optInTimePeriod: length
+  })
+
+  return Array(length).fill(0).concat(result.result.outReal)
+} catch(e) {console.error(e.stack||e);debugger} }
 
 async function getWilly({highs,lows,closes},length) { try {
   var result = await talibExecute({
@@ -255,6 +267,7 @@ module.exports = {
   init: init,
   roundPrice: roundPrice,
   getRsi: getRsi,
+  getSMA: getSMA,
   getWilly: getWilly,
   isFundingWindow: isFundingWindow,
   resetEntrySignal: resetEntrySignal,

@@ -1,21 +1,21 @@
 const path = require('path')
 
 const base = require('./base_strategy.js')
-const shoes = require('../shoes')
+const shoes = require('../shoes.js')
 const setup = shoes.setup
 
-const basedata = require('../exchange/basedata')
-const bitmex = require('../exchange/bitmex')
-const coinbase = require('../exchange/coinbase')
-const bitstamp = require('../exchange/bitstamp')
-const binance = require('../exchange/binance')
-const bitfinex = require('../exchange/bitfinex')
+const basedata = require('../exchange/basedata.js')
+const bitmex = require('../exchange/bitmex.js')
+const coinbase = require('../exchange/coinbase.js')
+const bitstamp = require('../exchange/bitstamp.js')
+const binance = require('../exchange/binance.js')
+const bitfinex = require('../exchange/bitfinex.js')
 const exchanges = {bitmex: bitmex, coinbase: coinbase, bitstamp: bitstamp, binance: binance, bitfinex: bitfinex}
 var tradeExchanges
 
 const winston = require('winston')
-const storage = require('../storage')
-const candlestick = require('../candlestick')
+const storage = require('../storage.js')
+const candlestick = require('../candlestick.js')
 const email = require('../email/email.js')
 
 const oneCandleMS = setup.candle.interval*60000
@@ -167,7 +167,7 @@ const logger = winston.createLogger({
   ]
 })
 
-async function getAccumulationSignal(signalExchange,{rsi},side,symbol) { try {
+async function getSMASignal(signalExchange,{rsi,sma},symbol) { try {
   var now = getTimeNow()
   var signal = {
     timestamp: new Date(now).toISOString(),
@@ -187,28 +187,46 @@ async function getAccumulationSignal(signalExchange,{rsi},side,symbol) { try {
   var last = market.closes.length-1
   var open = market.opens[last]
   var close = market.closes[last]
-
-  // var bullRun = timeNow < 1516579200000 /*Date.parse('22 Jan 2018 00:00:00 GMT')*/ ||
-  //   (timeNow > 1554681600000 /*Date.parse('08 Apr 2019 00:00:00 GMT')*/ && timeNow < 1569801600000 /*Date.parse('30 Sep 2019 00:00:00 GMT')*/)
-  // if (!bullRun) return signal
   
+  var fastAverage = await base.getSMA(market.closes, sma.fast)
+  var slowAverage = await base.getSMA(market.closes, sma.slow)
+  var longAverage = await base.getSMA(market.closes, sma.long)
+
+  var fastAverage0 = fastAverage[fastAverage.length-1]
+  var fastAverage1 = fastAverage[fastAverage.length-2]
+  var fastAverage2 = fastAverage[fastAverage.length-3]
+  var slowAverage0 = slowAverage[slowAverage.length-1]
+  var slowAverage1 = slowAverage[slowAverage.length-2]
+  var slowAverage2 = slowAverage[slowAverage.length-3]
+  var longAverage0 = longAverage[longAverage.length-1]
+
+  var crossLong0 = fastAverage1 < slowAverage1 && fastAverage0 > slowAverage0
+  var crossLong1 = fastAverage2 < slowAverage2 && fastAverage1 > slowAverage1
+  var crossShort0 = fastAverage1 > slowAverage1 && fastAverage0 < slowAverage0
+  var crossShort1 = fastAverage2 > slowAverage2 && fastAverage1 < slowAverage1
+
+  // TODO: RSI value is very close but not correct
   var rsis = (market.rsis || await base.getRsi(market.closes,rsi.rsiLength))
+  const rsi0 = rsis[rsis.length-1]
+  var rsiModerate = rsi0 > 46 && rsi0 < 60
+  
+  var crossLongCheck = crossLong0 || crossLong1
+  var crossShortCheck = crossShort0 || crossShort1
+  
+  var averageLongCheck = slowAverage0 > longAverage0 //and slowAverage[0] > longAverage[0]
+  var averageShortCheck = slowAverage0 < longAverage0 //and slowAverage[1] < longAverage[1]
+  
+  var priceLongCheck = close < open //and close[1] > open[1] 
+  var priceShortCheck = close > open //and close[1] < open[1] 
+  
+  var longCondition = crossLongCheck && rsiModerate && averageLongCheck && priceLongCheck
+  var shortCondition = crossShortCheck && rsiModerate && averageShortCheck && priceShortCheck
 
-  var [avgBodies,bodyHighs,bodyLows] = candlestick.getBody(market)
-
-  if (side == 'LONG') {
-    var [isWRsi,wrb1,wrt1,wrb2] = candlestick.findW(rsis,last,rsis,rsis[last-1],rsis[last])
-    var [isWPrice,wbottom1,wtop1,wbottom2] = candlestick.findW(avgBodies,last,bodyHighs,open,close)
-    if (isWPrice == 3 && isWRsi == 3) {
-      signal.condition = 'LONG'
-    }
-  }
-  else if (side == 'SHORT') {
-    var [isMRsi,mrt1,mrb1,mrt2] = candlestick.findM(rsis,last,rsis,rsis[last-1],rsis[last])
-    var [isMPrice,mtop1,mbottom1,mtop2] = candlestick.findM(avgBodies,last,bodyLows,open,close)
-    if (isMPrice == 3 && isMRsi == 3) {
-      signal.condition = 'SHORT'
-    }
+  if (longCondition) {
+    signal.condition = 'LONG'
+  } 
+  if (shortCondition) {
+    signal.condition = 'SHORT'
   }
   
   await basedata.writeSignal(signalExchange.name,signalExchange.symbols[setup.symbol],setup.candle.interval,now,signal)
@@ -500,53 +518,10 @@ async function getOrder(tradeExchange,setup,position,signal) {
   return order
 }
 
-async function getSignal(tradeExchange,setup,position,side) {
-  const tradeExchangeSignal = await getAccumulationSignal(tradeExchange,setup,side)
+async function getSignal(tradeExchange,setup,position) {
+  const tradeExchangeSignal = await getSMASignal(tradeExchange,setup)
   if (tradeExchangeSignal.condition != '-') {
     return tradeExchangeSignal
-  }
-  
-  if (tradeExchange != bitmex) {
-    const bitmexSignal = await getAccumulationSignal(bitmex,setup,side)
-    if (bitmexSignal.condition != '-') {
-      return bitmexSignal
-    }
-  }
-
-  // if (tradeExchange != coinbase) {
-  //   const coinbaseSignal = await getAccumulationSignal(coinbase,setup,side)
-  //   if (coinbaseSignal.condition != '-') {
-  //     return coinbaseSignal
-  //   }
-  // }
-
-  // if (!mock) {
-  //   const coinbaseUSDCSignal = await getAccumulationSignal(coinbase,setup,side,'BTCUSDC')
-  //   if (coinbaseUSDCSignal.condition != '-') {
-  //     return coinbaseUSDCSignal
-  //   }
-  // }
-
-  // if (tradeExchange != bitstamp) {
-  //   const bitstampSignal = await getAccumulationSignal(bitstamp,setup,side)
-  //   if (bitstampSignal.condition != '-') {
-  //     return bitstampSignal
-  //   }
-  // }
-
-  // binance api does not work with US IP
-  if (tradeExchange != binance && !shoes.test) {
-    const binanceSignal = await getAccumulationSignal(binance,setup,side)
-    if (binanceSignal.condition != '-') {
-      return binanceSignal
-    }
-  }
-
-  if (tradeExchange != bitfinex) {
-    const bitfinexSignal = await getAccumulationSignal(bitfinex,setup,side)
-    if (bitfinexSignal.condition != '-') {
-      return bitfinexSignal
-    }
   }
 
   return tradeExchangeSignal
@@ -671,7 +646,7 @@ async function checkEntry(tradeExchange) { try {
       }
     }
   }
-  var signal = await getOrder(tradeExchange,setup,position,await getSignal(tradeExchange,setup,position,'LONG'))
+  var signal = await getOrder(tradeExchange,setup,position,await getSignal(tradeExchange,setup,position))
 
   if (!mock) logger.info('ENTER SIGNAL',signal)
 
@@ -809,8 +784,8 @@ async function init(tx) {
   tradeExchanges = tx
   base.init(tradeExchanges)
   if (mock) {
-    mock.setGetSignalFn(getAccumulationSignal)
-    getAccumulationSignal = mock.getSignal
+    mock.setGetSignalFn(getSMASignal)
+    getSMASignal = mock.getSignal
   }
 }
 
