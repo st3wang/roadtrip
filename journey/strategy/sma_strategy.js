@@ -229,7 +229,7 @@ async function getSMASignal(signalExchange,{rsi,sma},symbol) { try {
     signal.condition = 'SHORT'
   }
   
-  await basedata.writeSignal(signalExchange.name,signalExchange.symbols[setup.symbol],setup.candle.interval,now,signal)
+  // await basedata.writeSignal(signalExchange.name,signalExchange.symbols[setup.symbol],setup.candle.interval,now,signal)
 
   return signal
 } catch(e) {console.error(e.stack||e);debugger} }
