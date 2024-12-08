@@ -1,5 +1,4 @@
 const fs = require('fs')
-const fsR = require('fs-reverse')
 const { Writable } = require('stream');
 const readFileOptions = {encoding:'utf-8', flag:'r'}
 const writeFileOptions = {encoding:'utf-8', flag:'w'}
