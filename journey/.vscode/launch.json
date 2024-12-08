@@ -10,8 +10,8 @@
       "name": "Launch Program",
       "program": "${workspaceFolder}/index.js",
       "outputCapture": "std",
-      "args": ["sma","XBTUSD"]
-      // "args": ["acc","XBTUSD"]
+      // "args": ["sma","XBTUSD"]
+      "args": ["acc","XBTUSD"]
       // "args": ["abi","abi"]
     }
   ]

@@ -87,7 +87,12 @@ const logger = winston.createLogger({
             case 'orderBulkRetry error': 
             case 'orderQueue error':
             case 'order error': {
-              let {status,obj} = splat[0]
+              let {status,obj,errObj} = splat[0]
+              if (!obj) {
+                obj = {
+                  error: errObj
+                }
+              }
               line += status + ' ' + obj.error.message + ' ' + JSON.stringify(splat[1])
             } break
             default: {
@@ -422,11 +427,23 @@ async function getQuote() {
 
 async function authorize() { try {
   console.log('Authorizing')
+
+  const authorization = new BitMEXAPIKeyAuthorization(exchange.bitmex.key, exchange.bitmex.secret)
+
   let swaggerClient = await new SwaggerClient({
     url: shoes.swagger,
-    usePromise: true
+    requestInterceptor(req) {
+      // Despite swagger seeing that JSON is the expected type, it will still build formdata bodies
+      // Long saga, may be fixed in https://github.com/swagger-api/swagger-js/pull/1500
+      req.headers['Content-Type'] = "application/x-www-form-urlencoded";
+      // Unfortunately, swagger-client removed custom authorizations in version 3.
+      // We implement our authorization as an interceptor instead.
+      if (typeof authorization !== 'undefined') {
+        authorization.apply(req);
+      }
+    }
   })
-  swaggerClient.clientAuthorizations.add("apiKey", new BitMEXAPIKeyAuthorization(exchange.bitmex.key, exchange.bitmex.secret));
+
   console.log('Authorized')
   return swaggerClient
 } catch(e) {logger.error(e.stack||e);debugger} }
@@ -498,7 +515,7 @@ async function getUserExecutionHistory(start,end) { try {
   const executions = []
   while (requestTime < endTime) {
     let timestamp = new Date(requestTime).toISOString()
-    let response = await client.User.User_getExecutionHistory({
+    let response = await client.apis.User.User_getExecutionHistory({
       symbol: 'XBTUSD',
       timestamp: timestamp
     })
@@ -517,7 +534,7 @@ async function getCurrentTradeBucketed(interval) { try {
   let now = getTimeNow()
   let candleTimeOffset = now % (interval*60000)
   let startTime = new Date(now - candleTimeOffset + 60000).toISOString()
-  let response = await client.Trade.Trade_getBucketed({symbol:symbol, binSize:binSizeString, 
+  let response = await client.apis.Trade.Trade_getBucketed({symbol:symbol, binSize:binSizeString, 
     startTime:startTime
   })
   var buckets = JSON.parse(response.data.toString());
@@ -542,7 +559,7 @@ async function getTradeBucketed(sp) { try {
   }
   let pages = getPageTimes(sp)
   getTradeBucketedRequesting = Promise.all(pages.map(async (page,i) => {
-    let response = await client.Trade.Trade_getBucketed({symbol: symbol, binSize: '1h', 
+    let response = await client.apis.Trade.Trade_getBucketed({symbol: symbol, binSize: '1h', 
       startTime:page.startTime,endTime:page.endTime})
     page.buckets = JSON.parse(response.data.toString())
   }))
@@ -610,7 +627,7 @@ async function getCurrentMarket() { try {
 } catch(e) {logger.error(e.stack||e);debugger} }
 
 async function getWalletHistory() { try {
-  let response = await client.User.User_getWalletHistory({
+  let response = await client.apis.User.User_getWalletHistory({
     currency: 'XBt'
   })
   return response.obj
@@ -618,7 +635,7 @@ async function getWalletHistory() { try {
 
 // async function getTradeHistory(startTime) { try {
 //   startTime = startTime || (getTimeNow() - (candleLengthMS))
-//   let response = await client.Execution.Execution_getTradeHistory({symbol: symbol,
+//   let response = await client.apis.Execution.Execution_getTradeHistory({symbol: symbol,
 //     startTime: new Date(startTime).toISOString(),
 //     columns:'commission,execComm,execCost,execType,foreignNotional,homeNotional,orderQty,lastQty,cumQty,price,ordType,ordStatus'
 //   })
@@ -631,7 +648,7 @@ async function getWalletHistory() { try {
 
 async function getFundingHistory(startTime) { try {
   startTime = startTime || (getTimeNow() - oneDayMS)
-  let response = await client.Funding.Funding_get({symbol: symbol,
+  let response = await client.apis.Funding.Funding_get({symbol: symbol,
     startTime: new Date(startTime).toISOString()
   })
   let data = JSON.parse(response.data)
@@ -644,7 +661,7 @@ async function getFundingHistory(startTime) { try {
 
 async function getNewOrders(startTime) { try {
   startTime = startTime || (getTimeNow() - oneDayMS)
-  let response = await client.Order.Order_getOrders({symbol: symbol,
+  let response = await client.apis.Order.Order_getOrders({symbol: symbol,
     startTime: new Date(startTime).toISOString(),
     filter: '{"ordStatus":"New"}',
     columns: 'price,orderQty,ordStatus,side,stopPx,ordType'
@@ -656,7 +673,7 @@ async function getNewOrders(startTime) { try {
 async function getOrders({startTime,endTime}) { try {
   startTime = startTime || new Date(getTimeNow() - oneDayMS).toISOString()
   endTime = endTime || new Date(getTimeNow()).toISOString()
-  let response = await client.Order.Order_getOrders({symbol: symbol,
+  let response = await client.apis.Order.Order_getOrders({symbol: symbol,
     startTime: startTime,
     endTime: endTime,
     // filter: '{"ordType":"Limit"}',
@@ -674,7 +691,7 @@ async function getCurrentCandle() {
 }
 
 async function cancelAll() { try {
-  var response = await client.Order.Order_cancelAll({symbol:symbol})
+  var response = await client.apis.Order.Order_cancelAll({symbol:symbol})
   if (response && response.status == 200) {
     response.data = undefined
     response.statusText = undefined
@@ -687,7 +704,7 @@ async function cancelOrders(orders) { try {
   var orderID = orders.map(o => {
     return o.orderID
   })
-  var response = await client.Order.Order_cancel({symbol:symbol,
+  var response = await client.apis.Order.Order_cancel({symbol:symbol,
     orderID: orderID
   })
   if (response && response.status == 200) {
@@ -700,7 +717,7 @@ async function cancelOrders(orders) { try {
 
 async function updateLeverage(leverage) { try {
   console.log('Updating Leverage',leverage)
-  var response = await client.Position.Position_updateLeverage({symbol:symbol,leverage:leverage})
+  var response = await client.apis.Position.Position_updateLeverage({symbol:symbol,leverage:leverage})
   console.log('Updated Leverage')
 } catch(e) {logger.error(e.stack||(e.url+'\n'+e.statusText));debugger} }
 
@@ -956,7 +973,7 @@ async function orderNewBulk(orders) { try {
   if (orders.length > 1) {
     debugger
   }
-  var response = await client.Order.Order_new(orders[0])
+  var response = await client.apis.Order.Order_new(orders[0])
   .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
@@ -984,7 +1001,7 @@ async function orderNewBulk(orders) { try {
 
 async function orderAmendBulk(orders) { try {
   // TODO change it to Order_amend
-  let response = await client.Order.Order_amend(orders[0]) //Bulk({orders:JSON.stringify(orders)})
+  let response = await client.apis.Order.Order_amend(orders[0]) //Bulk({orders:JSON.stringify(orders)})
   .catch(function(e) {
     e.data = undefined
     e.statusText = undefined
