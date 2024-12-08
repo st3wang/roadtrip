@@ -278,38 +278,51 @@ async function getOrder(tradeExchange,setup,position,signal) {
   signal.coinPairRate = quote.lastPrice/XBTUSDRate
   signal.marginBalance = position.marginBalance / signal.coinPairRate
 
-  if (!signal.lossDistance || !signal.marginBalance) {
-    debugger
+  if (!signal.lossDistance) {
+    signal.reason = 'lossDistance is ' + signal.lossDistance
+    return signal
+  }
+
+  if (!signal.marginBalance) {
+    signal.reason = 'marginBalance is ' + signal.marginBalance
     return signal
   }
 
   if (position.positionSize != 0) {
-    console.log('already in position')
+    signal.reason = 'already in position ' + position.positionSize
     return signal
   }
+
+  var lossDistancePercent = signal.lossDistance/signal.entryPrice
+  
+  // if (Math.abs(lossDistancePercent) < 0.003) {
+  //   signal.reason = 'lossDistancePercent < 0.003' + lossDistancePercent
+  //   console.log(lossDistancePercent)
+  //   return signal
+  // }
 
   switch(signal.condition) {
     case 'LONG':
       if (signal.entryPrice <= signal.stopLoss) {
         signal.reason = 'entryPrice <= stopLoss ' + JSON.stringify(quote)
-        debugger
+        // debugger
         return signal
       }
       else if (currentCandle && currentCandle.low <= signal.stopLoss) {
         signal.reason = 'currentCandle.low <= stopLoss ' + JSON.stringify(currentCandle)
-        debugger
+        // debugger
         return signal
       }
       break
     case 'SHORT':
       if (signal.entryPrice >= signal.stopLoss) {
         signal.reason = 'entryPrice >= stopLoss ' + JSON.stringify(quote)
-        debugger
+        // debugger
         return signal
       }
       else if (currentCandle && currentCandle.high >= signal.stopLoss) {
         signal.reason = 'currentCandle.high >= stopLoss ' + JSON.stringify(currentCandle)
-        debugger
+        // debugger
         return signal
       }
       break
@@ -318,7 +331,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   var {marginBalance,entryPrice,lossDistance,coinPairRate} = signal
   var leverageMargin = marginBalance*0.000000008
   var profitDistance, stopMarketDistance, 
-    stopLossTrigger, takeProfitTrigger,lossDistancePercent,
+    stopLossTrigger, takeProfitTrigger,
     riskAmountUSD, riskAmountBTC, orderQtyUSD, qtyBTC, leverage
 
   minOrderSizeBTC /= coinPairRate
@@ -331,8 +344,7 @@ async function getOrder(tradeExchange,setup,position,signal) {
   stopLossTrigger = entryPrice + (lossDistance/2)
   takeProfitTrigger = entryPrice + (profitDistance/8)
   stopMarketTrigger = entryPrice + (stopMarketDistance/4)
-  lossDistancePercent = lossDistance/entryPrice
-console.log(signal)
+
   const {stopBalance, stopRiskPercent, stopDistanceRiskRatio} = getStopRisk(position,stopMarket) 
   // console.log(stopRiskPercent)
   // if (stopDistanceRiskRatio > riskPerTradePercent*6000) {
@@ -358,6 +370,12 @@ console.log(signal)
   riskAmountUSD = riskAmountBTC * entryPrice
 
   leverage = Math.max(Math.ceil(Math.abs(qtyBTC / leverageMargin)*100)/100,1)
+  if (leverage > 3) {
+    signal.reason = 'leverage > 3 ' + leverage
+    console.log(leverage, lossDistancePercent)
+    // debugger
+    return signal
+  }
 
   var scaleInSize = Math.round(orderQtyUSD / scaleInLength)
   var scaleInStep = 0

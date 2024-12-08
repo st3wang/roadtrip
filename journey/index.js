@@ -203,6 +203,8 @@ async function getTradeJson(sp) { try {
   let totalWinGroups = 0, totalWinGroupLen = 0
   let totalLoseGroups = 0, totalLoseGroupLen = 0
   let contribution = 0
+  let winLeverage = []
+  let loseLeverage = []
 
   signals.forEach((signal,i) => {
     let {timestamp} = signal.signal
@@ -221,7 +223,7 @@ async function getTradeJson(sp) { try {
     let trade = {
       signal: s,
       entryOrders: bitmex.findOrders(/.+/,s.entryOrders,ords[i]),
-      closeOrders: [ords[i][ords[i].length-1]], //ords[i].filter(o => {return o.ordType == 'Stop'}),
+      closeOrders: bitmex.findOrders(/.+/,s.closeOrders,ords[i]), // [ords[i][ords[i].length-1]], //ords[i].filter(o => {return o.ordType == 'Stop'}),
       takeProfitOrders: bitmex.findOrders(/.+/,s.takeProfitOrders,ords[i]),
       fee: 0, cost: 0, costPercent: '%', feePercent: '%', pnl:0, pnlPercent:'%',
       group: 0, grouppnl: 0,
@@ -244,20 +246,27 @@ async function getTradeJson(sp) { try {
     trades.push(trade)
     if (!trade.entryOrders[0]) debugger
 
-    let closeOrder = trade.closeOrders[0]
-    if (!closeOrder) {
+    let closeOrder 
+    if (trade.closeOrders[0] && trade.closeOrders[0].cumQty) {
+      closeOrder = trade.closeOrders[0]
+    }
+    else if (trade.takeProfitOrders[0] && trade.takeProfitOrders[0].cumQty) {
+      closeOrder = trade.takeProfitOrders[0]
+    }
+    else {
       // debugger
       return
     }
-    switch (closeOrder.ordStatus) {
-      case 'New':
-      case 'Canceled': {
-        if (trade.takeProfitOrders[0] && trade.takeProfitOrders[0].ordStatus != 'Canceled') {
-          closeOrder = trade.takeProfitOrders[0]
-        }
-      }
-      break;
-    }
+
+    // switch (closeOrder.ordStatus) {
+    //   case 'New':
+    //   case 'Canceled': {
+    //     if (trade.takeProfitOrders[0] && trade.takeProfitOrders[0].ordStatus != 'Canceled') {
+    //       closeOrder = trade.takeProfitOrders[0]
+    //     }
+    //   }
+    //   break;
+    // }
     // if (closeOrder.ordStatus !== 'Filled') {
     //   debugger
     //   return
@@ -377,6 +386,10 @@ async function getTradeJson(sp) { try {
       tradesByNum[t.tradeNumber].totalPnlPercent += parseFloat(t.pnlPercent)
       if (t.wl > 0) {
         tradesByNum[t.tradeNumber].totalWins++
+        winLeverage.push(s.signal.leverage)
+      }
+      else if (t.wl < 0) {
+        loseLeverage.push(s.signal.leverage)
       }
     }
     trade.grouppnl = walletBalance - startWalletBalance
@@ -394,7 +407,7 @@ async function getTradeJson(sp) { try {
       }
       // console.log(groupLen,trade.walletBalanceUSD,trade.drawdownPercent,trade.grouppnl,trade.winsPercent)
     }
-    console.log(trade.entryOrders[0].timestamp,trade.entryOrders[0].price,trade.signal.signal.qtyBTC,trade.closeOrders[0].price,trade.walletBalancePercent,trade.drawdownPercent,trade.winsPercent)
+    console.log(trade.entryOrders[0].timestamp,trade.entryOrders[0].price,trade.signal.signal.qtyBTC.toFixed(2),trade.closeOrders[0].price,trade.walletBalancePercent,trade.drawdownPercent,trade.winsPercent)
   })
 
   // tradesByNum.forEach(t => {

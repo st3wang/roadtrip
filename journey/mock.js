@@ -15,8 +15,8 @@ const storage = require('./storage')
 const winston = require('winston')
 const {isoTimestamp, colorizer} = global
 
-const makerFee = 0.00125 // -0.00025
-const takerFee = 0.00125 //0.00075
+const makerFee = -0.0001
+const takerFee = 0.00075
 const oneDayMs = 24*60*60000
 var oneCandleMs
 
